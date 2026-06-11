@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.env
+.env.local
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Logs e transcrições de voz
+*.log
+*.tmp
+*.jsonl
+_logs/*.tmp
+_apps/*/logs/
+_apps/**/logs/
+_ferramentas/**/logs/
+
+# Estado local / dados sensíveis
+data/
+open-webui-data/
+.playwright-mcp/
+
+# Caches e modelos (grandes, gerados localmente)
+.cache/
+cache/
+models/
+*.onnx
+*.gguf
+*.safetensors
+
+# Ferramentas/clones grandes de terceiros (têm próprio .git — não submodules)
+_ferramentas/voz-sandbox/
+_referencias/ECC/
+_referencias/silero-vad/
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Ferramentas locais geradas
+.codegraph/
+.headroom/
+.leanctx/

@@ -1,0 +1,14 @@
+{
+  "cssEnabledSnippets": [],
+  "userIgnoreFilters": [
+    "_ferramentas/voz-sandbox",
+    "_referencias"
+  ],
+  "alwaysUpdateLinks": true,
+  "newFileLocation": "current",
+  "attachmentFolderPath": "_assets",
+  "showUnsupportedFiles": false,
+  "spellcheck": false,
+  "defaultViewMode": "preview",
+  "vimMode": false
+}

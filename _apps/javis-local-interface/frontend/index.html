@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Javis Local Interface</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Javis <span class="tag">v0</span></h1>
+      <p class="subtitle">Interface local — ações no computador</p>
+    </header>
+
+    <div class="log" id="log">
+      <div class="entry system">Pronto. Digite um comando abaixo.</div>
+    </div>
+
+    <form class="input-row" id="form">
+      <input
+        type="text"
+        id="input"
+        placeholder="Ex: abre o youtube, status, anota minha ideia..."
+        autocomplete="off"
+        autofocus
+      />
+      <button type="submit">Enviar</button>
+    </form>
+
+    <div class="quickactions">
+      <button class="quick" data-cmd="status">Status</button>
+      <button class="quick" data-cmd="abre o youtube">YouTube</button>
+      <button class="quick" data-cmd="abre o open webui">Open WebUI</button>
+      <button class="quick" data-cmd="abre a pasta do javis">Pasta Javis</button>
+      <button class="quick" data-cmd="toca uma música">Música</button>
+    </div>
+
+    <footer>
+      <small>Backend CLI: <code>python backend/main.py</code></small>
+    </footer>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

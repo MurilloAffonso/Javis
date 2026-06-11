@@ -1,0 +1,128 @@
+# commands.yaml — documentação dos intents do Command Router
+# Este arquivo é somente leitura para humanos.
+# A lógica vive em backend/command_router.py
+
+intents:
+
+  conversa:
+    description: Texto que parece ser uma pergunta ou conversa natural
+    risk_level: none
+    requires_approval: false
+    action: llm_chat
+    examples:
+      - "como vai você"
+      - "me explica o que é Docker"
+      - "o que devo fazer hoje"
+
+  abrir_navegador:
+    description: Abre o navegador padrão do sistema
+    risk_level: low
+    requires_approval: false
+    action: open_browser
+    examples:
+      - "abre o navegador"
+      - "abre o chrome"
+
+  abrir_youtube:
+    description: Abre o YouTube no navegador
+    risk_level: low
+    requires_approval: false
+    action: open_url
+    examples:
+      - "abre o youtube"
+      - "youtube"
+
+  tocar_musica:
+    description: Abre playlist de música no YouTube
+    risk_level: low
+    requires_approval: false
+    action: open_url
+    examples:
+      - "toca uma música"
+      - "coloca lofi"
+      - "playlist para trabalhar"
+
+  abrir_openwebui:
+    description: Abre o Open WebUI em localhost:3000
+    risk_level: low
+    requires_approval: false
+    action: open_url
+    examples:
+      - "abre o open webui"
+      - "abre o javis no navegador"
+      - "localhost:3000"
+
+  abrir_javis:
+    description: Abre a pasta raiz do projeto Javis no Explorer
+    risk_level: low
+    requires_approval: false
+    action: open_folder
+    examples:
+      - "abre a pasta do javis"
+      - "pasta javis"
+
+  abrir_vscode:
+    description: Abre o VS Code na pasta do Javis
+    risk_level: low
+    requires_approval: false
+    action: open_vscode
+    examples:
+      - "abre o vscode"
+      - "editor de código"
+
+  abrir_terminal:
+    description: Abre um terminal na pasta do Javis
+    risk_level: medium
+    requires_approval: true
+    action: open_terminal
+    examples:
+      - "abre o terminal"
+      - "abre o powershell"
+
+  abrir_projeto:
+    description: Abre a pasta do Javis (mesmo que abrir_javis por hora)
+    risk_level: low
+    requires_approval: false
+    action: open_folder
+    examples:
+      - "abre o projeto javis"
+
+  registrar_ideia:
+    description: Salva texto em _ideias/ como arquivo Markdown
+    risk_level: low
+    requires_approval: false
+    action: write_file
+    examples:
+      - "anota: quero criar um dashboard de projetos"
+      - "tive uma ideia para o Javis"
+
+  status_sistema:
+    description: Verifica se Open WebUI, Ollama e sandbox de voz estão ativos
+    risk_level: low
+    requires_approval: false
+    action: check_status
+    examples:
+      - "status"
+      - "tá tudo funcionando?"
+      - "como estão os serviços"
+
+  acao_perigosa:
+    description: Qualquer palavra-chave destrutiva — bloqueado imediatamente
+    risk_level: critical
+    requires_approval: true
+    action: blocked
+    examples:
+      - "apaga os arquivos"
+      - "instala o python"
+      - "formata o disco"
+      - "git push --force"
+      - "rm -rf"
+
+  desconhecido:
+    description: Texto curto sem padrão reconhecido
+    risk_level: none
+    requires_approval: false
+    action: llm_chat
+    examples:
+      - "ok"
+      - "blz"
