@@ -11,4 +11,4 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./open-webui-data:/app/backend/data
+      - C:/Users/noteacer/open-webui-data:/app/backend/data

@@ -3,43 +3,250 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Javis Local Interface</title>
+  <title>JAVIS</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="container">
-    <header>
-      <h1>Javis <span class="tag">v0</span></h1>
-      <p class="subtitle">Interface local — ações no computador</p>
-    </header>
 
-    <div class="log" id="log">
-      <div class="entry system">Pronto. Digite um comando abaixo.</div>
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="logo-bolt">⚡</span>
+      <span class="logo-name">JAVIS</span>
+      <span class="logo-ver">v2</span>
     </div>
-
-    <form class="input-row" id="form">
-      <input
-        type="text"
-        id="input"
-        placeholder="Ex: abre o youtube, status, anota minha ideia..."
-        autocomplete="off"
-        autofocus
-      />
-      <button type="submit">Enviar</button>
-    </form>
-
-    <div class="quickactions">
-      <button class="quick" data-cmd="status">Status</button>
-      <button class="quick" data-cmd="abre o youtube">YouTube</button>
-      <button class="quick" data-cmd="abre o open webui">Open WebUI</button>
-      <button class="quick" data-cmd="abre a pasta do javis">Pasta Javis</button>
-      <button class="quick" data-cmd="toca uma música">Música</button>
+    <div class="brains-row">
+      <div class="brain active" id="brain-main">
+        <span class="brain-icon">🧠</span>
+        <span class="brain-lbl">MAIN</span>
+      </div>
+      <div class="brain" id="brain-conclave">
+        <span class="brain-icon">⚔️</span>
+        <span class="brain-lbl">CONCLAVE</span>
+      </div>
+      <div class="brain" id="brain-memory">
+        <span class="brain-icon">💾</span>
+        <span class="brain-lbl">MEMORY</span>
+      </div>
     </div>
+    <div class="topbar-status">
+      <div class="svc" id="svc-ollama">
+        <div class="svc-dot"></div>
+        <span>OLLAMA</span>
+      </div>
+      <div class="svc offline" id="svc-webui">
+        <div class="svc-dot"></div>
+        <span>WEBUI</span>
+      </div>
+    </div>
+  </header>
 
-    <footer>
-      <small>Backend CLI: <code>python backend/main.py</code></small>
-    </footer>
+  <!-- LAYOUT -->
+  <div class="layout">
+
+    <!-- CHAT -->
+    <main class="chat-wrap">
+      <div class="chat-log" id="chat-log">
+        <div class="welcome-block">
+          <div class="wb-bolt">⚡</div>
+          <div class="wb-title">JAVIS online.</div>
+          <div class="wb-sub">3 cérebros · 17 agentes · Vida própria.</div>
+        </div>
+      </div>
+
+      <!-- CONCLAVE PANEL -->
+      <div class="conclave-wrap hidden" id="conclave-wrap">
+        <button class="conclave-hdr" id="conclave-toggle">
+          <span>⚔️ CONCLAVE — debate interno</span>
+          <span id="conclave-chevron">▼</span>
+        </button>
+        <div class="conclave-agents" id="conclave-body">
+          <div class="ca">
+            <div class="ca-hdr red"><span>🔴</span> CRÍTICO</div>
+            <div class="ca-txt" id="ct-critico">aguardando debate...</div>
+          </div>
+          <div class="ca">
+            <div class="ca-hdr orange"><span>⚔️</span> ADVOGADO</div>
+            <div class="ca-txt" id="ct-advogado">aguardando debate...</div>
+          </div>
+          <div class="ca">
+            <div class="ca-hdr green"><span>✅</span> SINTETIZADOR</div>
+            <div class="ca-txt" id="ct-sintetizador">aguardando debate...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SQUAD PANEL -->
+      <div class="squad-wrap hidden" id="squad-wrap">
+        <button class="conclave-hdr" id="squad-toggle">
+          <span>🤝 SQUAD — colaboração autônoma</span>
+          <span id="squad-chevron">▼</span>
+        </button>
+        <div class="squad-rounds" id="squad-rounds"></div>
+      </div>
+
+      <!-- INPUT AREA -->
+      <form class="input-area" id="form">
+        <div class="input-row">
+          <select class="model-sel" id="model-sel">
+            <option value="llama3.2:3b">llama3.2:3b</option>
+            <option value="phi3:mini">phi3:mini</option>
+            <option value="llama3.1">llama3.1</option>
+            <option value="gemma3">gemma3</option>
+            <option value="mistral">mistral</option>
+          </select>
+          <input
+            id="input"
+            type="text"
+            placeholder="Fala com o Javis..."
+            autocomplete="off"
+            autofocus
+          />
+          <label class="conclave-chk" title="Ativar Conclave">
+            <input type="checkbox" id="use-conclave" />
+            <span>⚔️</span>
+          </label>
+          <button type="submit" class="send-btn">▶</button>
+        </div>
+        <div class="quick-row">
+          <button type="button" class="qbtn" data-cmd="status do sistema">⚡ status</button>
+          <button type="button" class="qbtn" data-cmd="abre o youtube">▶ youtube</button>
+          <button type="button" class="qbtn" data-cmd="abre o open webui">🤖 webui</button>
+          <button type="button" class="qbtn" data-cmd="abre o vscode">💻 vscode</button>
+          <button type="button" class="qbtn" data-cmd="abre o terminal">$ terminal</button>
+          <button type="button" class="qbtn qbtn-debate" id="btn-debate">🤝 debate</button>
+        </div>
+      </form>
+    </main>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <!-- META-AGENTES -->
+      <div class="sb-section">
+        <div class="sb-title">META · COORDENAÇÃO</div>
+        <div class="agents-grid">
+          <div class="ag-card meta-card" data-id="aios_master">
+            <div class="ag-icon">🧬</div>
+            <div class="ag-name">AIOS Master</div>
+            <div class="ag-role">Coordena a squad</div>
+          </div>
+          <div class="ag-card meta-card" data-id="squad_creator">
+            <div class="ag-icon">⚡</div>
+            <div class="ag-name">Squad Creator</div>
+            <div class="ag-role">Cria squads novas</div>
+          </div>
+          <div class="ag-card meta-card" data-id="jarvis_soul">
+            <div class="ag-icon">✨</div>
+            <div class="ag-name">Jarvis Soul</div>
+            <div class="ag-role">Identidade e tom</div>
+          </div>
+          <div class="ag-card red-card" data-id="rootcause">
+            <div class="ag-icon">🔬</div>
+            <div class="ag-name">Rootcause</div>
+            <div class="ag-role">Diagnóstico de bugs</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ESPECIALISTAS -->
+      <div class="sb-section">
+        <div class="sb-title">ESPECIALISTAS</div>
+        <div class="agents-grid" id="agents-grid">
+          <div class="ag-card" data-id="architect">
+            <div class="ag-icon">🏗️</div>
+            <div class="ag-name">Architect</div>
+            <div class="ag-role">Design de sistemas</div>
+          </div>
+          <div class="ag-card" data-id="developer">
+            <div class="ag-icon">💻</div>
+            <div class="ag-name">Developer</div>
+            <div class="ag-role">Código e implementação</div>
+          </div>
+          <div class="ag-card" data-id="ux_designer">
+            <div class="ag-icon">🎨</div>
+            <div class="ag-name">UX Designer</div>
+            <div class="ag-role">Interfaces e UX</div>
+          </div>
+          <div class="ag-card" data-id="qa">
+            <div class="ag-icon">🔍</div>
+            <div class="ag-name">QA Tester</div>
+            <div class="ag-role">Testes e qualidade</div>
+          </div>
+          <div class="ag-card" data-id="pm">
+            <div class="ag-icon">📋</div>
+            <div class="ag-name">Project Manager</div>
+            <div class="ag-role">Planejamento e prazos</div>
+          </div>
+          <div class="ag-card" data-id="po">
+            <div class="ag-icon">🎯</div>
+            <div class="ag-name">Product Owner</div>
+            <div class="ag-role">Priorização e produto</div>
+          </div>
+          <div class="ag-card" data-id="scrum">
+            <div class="ag-icon">⚙️</div>
+            <div class="ag-name">Scrum Master</div>
+            <div class="ag-role">Gestão de tarefas</div>
+          </div>
+          <div class="ag-card" data-id="analyst">
+            <div class="ag-icon">📊</div>
+            <div class="ag-name">Analyst</div>
+            <div class="ag-role">Pesquisa e estratégia</div>
+          </div>
+          <div class="ag-card" data-id="devops">
+            <div class="ag-icon">🚀</div>
+            <div class="ag-name">DevOps</div>
+            <div class="ag-role">Deploy e infra</div>
+          </div>
+          <div class="ag-card" data-id="data_engineer">
+            <div class="ag-icon">🗄️</div>
+            <div class="ag-name">Data Engineer</div>
+            <div class="ag-role">Dados e pipelines</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CONCLAVE -->
+      <div class="sb-section">
+        <div class="sb-title">CONCLAVE · DEBATE</div>
+        <div class="agents-grid">
+          <div class="ag-card red-card" data-id="critico">
+            <div class="ag-icon">🔴</div>
+            <div class="ag-name">Crítico</div>
+            <div class="ag-role">Audita falhas</div>
+          </div>
+          <div class="ag-card orange-card" data-id="advogado">
+            <div class="ag-icon">⚔️</div>
+            <div class="ag-name">Advogado</div>
+            <div class="ag-role">Ataca o plano</div>
+          </div>
+          <div class="ag-card green-card" data-id="sintetizador">
+            <div class="ag-icon">✅</div>
+            <div class="ag-name">Sintetizador</div>
+            <div class="ag-role">Integra solução</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sb-section">
+        <div class="sb-title">ÚLTIMO PLANO</div>
+        <div class="plan-box" id="plan-box">—</div>
+      </div>
+
+      <div class="sb-section">
+        <div class="sb-title">ENTREGÁVEIS</div>
+        <div class="deliverables">
+          <div class="dlv">📊 Dashboard</div>
+          <div class="dlv">📄 Proposta</div>
+          <div class="dlv">📈 Relatório</div>
+          <div class="dlv">🌐 Landing Page</div>
+          <div class="dlv">⚙️ Script</div>
+          <div class="dlv">📋 Planilha</div>
+        </div>
+      </div>
+    </aside>
+
   </div>
+
   <script src="app.js"></script>
 </body>
 </html>

@@ -1,104 +1,371 @@
-// Javis Local Interface — frontend v0
-// Simula o Command Router em JS para feedback imediato (sem servidor).
-// Para executar ações reais, use o CLI: python backend/main.py
+// Javis v2 — frontend app
+// Connects to FastAPI server at localhost:8000
 
-const RULES = [
-  ["acao_perigosa",  ["apaga","apagar","deleta","deletar","formata","rm -rf","del /f","git push","instala","instalar","remove","remover"]],
-  ["abrir_youtube",  ["youtube"]],
-  ["tocar_musica",   ["toca ","música","musica","playlist","play ","lofi","som relaxante"]],
-  ["abrir_openwebui",["open webui","openwebui","webui","localhost:3000"]],
-  ["abrir_vscode",   ["vscode","vs code","visual studio","editor de código","editor de codigo"]],
-  ["abrir_terminal", ["terminal","powershell","cmd","prompt de comando"]],
-  ["abrir_navegador",["navegador","chrome","firefox","edge","browser"]],
-  ["abrir_javis",    ["pasta do javis","pasta javis","abre o javis","abrir javis"]],
-  ["registrar_ideia",["anota","anotar","captura ideia","registra ideia","ideia:","tive uma ideia"]],
-  ["status_sistema", ["status","tá funcionando","ta funcionando","check sistema","como estão os serviços"]],
-];
+const API = "http://localhost:8000";
 
-const RISK = {
-  acao_perigosa:"critical", abrir_terminal:"medium",
-  abrir_navegador:"low", abrir_youtube:"low", tocar_musica:"low",
-  abrir_openwebui:"low", abrir_vscode:"low", abrir_javis:"low",
-  registrar_ideia:"low", status_sistema:"low",
-  conversa:"none", desconhecido:"none",
+// ─── DOM refs ────────────────────────────────────────────
+const chatLog      = document.getElementById("chat-log");
+const form         = document.getElementById("form");
+const inputEl      = document.getElementById("input");
+const modelSel     = document.getElementById("model-sel");
+const useConclave  = document.getElementById("use-conclave");
+const sendBtn      = document.querySelector(".send-btn");
+const planBox      = document.getElementById("plan-box");
+const conclaveWrap = document.getElementById("conclave-wrap");
+const squadWrap    = document.getElementById("squad-wrap");
+const squadRounds  = document.getElementById("squad-rounds");
+const svcOllama    = document.getElementById("svc-ollama");
+const svcWebui     = document.getElementById("svc-webui");
+
+// Brain buttons
+const brains = {
+  main:     document.getElementById("brain-main"),
+  conclave: document.getElementById("brain-conclave"),
+  memory:   document.getElementById("brain-memory"),
 };
 
-const ICON = { critical:"🔴", medium:"🟡", low:"🟢", none:"⚪" };
-
-const MESSAGES = {
-  acao_perigosa:  () => ({ cls:"blocked", text:"⛔ Ação bloqueada — risk_level: critical. Comando destrutivo detectado." }),
-  abrir_youtube:  () => ({ cls:"ok",  text:"✅ Abrindo YouTube...", url:"https://www.youtube.com" }),
-  tocar_musica:   () => ({ cls:"ok",  text:"✅ Buscando música no YouTube...", url:"https://www.youtube.com/results?search_query=lofi+beats+para+trabalhar" }),
-  abrir_openwebui:() => ({ cls:"ok",  text:"✅ Abrindo Open WebUI...", url:"http://localhost:3000" }),
-  abrir_navegador:() => ({ cls:"ok",  text:"✅ Abrindo navegador...", url:"https://www.google.com" }),
-  abrir_vscode:   () => ({ cls:"warn",text:"🟡 Para abrir o VS Code, use o CLI: python backend/main.py" }),
-  abrir_terminal: () => ({ cls:"warn",text:"🟡 Abrir terminal requer aprovação. Use o CLI: python backend/main.py" }),
-  abrir_javis:    () => ({ cls:"warn",text:"🟡 Para abrir a pasta, use o CLI: python backend/main.py" }),
-  registrar_ideia:() => ({ cls:"warn",text:"🟡 Registro de ideias requer o CLI: python backend/main.py" }),
-  status_sistema: () => ({ cls:"system",text:"ℹ️ Verificando serviços...\n   Open WebUI (3000) — verifique em http://localhost:3000\n   Ollama (11434) — verifique com: ollama list\n   Voz (12393) — verifique em http://localhost:12393" }),
-  conversa:       () => ({ cls:"llm",text:"💬 Encaminhando ao Open WebUI → http://localhost:3000", url:"http://localhost:3000" }),
-  desconhecido:   () => ({ cls:"llm",text:"💬 Sem ação reconhecida → http://localhost:3000", url:"http://localhost:3000" }),
+// Conclave text areas
+const ct = {
+  critico:      document.getElementById("ct-critico"),
+  advogado:     document.getElementById("ct-advogado"),
+  sintetizador: document.getElementById("ct-sintetizador"),
 };
 
-function classify(text) {
-  const t = text.toLowerCase();
-  for (const [intent, kws] of RULES) {
-    for (const kw of kws) { if (t.includes(kw)) return intent; }
+// Agent cards
+const agentCards = {};
+document.querySelectorAll(".ag-card[data-id]").forEach(card => {
+  agentCards[card.dataset.id] = card;
+});
+
+// ─── Init ────────────────────────────────────────────────
+checkStatus();
+setInterval(checkStatus, 30000);
+
+document.getElementById("conclave-toggle").addEventListener("click", () => {
+  conclaveWrap.classList.toggle("open");
+});
+document.getElementById("squad-toggle")?.addEventListener("click", () => {
+  squadWrap.classList.toggle("open");
+});
+
+// Debate autônomo
+document.getElementById("btn-debate")?.addEventListener("click", () => {
+  const task = inputEl.value.trim();
+  if (!task) {
+    inputEl.focus();
+    inputEl.placeholder = "Digite a tarefa para o debate autônomo...";
+    return;
   }
-  const hints = ["como","o que","me explica","quem","quando","por que","qual","você","voce","ajuda","preciso"];
-  if (hints.some(h => t.includes(h))) return "conversa";
-  if (t.split(" ").length <= 3) return "desconhecido";
-  return "conversa";
-}
+  inputEl.value = "";
+  runAutonomousDebate(task);
+});
 
-function route(text) {
-  const intent = classify(text);
-  const risk = RISK[intent] || "none";
-  return { intent, risk, icon: ICON[risk] };
-}
-
-const log  = document.getElementById("log");
-const form = document.getElementById("form");
-const inp  = document.getElementById("input");
-
-function addEntry(cls, html) {
-  const div = document.createElement("div");
-  div.className = `entry ${cls}`;
-  div.innerHTML = html;
-  log.appendChild(div);
-  log.scrollTop = log.scrollHeight;
-}
-
-function handleText(text) {
-  if (!text.trim()) return;
-  addEntry("user", `<strong>Você:</strong> ${esc(text)}`);
-
-  const { intent, risk, icon } = route(text);
-  const meta = `<div class="meta">${icon} intent: <code>${intent}</code>  risk: ${risk}</div>`;
-
-  const handler = MESSAGES[intent] || MESSAGES["desconhecido"];
-  const { cls, text: msg, url } = handler();
-
-  const lines = msg.split("\n").map(l => esc(l)).join("<br>");
-  addEntry(cls, lines + meta);
-
-  if (url && risk !== "critical") {
-    setTimeout(() => window.open(url, "_blank"), 300);
-  }
-}
-
+// ─── Form submit ─────────────────────────────────────────
 form.addEventListener("submit", e => {
   e.preventDefault();
-  const text = inp.value.trim();
-  if (!text) return;
-  inp.value = "";
-  handleText(text);
+  const text = inputEl.value.trim();
+  if (!text || sendBtn.disabled) return;
+  inputEl.value = "";
+  sendMessage(text);
 });
 
-document.querySelectorAll(".quick").forEach(btn => {
-  btn.addEventListener("click", () => handleText(btn.dataset.cmd));
+// Quick action buttons
+document.querySelectorAll(".qbtn:not(#btn-debate)").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const cmd = btn.dataset.cmd;
+    if (cmd && !sendBtn.disabled) sendMessage(cmd);
+  });
 });
+
+// ─── Send message ─────────────────────────────────────────
+async function sendMessage(text) {
+  removeWelcome();
+  appendMsg("user", esc(text));
+  setLoading(true);
+  clearAgentActivity();
+
+  const typing = appendTyping();
+
+  try {
+    const res = await fetch(`${API}/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message:      text,
+        use_conclave: useConclave.checked,
+        model:        modelSel.value,
+      }),
+    });
+
+    typing.remove();
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      appendMsg("error", `⚠️ Erro ${res.status}: ${esc(err.error || res.statusText)}`);
+      return;
+    }
+
+    const data = await res.json();
+    handleResponse(data);
+
+  } catch (err) {
+    typing.remove();
+    if (err.name === "TypeError") {
+      appendMsg("error", "⚠️ Servidor offline. Inicie com: <code>python backend/server.py</code>");
+    } else {
+      appendMsg("error", `⚠️ ${esc(err.message)}`);
+    }
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ─── Debate autônomo (Squad) ───────────────────────────────
+async function runAutonomousDebate(task) {
+  removeWelcome();
+  appendMsg("user", `🤝 Debate autônomo: ${esc(task)}`);
+  setLoading(true);
+  clearAgentActivity();
+
+  const typing = appendTyping("squad debatendo...");
+
+  try {
+    const res = await fetch(`${API}/debate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        task,
+        agents: ["architect", "developer", "analyst", "qa"],
+        rounds: 2,
+        model:  modelSel.value,
+      }),
+    });
+
+    typing.remove();
+
+    if (!res.ok) {
+      appendMsg("error", `⚠️ Erro no debate: ${res.statusText}`);
+      return;
+    }
+
+    const data = await res.json();
+
+    appendMsg("assistant", renderMarkdown(data.synthesis || "Sem síntese."), {
+      intent: "debate autônomo",
+      brain: "squad",
+    });
+
+    if (data.rounds?.length) {
+      renderSquadRounds(data.rounds);
+      squadWrap.classList.remove("hidden");
+      squadWrap.classList.add("open");
+    }
+
+    if (data.saved_to) {
+      appendMsg("assistant",
+        `💾 Decisão salva em <code>_memoria/${esc(data.saved_to)}</code>`,
+        {}
+      );
+    }
+
+    setBrain("conclave");
+    highlightAgents(data.agents || []);
+
+  } catch (err) {
+    typing.remove();
+    appendMsg("error", `⚠️ ${esc(err.message)}`);
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ─── Handle API response ──────────────────────────────────
+function handleResponse(data) {
+  const response  = data.response || data.message || "Sem resposta.";
+  const brain     = data.brain || "main";
+  const agents    = data.agents || [];
+  const plan      = data.plan || "";
+  const conclave  = data.conclave || {};
+  const squad     = data.squad || {};
+  const isBlocked = data.status === "blocked";
+
+  appendMsg(
+    isBlocked ? "blocked" : "assistant",
+    renderMarkdown(response),
+    { intent: data.intent, brain, ms: data.ms }
+  );
+
+  setBrain(brain);
+
+  if (agents.length) highlightAgents(agents);
+  if (plan)          planBox.textContent = plan;
+
+  if (conclave.used) {
+    updateConclave(conclave);
+    conclaveWrap.classList.remove("hidden");
+    conclaveWrap.classList.add("open");
+  }
+
+  if (squad.used) {
+    renderSquadRounds(squad.rounds || []);
+    squadWrap.classList.remove("hidden");
+    squadWrap.classList.add("open");
+  }
+}
+
+// ─── Squad rounds renderer ────────────────────────────────
+function renderSquadRounds(rounds) {
+  squadRounds.innerHTML = "";
+
+  const agentIcons = {
+    architect: "🏗️", developer: "💻", analyst: "📊",
+    qa: "🔍", jarvis_soul: "✨",
+  };
+
+  rounds.forEach(r => {
+    const div = document.createElement("div");
+    div.className = "squad-round";
+
+    const label = r.type === "analise" ? "ANÁLISE INDIVIDUAL" : `DEBATE — RODADA ${r.round}`;
+    div.innerHTML = `<div class="squad-round-hdr">RODADA ${r.round} · ${label}</div>`;
+
+    const outputs = document.createElement("div");
+    outputs.className = "squad-agent-outputs";
+
+    for (const [agentId, txt] of Object.entries(r.outputs || {})) {
+      const agDiv = document.createElement("div");
+      agDiv.className = "squad-agent";
+      const icon = agentIcons[agentId] || "🤖";
+      agDiv.innerHTML = `
+        <div class="squad-agent-name">${icon} ${agentId.toUpperCase()}</div>
+        <div class="squad-agent-txt">${esc(txt).replace(/\n/g, "<br>")}</div>
+      `;
+      outputs.appendChild(agDiv);
+    }
+
+    div.appendChild(outputs);
+    squadRounds.appendChild(div);
+  });
+}
+
+// ─── UI helpers ───────────────────────────────────────────
+function appendMsg(role, html, meta = {}) {
+  const div = document.createElement("div");
+  div.className = `msg ${role}`;
+
+  const bubble = document.createElement("div");
+  bubble.className = "msg-bubble";
+  bubble.innerHTML = html;
+  div.appendChild(bubble);
+
+  if (meta && (meta.intent || meta.brain || meta.ms != null)) {
+    const metaDiv = document.createElement("div");
+    metaDiv.className = "msg-meta";
+    if (meta.intent) metaDiv.innerHTML += `<span class="tag">${esc(meta.intent)}</span>`;
+    if (meta.brain)  metaDiv.innerHTML += `<span class="tag">🧠 ${esc(meta.brain)}</span>`;
+    if (meta.ms != null) metaDiv.innerHTML += `<span>${meta.ms}ms</span>`;
+    div.appendChild(metaDiv);
+  }
+
+  chatLog.appendChild(div);
+  chatLog.scrollTop = chatLog.scrollHeight;
+  return div;
+}
+
+function appendTyping(label = "pensando...") {
+  const div = document.createElement("div");
+  div.className = "typing-indicator";
+  div.innerHTML = `<div class="typing-dots"><span></span><span></span><span></span></div><span>${esc(label)}</span>`;
+  chatLog.appendChild(div);
+  chatLog.scrollTop = chatLog.scrollHeight;
+  return div;
+}
+
+function removeWelcome() {
+  const wb = chatLog.querySelector(".welcome-block");
+  if (wb) wb.remove();
+}
+
+function setLoading(on) {
+  sendBtn.disabled = on;
+  inputEl.disabled = on;
+}
+
+function setBrain(name) {
+  const map = { squad: "conclave" };
+  const key = map[name] || name;
+  Object.entries(brains).forEach(([k, el]) => {
+    el.classList.toggle("active", k === key);
+  });
+}
+
+function highlightAgents(ids) {
+  clearAgentActivity();
+  ids.forEach(id => {
+    if (agentCards[id]) agentCards[id].classList.add("active");
+  });
+  setTimeout(clearAgentActivity, 5000);
+}
+
+function clearAgentActivity() {
+  Object.values(agentCards).forEach(c => c.classList.remove("active"));
+}
+
+function updateConclave(c) {
+  if (c.critico)   ct.critico.textContent   = c.critico;
+  if (c.advogado)  ct.advogado.textContent  = c.advogado;
+  if (c.synthesis) ct.sintetizador.textContent = c.synthesis;
+}
+
+// ─── Status check ─────────────────────────────────────────
+async function checkStatus() {
+  setSvc(svcOllama, "checking");
+  setSvc(svcWebui,  "checking");
+  try {
+    const res  = await fetch(`${API}/status`, { signal: AbortSignal.timeout(4000) });
+    const data = await res.json();
+    const svcs = data.services || {};
+
+    setSvc(svcOllama, svcs["Ollama"]?.status     === "online" ? "online" : "offline");
+    setSvc(svcWebui,  svcs["Open WebUI"]?.status === "online" ? "online" : "offline");
+  } catch {
+    setSvc(svcOllama, "offline");
+    setSvc(svcWebui,  "offline");
+  }
+}
+
+function setSvc(el, state) {
+  el.className = "svc";
+  if (state === "offline")  el.classList.add("offline");
+  if (state === "checking") el.classList.add("checking");
+}
+
+// ─── Markdown renderer ────────────────────────────────────
+function renderMarkdown(raw) {
+  const blocks = [];
+  const withPH = raw.replace(/```[\w]*\n?([\s\S]*?)```/g, (_, code) => {
+    blocks.push(code.trim());
+    return `\x00BLOCK${blocks.length - 1}\x00`;
+  });
+
+  let out = esc(withPH)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/^#{1,3}\s+(.+)$/gm, "<strong>$1</strong>")
+    .replace(/^\s*[-*]\s+(.+)$/gm, "• $1")
+    .replace(/\n/g, "<br>");
+
+  blocks.forEach((code, i) => {
+    out = out.replace(`\x00BLOCK${i}\x00`, `<pre><code>${esc(code)}</code></pre>`);
+  });
+  return out;
+}
 
 function esc(s) {
-  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }

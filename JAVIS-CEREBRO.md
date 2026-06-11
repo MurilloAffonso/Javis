@@ -68,7 +68,26 @@
 
 - [[_ferramentas/leanctx/STATUS]] — LeanCTX (compressão de tokens)
 - [[_ferramentas/voz/STATUS]] — sandbox de voz
-- [[_ferramentas/agentmemory/STATUS]] — AgentMemory MCP
+- [[_ferramentas/agentmemory/STATUS]] — AgentMemory MCP (porta 3111/3113)
+
+---
+
+## 🧠 Memória
+
+- [[_memoria/murillo]] — quem é Murillo, como prefere ser atendido
+- [[_memoria/javis-arquitetura]] — stack, módulos, 13 intents
+- [[_memoria/javis-regras]] — regras críticas para Claude e agentes
+- [[_memoria/javis-ferramentas]] — LeanCTX, AgentMemory, CodeGraph, Obsidian
+- [[_memoria/javis-protocolo]] — protocolo de sessão (abrir/fechar)
+- [[_memoria/javis-testes]] — 189/189 testes, como rodar
+- [[_memoria/javis-decisoes]] — histórico de decisões técnicas
+
+---
+
+## 🐙 GitHub
+
+- Repositório: [MurilloAffonso/Javis](https://github.com/MurilloAffonso/Javis)
+- Branch: `master` · Commit inicial: `cc42b2a` (92 arquivos)
 
 ---
 
