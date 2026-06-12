@@ -18,7 +18,7 @@ DEFAULT_MODEL = "llama3.2:3b"
 TIMEOUT       = 30
 
 SYSTEM_ORCHESTRATOR = """\
-Você é o orquestrador do Javis, assistente pessoal de Murillo Affonso.
+Você é o orquestrador da Jamba, assistente pessoal de Murillo Affonso.
 
 Analise o input e retorne SOMENTE um JSON válido (sem markdown, sem explicação):
 
@@ -54,13 +54,14 @@ status_sistema, acao_perigosa
 """
 
 SYSTEM_MAIN_BRAIN = """\
-Você é o Javis, assistente pessoal de Murillo Affonso.
-Direto, prático, sempre com um próximo passo concreto.
-Responda em português, de forma concisa.
+Você é o Jamba, assistente pessoal de Murillo Affonso — um mordomo de IA estilo JARVIS.
+Trate Murillo sempre por "senhor". Tom respeitoso, sereno e elegante, mas direto e prático.
+Sempre termine com um próximo passo concreto. Responda em português, de forma concisa.
 """
 
 SYSTEM_MEMORY_BRAIN = """\
-Você é o Javis no modo Memória. Tem acesso ao histórico e decisões anteriores.
+Você é o Jamba no modo Memória — mordomo de IA de Murillo. Trate-o por "senhor".
+Tem acesso ao histórico e decisões anteriores.
 Use o contexto fornecido para dar uma resposta personalizada e relevante.
 Responda em português, referenciando informações do histórico quando útil.
 """
@@ -158,6 +159,7 @@ class Orchestrator:
 
     def _memory_brain(self, text: str, result: OrchestrationResult) -> str:
         from agents.memory_bridge import MemoryBridge
+        from llm_providers import call_claude
         mb = MemoryBridge()
         recalled = mb.recall(text)
         context = f"Memória relevante:\n{recalled}" if recalled else ""
@@ -168,53 +170,29 @@ class Orchestrator:
             messages.append({"role": "system", "content": context})
         messages.append({"role": "user", "content": text})
         try:
-            resp = requests.post(
-                OLLAMA_URL,
-                json={"model": self.model, "messages": messages, "stream": False},
-                timeout=TIMEOUT,
-            )
-            resp.raise_for_status()
-            return resp.json()["message"]["content"].strip()
+            return call_claude(messages)
         except Exception as e:
             return f"Memória inacessível: {e}"
 
     def _main_brain(self, text: str, history: list[dict]) -> str:
+        from llm_providers import call_claude
         messages = [{"role": "system", "content": SYSTEM_MAIN_BRAIN}]
         messages.extend(history[-6:])
         messages.append({"role": "user", "content": text})
         try:
-            resp = requests.post(
-                OLLAMA_URL,
-                json={"model": self.model, "messages": messages, "stream": False},
-                timeout=TIMEOUT,
-            )
-            resp.raise_for_status()
-            return resp.json()["message"]["content"].strip()
+            return call_claude(messages)
         except Exception as e:
-            return (
-                f"Ollama indisponível: {e}. "
-                "Acesse http://localhost:3000 para usar o Open WebUI."
-            )
+            return f"Cérebro indisponível: {e}"
 
     # ── Classify ──────────────────────────────────────────────
 
     def _classify(self, text: str) -> dict | None:
+        from llm_providers import call_claude
         try:
-            resp = requests.post(
-                OLLAMA_URL,
-                json={
-                    "model": self.model,
-                    "messages": [
-                        {"role": "system", "content": SYSTEM_ORCHESTRATOR},
-                        {"role": "user",   "content": text},
-                    ],
-                    "stream": False,
-                    "options": {"temperature": 0.1},
-                },
-                timeout=TIMEOUT,
-            )
-            resp.raise_for_status()
-            content = resp.json()["message"]["content"].strip()
+            content = call_claude([
+                {"role": "system", "content": SYSTEM_ORCHESTRATOR},
+                {"role": "user",   "content": text},
+            ], temperature=0.1)
             content = re.sub(r"```(?:json)?|```", "", content).strip()
             return json.loads(content)
         except Exception:

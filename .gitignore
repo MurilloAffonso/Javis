@@ -50,3 +50,15 @@ desktop.ini
 .codegraph/
 .headroom/
 .leanctx/
+
+# Estado de runtime do Jamba (gerado/pessoal — não versionar)
+_memoria/knowledge_index.json
+_memoria/perfil.json
+_memoria/lembretes.json
+_memoria/decisao-*.md
+
+# Artefatos de teste / screenshots descartáveis
+*.png
+*.jpeg
+*.jpg
+_git_*_tmp.txt

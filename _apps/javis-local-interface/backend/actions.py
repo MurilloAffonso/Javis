@@ -13,8 +13,17 @@ JAVIS_ROOT = Path(__file__).resolve().parents[3]
 URLS = {
     "open_browser":   "https://www.google.com",
     "open_youtube":   "https://www.youtube.com",
-    "open_music":     "https://www.youtube.com/results?search_query=lofi+beats+para+trabalhar",
+    # Stream lofi 24/7 — abre no modo player e dá autoplay
+    "open_music":     "https://www.youtube.com/watch?v=jfKfPfyJRdk",
     "open_openwebui": "http://localhost:3000",
+}
+
+# Termos genéricos que removemos para extrair o que tocar de fato
+_MUSIC_FILLERS = {
+    "toca", "tocar", "toque", "coloca", "colocar", "bota", "botar", "play",
+    "uma", "um", "o", "a", "de", "do", "da", "no", "na", "som", "música",
+    "musica", "playlist", "aí", "ai", "por", "favor", "pra", "para", "mim",
+    "jamba", "youtube",
 }
 
 _MAX_IDEA_LEN = 2000
@@ -33,6 +42,8 @@ def execute(intent: str, user_text: str = "") -> dict:
         "abrir_projeto":    lambda t: _open_javis_folder(t),
         "registrar_ideia":  _register_idea,
         "status_sistema":   _system_status,
+        "analisar_site":    _analyze_site,
+        "clima":            _weather,
         "acao_perigosa":    _blocked,
         "conversa":         _to_llm,
         "desconhecido":     _to_llm,
@@ -56,9 +67,32 @@ def _open_youtube(_: str) -> dict:
     return {"status": "ok", "message": "YouTube aberto."}
 
 
-def _play_music(_: str) -> dict:
+def _play_music(text: str) -> dict:
+    """Toca música. Com YOUTUBE_API_KEY toca o vídeo EXATO; senão busca/abre o stream lofi."""
+    import re
+    import urllib.parse
+
+    words = re.findall(r"[a-zà-ÿ0-9]+", (text or "").lower())
+    query = [w for w in words if w not in _MUSIC_FILLERS]
+
+    if query:
+        term = " ".join(query)
+        # 1) Tenta a API do YouTube — abre o vídeo exato (autoplay de verdade)
+        try:
+            import integrations
+            url = integrations.youtube_watch_url(term)
+        except Exception:
+            url = None
+        if url:
+            webbrowser.open(url)
+            return {"status": "ok", "message": f"🎵 Tocando \"{term}\" no YouTube, senhor."}
+        # 2) Fallback — página de busca (sem API key)
+        url = "https://www.youtube.com/results?search_query=" + urllib.parse.quote(term)
+        webbrowser.open(url)
+        return {"status": "ok", "message": f"🎵 Buscando \"{term}\" no YouTube — clique no primeiro vídeo para tocar."}
+
     webbrowser.open(URLS["open_music"])
-    return {"status": "ok", "message": "Música iniciada no YouTube."}
+    return {"status": "ok", "message": "🎵 Tocando lofi no YouTube (stream 24/7), senhor."}
 
 
 def _open_openwebui(_: str) -> dict:
@@ -127,6 +161,35 @@ def _system_status(_: str) -> dict:
             results.append(f"  ❌ {name}")
     summary = "\n".join(results)
     return {"status": "ok", "message": f"Status dos serviços:\n{summary}"}
+
+
+def _analyze_site(text: str) -> dict:
+    """Analisa um site e gera um esqueleto de código próprio recriando o layout."""
+    import site_analyzer
+    result = site_analyzer.analyze(text, generate_code=True)
+    if result.get("status") != "ok":
+        return {"status": "error", "message": result.get("message", "Falha ao analisar site.")}
+    return {"status": "ok", "message": result["message"], "url": result.get("url", "")}
+
+
+def _weather(text: str) -> dict:
+    """Clima atual. Extrai cidade de 'clima em X'; senão usa JAMBA_CITY."""
+    import re
+    import integrations
+
+    m = re.search(r"\b(?:em|no|na|de|do|da)\s+([a-zà-ÿ\s]{3,40})$", (text or "").strip(), re.I)
+    city = m.group(1).strip() if m else ""
+
+    data = integrations.weather(city)
+    if not data:
+        if not os.environ.get("OPENWEATHER_API_KEY", "").strip():
+            return {"status": "error",
+                    "message": "Clima indisponível, senhor — falta a OPENWEATHER_API_KEY no .env (grátis em openweathermap.org/api)."}
+        return {"status": "error", "message": "Não consegui obter o clima dessa cidade, senhor."}
+
+    msg = (f"🌡️ {data['city']}: {data['temp']}°C ({data['desc']}), "
+           f"sensação {data['feels']}°C, umidade {data['humidity']}%, vento {data['wind']} km/h, senhor.")
+    return {"status": "ok", "message": msg}
 
 
 def _blocked(_: str) -> dict:

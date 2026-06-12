@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>JAVIS</title>
+  <title>JAMBA</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -12,237 +12,227 @@
   <header class="topbar">
     <div class="topbar-left">
       <span class="logo-bolt">⚡</span>
-      <span class="logo-name">JAVIS</span>
+      <span class="logo-name">JAMBA</span>
       <span class="logo-ver">v2</span>
     </div>
-    <div class="brains-row">
-      <div class="brain active" id="brain-main">
-        <span class="brain-icon">🧠</span>
-        <span class="brain-lbl">MAIN</span>
-      </div>
-      <div class="brain" id="brain-conclave">
-        <span class="brain-icon">⚔️</span>
-        <span class="brain-lbl">CONCLAVE</span>
-      </div>
-      <div class="brain" id="brain-memory">
-        <span class="brain-icon">💾</span>
-        <span class="brain-lbl">MEMORY</span>
-      </div>
+    <div class="topbar-center">
+      <span class="tc-val" id="stat-count">0</span><span class="tc-lbl">msgs</span>
+      <span class="tc-sep">·</span>
+      <span class="tc-val">17</span><span class="tc-lbl">agentes</span>
+      <span class="tc-sep">·</span>
+      <span class="tc-val" id="stat-brain-lbl">MAIN</span>
+      <span class="tc-sep">·</span>
+      <span class="tc-val" id="stat-session">00:00</span>
     </div>
-    <div class="topbar-status">
-      <div class="svc" id="svc-ollama">
-        <div class="svc-dot"></div>
-        <span>OLLAMA</span>
-      </div>
-      <div class="svc offline" id="svc-webui">
-        <div class="svc-dot"></div>
-        <span>WEBUI</span>
-      </div>
+    <div class="topbar-right">
+      <div class="svc" id="svc-ollama"><div class="svc-dot"></div><span>OLLAMA</span></div>
+      <div class="svc offline" id="svc-webui"><div class="svc-dot"></div><span>WEBUI</span></div>
     </div>
   </header>
 
-  <!-- LAYOUT -->
   <div class="layout">
 
-    <!-- CHAT -->
-    <main class="chat-wrap">
+    <!-- ═══ LEFT PANEL ═══ -->
+    <aside class="panel-left">
+
+      <div class="brain-card active" data-brain="main" id="bc-main">
+        <div class="bc-bar"></div>
+        <div class="bc-top">
+          <span class="bc-icon">🤓</span>
+          <div>
+            <div class="bc-label">CÉREBRO PRINCIPAL</div>
+            <div class="bc-name" id="bc-main-name">llama3.2:3b</div>
+          </div>
+        </div>
+        <div class="bc-desc">Raciocínio direto e rápido. Modelo principal de IA.</div>
+      </div>
+
+      <div class="brain-card" data-brain="conclave" id="bc-conclave">
+        <div class="bc-bar"></div>
+        <div class="bc-top">
+          <span class="bc-icon">🧠</span>
+          <div>
+            <div class="bc-label">MEGA-BRAIN CONCLAVE</div>
+            <div class="bc-name">Cérebro Coletivo</div>
+          </div>
+        </div>
+        <div class="bc-desc">3 especialistas debatem cada decisão: crítico, advogado, sintetizador.</div>
+      </div>
+
+      <div class="brain-card" data-brain="memory" id="bc-memory">
+        <div class="bc-bar"></div>
+        <div class="bc-top">
+          <span class="bc-icon">💾</span>
+          <div>
+            <div class="bc-label">MEMÓRIA ETERNA</div>
+            <div class="bc-name">Obsidian Memory</div>
+          </div>
+        </div>
+        <div class="bc-desc">Memória permanente que nunca esquece. Cresce com cada conversa.</div>
+      </div>
+
+      <div class="left-sep"></div>
+
+      <div class="left-section">
+        <div class="left-title">MODELO DE IA</div>
+        <select class="model-sel" id="model-sel">
+          <optgroup label="☁️ Cloud">
+            <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
+            <option value="claude-opus-4-8">Claude Opus 4.8</option>
+            <option value="gpt-4o-mini">GPT-4o mini</option>
+            <option value="gpt-4o">GPT-4o</option>
+          </optgroup>
+          <optgroup label="🏠 Local (Ollama)">
+            <option value="llama3.2:3b">llama3.2:3b</option>
+            <option value="phi3:mini">phi3:mini</option>
+            <option value="llama3.1">llama3.1</option>
+            <option value="gemma3">gemma3</option>
+            <option value="mistral">mistral</option>
+          </optgroup>
+        </select>
+      </div>
+
+      <div class="left-section">
+        <div class="left-title">STATUS DO SISTEMA</div>
+        <div class="sys-rows">
+          <div class="sys-row"><span>RESPOSTAS</span><span id="sys-count">0</span></div>
+          <div class="sys-row"><span>ÚLTIMO MS</span><span id="sys-ms">—</span></div>
+          <div class="sys-row"><span>CÉREBRO</span><span id="sys-brain">MAIN</span></div>
+          <div class="sys-row"><span>SESSÃO</span><span id="sys-uptime">00:00</span></div>
+          <div class="sys-row"><span>INTENT</span><span id="sys-intent">—</span></div>
+        </div>
+      </div>
+
+      <div class="left-section">
+        <div class="left-title">RESERVATÓRIO · ATIVIDADE</div>
+        <canvas id="reservoir-canvas" width="216" height="86"></canvas>
+        <div class="res-stats">
+          <span id="res-avg">avg —ms</span>
+          <span id="res-peak">pico —ms</span>
+        </div>
+      </div>
+
+      <div class="left-section">
+        <div class="left-title">ÚLTIMO PLANO</div>
+        <div class="plan-box" id="plan-box">—</div>
+      </div>
+
+      <div class="left-section">
+        <div class="left-title">ESPECIALISTAS</div>
+        <div class="agents-grid" id="agents-grid">
+          <div class="ag-card" data-id="architect"><div class="ag-icon">🏗️</div><div class="ag-name">Architect</div></div>
+          <div class="ag-card" data-id="developer"><div class="ag-icon">💻</div><div class="ag-name">Developer</div></div>
+          <div class="ag-card" data-id="ux_designer"><div class="ag-icon">🎨</div><div class="ag-name">UX Design</div></div>
+          <div class="ag-card" data-id="qa"><div class="ag-icon">🔍</div><div class="ag-name">QA</div></div>
+          <div class="ag-card" data-id="pm"><div class="ag-icon">📋</div><div class="ag-name">PM</div></div>
+          <div class="ag-card" data-id="po"><div class="ag-icon">🎯</div><div class="ag-name">PO</div></div>
+          <div class="ag-card" data-id="scrum"><div class="ag-icon">⚙️</div><div class="ag-name">Scrum</div></div>
+          <div class="ag-card" data-id="analyst"><div class="ag-icon">📊</div><div class="ag-name">Analyst</div></div>
+          <div class="ag-card" data-id="devops"><div class="ag-icon">🚀</div><div class="ag-name">DevOps</div></div>
+          <div class="ag-card" data-id="data_engineer"><div class="ag-icon">🗄️</div><div class="ag-name">Data Eng</div></div>
+          <div class="ag-card meta-card" data-id="aios_master"><div class="ag-icon">🧬</div><div class="ag-name">AIOS Master</div></div>
+          <div class="ag-card meta-card" data-id="jarvis_soul"><div class="ag-icon">✨</div><div class="ag-name">Jamba Soul</div></div>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- ═══ CENTER: ORB STAGE ═══ -->
+    <main class="stage">
+
+      <div class="stage-name">JAMBA</div>
+      <div class="stage-sub">assistente pessoal · comando de voz</div>
+
+      <div class="orb-stage" id="orb-stage">
+        <canvas id="orb-canvas"></canvas>
+      </div>
+
+      <div class="orb-state-lbl" id="neural-state">ONLINE</div>
+      <div class="orb-pulse-lbl" id="neural-pulse-lbl">aguardando comando</div>
+
+      <div class="voice-status" id="voice-status">
+        <div class="voice-status-dot"></div>
+        <span>OUVINDO</span>
+        <span class="voice-interim" id="voice-interim"></span>
+      </div>
+
+      <div class="orb-controls">
+        <button type="button" class="mic-btn" id="mic-btn" title="Comando de voz (pt-BR)">🎤</button>
+        <button type="button" class="voice-auto-btn" id="wake-btn" title='Wake word — diga "Jamba" para ativar'>🎙️</button>
+        <button type="button" class="voice-auto-btn" id="voice-auto-btn" title="Voz sempre ativa — clique para ligar">👂</button>
+        <label class="tts-chk" title="Falar resposta (TTS)">
+          <input type="checkbox" id="use-tts" checked />
+          <span>🔊</span>
+        </label>
+        <label class="conclave-chk" title="Ativar Conclave">
+          <input type="checkbox" id="use-conclave" />
+          <span>⚔️</span>
+        </label>
+      </div>
+
+      <div class="quick-row">
+        <button type="button" class="qbtn" data-cmd="status do sistema">⚡ status</button>
+        <button type="button" class="qbtn" data-cmd="que tempo faz hoje">🌡️ clima</button>
+        <button type="button" class="qbtn" data-cmd="abre o youtube">▶ youtube</button>
+        <button type="button" class="qbtn" data-cmd="toca uma música">🎵 música</button>
+        <button type="button" class="qbtn" data-cmd="abre o vscode">💻 vscode</button>
+        <button type="button" class="qbtn" data-cmd="abre o terminal">$ terminal</button>
+        <button type="button" class="qbtn" data-cmd="abre o projeto">📂 projeto</button>
+        <button type="button" class="qbtn" data-cmd="analisa o site ">🌐 site</button>
+        <button type="button" class="qbtn qbtn-debate" id="btn-debate">🤝 debate</button>
+      </div>
+
+    </main>
+
+    <!-- ═══ RIGHT: CHAT ═══ -->
+    <aside class="panel-chat">
+
+      <div class="chat-hdr">
+        <span>💬 CONVERSA</span>
+        <span class="chat-hdr-sub" id="chat-hdr-sub">Jamba online</span>
+      </div>
+
       <div class="chat-log" id="chat-log">
         <div class="welcome-block">
-          <div class="wb-bolt">⚡</div>
-          <div class="wb-title">JAVIS online.</div>
-          <div class="wb-sub">3 cérebros · 17 agentes · Vida própria.</div>
+          <div class="wb-title">JAMBA online.</div>
+          <div class="wb-sub">Fala ou digita. Eu te respondo.</div>
+          <div class="wb-chips">
+            <span class="wb-chip">🤓 Principal</span>
+            <span class="wb-chip">🧠 Conclave</span>
+            <span class="wb-chip">💾 Memória</span>
+            <span class="wb-chip">🎤 Voz pt-BR</span>
+          </div>
         </div>
       </div>
 
       <!-- CONCLAVE PANEL -->
       <div class="conclave-wrap hidden" id="conclave-wrap">
-        <button class="conclave-hdr" id="conclave-toggle">
-          <span>⚔️ CONCLAVE — debate interno</span>
+        <button class="panel-hdr" id="conclave-toggle">
+          <span>🧠 CONCLAVE — debate interno</span>
           <span id="conclave-chevron">▼</span>
         </button>
         <div class="conclave-agents" id="conclave-body">
-          <div class="ca">
-            <div class="ca-hdr red"><span>🔴</span> CRÍTICO</div>
-            <div class="ca-txt" id="ct-critico">aguardando debate...</div>
-          </div>
-          <div class="ca">
-            <div class="ca-hdr orange"><span>⚔️</span> ADVOGADO</div>
-            <div class="ca-txt" id="ct-advogado">aguardando debate...</div>
-          </div>
-          <div class="ca">
-            <div class="ca-hdr green"><span>✅</span> SINTETIZADOR</div>
-            <div class="ca-txt" id="ct-sintetizador">aguardando debate...</div>
-          </div>
+          <div class="ca"><div class="ca-hdr red"><span>🔴</span> CRÍTICO</div><div class="ca-txt" id="ct-critico">aguardando debate...</div></div>
+          <div class="ca"><div class="ca-hdr orange"><span>⚔️</span> ADVOGADO</div><div class="ca-txt" id="ct-advogado">aguardando debate...</div></div>
+          <div class="ca"><div class="ca-hdr green"><span>✅</span> SINTETIZADOR</div><div class="ca-txt" id="ct-sintetizador">aguardando debate...</div></div>
         </div>
       </div>
 
       <!-- SQUAD PANEL -->
       <div class="squad-wrap hidden" id="squad-wrap">
-        <button class="conclave-hdr" id="squad-toggle">
+        <button class="panel-hdr" id="squad-toggle">
           <span>🤝 SQUAD — colaboração autônoma</span>
           <span id="squad-chevron">▼</span>
         </button>
         <div class="squad-rounds" id="squad-rounds"></div>
       </div>
 
-      <!-- INPUT AREA -->
-      <form class="input-area" id="form">
-        <div class="input-row">
-          <select class="model-sel" id="model-sel">
-            <option value="llama3.2:3b">llama3.2:3b</option>
-            <option value="phi3:mini">phi3:mini</option>
-            <option value="llama3.1">llama3.1</option>
-            <option value="gemma3">gemma3</option>
-            <option value="mistral">mistral</option>
-          </select>
-          <input
-            id="input"
-            type="text"
-            placeholder="Fala com o Javis..."
-            autocomplete="off"
-            autofocus
-          />
-          <label class="conclave-chk" title="Ativar Conclave">
-            <input type="checkbox" id="use-conclave" />
-            <span>⚔️</span>
-          </label>
-          <button type="submit" class="send-btn">▶</button>
-        </div>
-        <div class="quick-row">
-          <button type="button" class="qbtn" data-cmd="status do sistema">⚡ status</button>
-          <button type="button" class="qbtn" data-cmd="abre o youtube">▶ youtube</button>
-          <button type="button" class="qbtn" data-cmd="abre o open webui">🤖 webui</button>
-          <button type="button" class="qbtn" data-cmd="abre o vscode">💻 vscode</button>
-          <button type="button" class="qbtn" data-cmd="abre o terminal">$ terminal</button>
-          <button type="button" class="qbtn qbtn-debate" id="btn-debate">🤝 debate</button>
-        </div>
+      <!-- TEXT INPUT -->
+      <form class="chat-input" id="form">
+        <input id="input" type="text" placeholder="Fala com a Jamba..." autocomplete="off" autofocus />
+        <button type="submit" class="send-btn">▶</button>
       </form>
-    </main>
 
-    <!-- SIDEBAR -->
-    <aside class="sidebar">
-      <!-- META-AGENTES -->
-      <div class="sb-section">
-        <div class="sb-title">META · COORDENAÇÃO</div>
-        <div class="agents-grid">
-          <div class="ag-card meta-card" data-id="aios_master">
-            <div class="ag-icon">🧬</div>
-            <div class="ag-name">AIOS Master</div>
-            <div class="ag-role">Coordena a squad</div>
-          </div>
-          <div class="ag-card meta-card" data-id="squad_creator">
-            <div class="ag-icon">⚡</div>
-            <div class="ag-name">Squad Creator</div>
-            <div class="ag-role">Cria squads novas</div>
-          </div>
-          <div class="ag-card meta-card" data-id="jarvis_soul">
-            <div class="ag-icon">✨</div>
-            <div class="ag-name">Jarvis Soul</div>
-            <div class="ag-role">Identidade e tom</div>
-          </div>
-          <div class="ag-card red-card" data-id="rootcause">
-            <div class="ag-icon">🔬</div>
-            <div class="ag-name">Rootcause</div>
-            <div class="ag-role">Diagnóstico de bugs</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ESPECIALISTAS -->
-      <div class="sb-section">
-        <div class="sb-title">ESPECIALISTAS</div>
-        <div class="agents-grid" id="agents-grid">
-          <div class="ag-card" data-id="architect">
-            <div class="ag-icon">🏗️</div>
-            <div class="ag-name">Architect</div>
-            <div class="ag-role">Design de sistemas</div>
-          </div>
-          <div class="ag-card" data-id="developer">
-            <div class="ag-icon">💻</div>
-            <div class="ag-name">Developer</div>
-            <div class="ag-role">Código e implementação</div>
-          </div>
-          <div class="ag-card" data-id="ux_designer">
-            <div class="ag-icon">🎨</div>
-            <div class="ag-name">UX Designer</div>
-            <div class="ag-role">Interfaces e UX</div>
-          </div>
-          <div class="ag-card" data-id="qa">
-            <div class="ag-icon">🔍</div>
-            <div class="ag-name">QA Tester</div>
-            <div class="ag-role">Testes e qualidade</div>
-          </div>
-          <div class="ag-card" data-id="pm">
-            <div class="ag-icon">📋</div>
-            <div class="ag-name">Project Manager</div>
-            <div class="ag-role">Planejamento e prazos</div>
-          </div>
-          <div class="ag-card" data-id="po">
-            <div class="ag-icon">🎯</div>
-            <div class="ag-name">Product Owner</div>
-            <div class="ag-role">Priorização e produto</div>
-          </div>
-          <div class="ag-card" data-id="scrum">
-            <div class="ag-icon">⚙️</div>
-            <div class="ag-name">Scrum Master</div>
-            <div class="ag-role">Gestão de tarefas</div>
-          </div>
-          <div class="ag-card" data-id="analyst">
-            <div class="ag-icon">📊</div>
-            <div class="ag-name">Analyst</div>
-            <div class="ag-role">Pesquisa e estratégia</div>
-          </div>
-          <div class="ag-card" data-id="devops">
-            <div class="ag-icon">🚀</div>
-            <div class="ag-name">DevOps</div>
-            <div class="ag-role">Deploy e infra</div>
-          </div>
-          <div class="ag-card" data-id="data_engineer">
-            <div class="ag-icon">🗄️</div>
-            <div class="ag-name">Data Engineer</div>
-            <div class="ag-role">Dados e pipelines</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- CONCLAVE -->
-      <div class="sb-section">
-        <div class="sb-title">CONCLAVE · DEBATE</div>
-        <div class="agents-grid">
-          <div class="ag-card red-card" data-id="critico">
-            <div class="ag-icon">🔴</div>
-            <div class="ag-name">Crítico</div>
-            <div class="ag-role">Audita falhas</div>
-          </div>
-          <div class="ag-card orange-card" data-id="advogado">
-            <div class="ag-icon">⚔️</div>
-            <div class="ag-name">Advogado</div>
-            <div class="ag-role">Ataca o plano</div>
-          </div>
-          <div class="ag-card green-card" data-id="sintetizador">
-            <div class="ag-icon">✅</div>
-            <div class="ag-name">Sintetizador</div>
-            <div class="ag-role">Integra solução</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="sb-section">
-        <div class="sb-title">ÚLTIMO PLANO</div>
-        <div class="plan-box" id="plan-box">—</div>
-      </div>
-
-      <div class="sb-section">
-        <div class="sb-title">ENTREGÁVEIS</div>
-        <div class="deliverables">
-          <div class="dlv">📊 Dashboard</div>
-          <div class="dlv">📄 Proposta</div>
-          <div class="dlv">📈 Relatório</div>
-          <div class="dlv">🌐 Landing Page</div>
-          <div class="dlv">⚙️ Script</div>
-          <div class="dlv">📋 Planilha</div>
-        </div>
-      </div>
     </aside>
 
   </div>

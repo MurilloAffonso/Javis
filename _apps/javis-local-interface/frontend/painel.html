@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JAMBA · PAINEL</title>
+  <link rel="stylesheet" href="painel.css" />
+</head>
+<body>
+
+  <header class="hdr">
+    <div class="hdr-left">
+      <span class="bolt">⚡</span>
+      <span class="brand">JAMBA</span>
+      <span class="sub">· PAINEL</span>
+    </div>
+    <div class="hdr-right">
+      <span class="clock" id="clock">--:--:--</span>
+      <a class="back" href="/">← voltar ao Jamba</a>
+    </div>
+  </header>
+
+  <main class="grid">
+
+    <section class="card resume">
+      <div class="card-title">RESUMO</div>
+      <div class="resume-row">
+        <div class="stat"><span class="stat-val" id="r-msgs">—</span><span class="stat-lbl">mensagens</span></div>
+        <div class="stat"><span class="stat-val" id="r-agents">—</span><span class="stat-lbl">agentes</span></div>
+        <div class="stat"><span class="stat-val" id="r-integ">—</span><span class="stat-lbl">integrações</span></div>
+        <div class="stat"><span class="stat-val" id="r-rem">—</span><span class="stat-lbl">lembretes</span></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-title">⏰ LEMBRETES</div>
+      <div class="list" id="reminders"><div class="empty">carregando…</div></div>
+    </section>
+
+    <section class="card">
+      <div class="card-title">🧬 MEMÓRIA — o que sei sobre o senhor</div>
+      <div class="list" id="memory"><div class="empty">carregando…</div></div>
+    </section>
+
+    <section class="card">
+      <div class="card-title">🖥️ SERVIÇOS</div>
+      <div class="list" id="services"><div class="empty">carregando…</div></div>
+    </section>
+
+    <section class="card">
+      <div class="card-title">🔌 INTEGRAÇÕES</div>
+      <div class="chips" id="integrations"><div class="empty">carregando…</div></div>
+    </section>
+
+    <section class="card wide">
+      <div class="card-title">💬 ÚLTIMAS CONVERSAS</div>
+      <div class="list" id="history"><div class="empty">carregando…</div></div>
+    </section>
+
+  </main>
+
+  <footer class="foot">
+    <span class="dot" id="conn-dot"></span>
+    <span id="conn-lbl">conectando…</span>
+    <span class="foot-sep">·</span>
+    <span>atualiza a cada 10s</span>
+  </footer>
+
+  <script src="painel.js"></script>
+</body>
+</html>

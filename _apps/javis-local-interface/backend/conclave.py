@@ -93,21 +93,11 @@ class Conclave:
         }
 
     def _call(self, system: str, user_content: str) -> str:
+        from llm_providers import call_openai
         try:
-            resp = requests.post(
-                OLLAMA_URL,
-                json={
-                    "model": self.model,
-                    "messages": [
-                        {"role": "system", "content": system},
-                        {"role": "user",   "content": user_content},
-                    ],
-                    "stream": False,
-                    "options": {"temperature": 0.3},
-                },
-                timeout=TIMEOUT,
-            )
-            resp.raise_for_status()
-            return resp.json()["message"]["content"].strip()
+            return call_openai([
+                {"role": "system", "content": system},
+                {"role": "user",   "content": user_content},
+            ], temperature=0.3)
         except Exception as e:
             return f"[Conclave indisponível: {e}]"

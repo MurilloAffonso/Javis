@@ -16,8 +16,9 @@ import command_router
 import logger
 
 _PREFIX_WORDS = [
-    # wake words (variações do nome)
-    "javis", "jarvis", "javes", "diabes", "diaves", "chaves",
+    # wake words (variações do nome — Jamba e como o ASR costuma ouvir)
+    "jamba", "jambo", "jambá", "jamb", "javis", "jarvis", "javes",
+    "diabes", "diaves", "chaves",
     # saudações comuns antes do comando
     "olá", "ola", "oi", "ei", "hey", "e aí", "eai",
 ]
@@ -26,12 +27,12 @@ _PREFIX_RE = re.compile(
     re.IGNORECASE,
 )
 # mantém compatibilidade com código que importa WAKE_WORDS diretamente
-WAKE_WORDS = ["javis", "jarvis", "javes", "diabes", "diaves", "chaves"]
+WAKE_WORDS = ["jamba", "jambo", "jambá", "javis", "jarvis", "javes", "diabes", "diaves", "chaves"]
 
 # Palavras-chave que surgem em hallucinations do prompt — natural speech raramente
 # contém 5+ destas ao mesmo tempo
 _HALLUCINATION_WORDS = {
-    "javis", "javes", "jarvis",    # wake words
+    "jamba", "javis", "javes", "jarvis",    # wake words
     "youtube", "webui", "vscode",  # apps específicos
     "status", "sistema",           # contexto de sistema
     "terminal", "navegador",       # apps/contexto
@@ -57,7 +58,7 @@ def _is_hallucination(text: str) -> bool:
 SAFE_INTENTS = {
     "abrir_navegador", "abrir_youtube", "tocar_musica", "abrir_openwebui",
     "abrir_javis", "abrir_vscode", "abrir_projeto", "registrar_ideia",
-    "status_sistema", "conversa", "desconhecido",
+    "status_sistema", "analisar_site", "clima", "conversa", "desconhecido",
 }
 
 APPROVAL_INTENTS = {"abrir_terminal"}

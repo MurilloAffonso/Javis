@@ -15,10 +15,10 @@
 
 ---
 
-## Prioridade 1 — Frontend (pequeno)
+## ✅ Prioridade 1 — Frontend (CONCLUÍDO 2026-06-12)
 
-- [ ] Adicionar `abrir_projeto` em `frontend/app.js` (RULES, RISK, MESSAGES)
-- [ ] 3 linhas de mudança — baixo risco
+- [x] Botão rápido `📂 projeto` adicionado em `frontend/index.html` → dispara `abrir_projeto`
+- [x] frontend agora cobre 13/13 intents do backend
 
 ---
 
