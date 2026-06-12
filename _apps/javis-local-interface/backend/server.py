@@ -52,21 +52,21 @@ async def _start_integrations():
     try:
         import telegram_bridge
         if telegram_bridge.start_background():
-            print("  Telegram: conectado ✓")
+            print("  Telegram: conectado [ok]")
     except Exception as e:
-        print(f"  Telegram: não iniciado ({e})")
+        print(f"  Telegram: nao iniciado ({e})")
     try:
         import reminders
         reminders.start_background()
-        print("  Lembretes: checador ativo ✓")
+        print("  Lembretes: checador ativo [ok]")
     except Exception as e:
-        print(f"  Lembretes: não iniciado ({e})")
+        print(f"  Lembretes: nao iniciado ({e})")
     try:
         import knowledge
         knowledge.start_background_index()
-        print("  Conhecimento: indexando vault em segundo plano ✓")
+        print("  Conhecimento: indexando vault em segundo plano [ok]")
     except Exception as e:
-        print(f"  Conhecimento: não iniciado ({e})")
+        print(f"  Conhecimento: nao iniciado ({e})")
 
 
 @app.post("/knowledge/reindex")
@@ -180,39 +180,18 @@ async def chat(req: ChatRequest):
         return JSONResponse({"error": "Mensagem vazia"}, status_code=400)
 
     orchestrator.model = req.model
-
-    # 1. Keyword routing para ações locais rápidas
     route = command_router.route(text)
 
-    # 2. Ações críticas bloqueadas imediatamente
+    # Ações críticas bloqueadas imediatamente
     if route["risk_level"] == "critical":
         entry = _make_entry("blocked", text, route, {"status": "blocked"}, start)
         _save(entry)
         return JSONResponse(entry)
 
-    # 3. Orquestrador LLM (run_in_threadpool evita bloquear o event loop)
-    result = await run_in_threadpool(orchestrator.process, text, _get_history_messages())
-
-    # 4. Se orquestrador identificou ação local, executa
-    action_intent = result.action_intent or route["intent"]
-    action_result = {"status": "llm", "message": result.response}
-
-    if result.requires_action and action_intent not in ("conversa", "desconhecido"):
-        action_result = actions.execute(action_intent, text)
-    elif route["intent"] not in ("conversa", "desconhecido") and not result.response:
-        action_result = actions.execute(route["intent"], text)
-
-    # 5. Resposta final
-    response_text = (
-        action_result.get("message", "")
-        if action_result.get("status") in ("ok", "blocked")
-        else result.response or action_result.get("message", "Sem resposta.")
-    )
-
-    entry = _make_entry("ok", text, route, action_result, start, result)
-    entry["response"] = response_text
+    # Núcleo único (threadpool evita bloquear o event loop)
+    out = await run_in_threadpool(_brain, text, _get_history_messages(), req.use_conclave)
+    entry = _entry_from_brain(text, out, start)
     _save(entry)
-
     return JSONResponse(entry)
 
 
@@ -316,47 +295,18 @@ async def voice_input(req: VoiceRequest):
         _save(entry)
         return JSONResponse({**entry, "response": "Ação bloqueada.", "tts": True})
 
-    action_intent = route["intent"]
-
-    # Atalho instantâneo: abridores de app inequívocos (sem conjunção "e")
-    FAST_PATH = {
-        "abrir_navegador", "abrir_openwebui", "abrir_javis",
-        "abrir_vscode", "abrir_terminal", "abrir_projeto", "status_sistema",
-    }
-    if action_intent in FAST_PATH and " e " not in f" {clean.lower()} " and not _looks_like_question(clean):
-        action_result = actions.execute(action_intent, clean)
-        response_text = action_result.get("message", "Feito, senhor.")
-        entry = _make_entry("ok", clean, route, action_result, start)
-        entry["response"] = response_text
-        entry["source"] = "voice"
-        entry["original_transcript"] = transcript
-        entry["tts"] = req.tts
-        _save(entry)
-        return JSONResponse(entry)
-
-    # Cérebro AGENTE (tool-use) — entende intenção e encadeia ações
-    import agent
-    ag = await run_in_threadpool(agent.respond, clean, _get_history_messages())
-    if ag is not None:
-        response_text = ag["text"] or "Pronto, senhor."
-        action_intent = ag["tools"][0] if ag.get("tools") else action_intent
-        action_result = {"status": "agent", "message": response_text}
-    else:
-        # Fallback sem Claude
-        response_text = await run_in_threadpool(orchestrator._main_brain, clean, _get_history_messages())
-        action_result = {"status": "llm", "message": response_text}
-
-    entry = _make_entry("ok", clean, route, action_result, start)
-    entry["response"]             = response_text
-    entry["source"]               = "voice"
-    entry["original_transcript"]  = transcript
-    entry["tts"]                  = req.tts
+    # Núcleo único — mesmo cérebro do chat
+    out = await run_in_threadpool(_brain, clean, _get_history_messages(), req.use_conclave)
+    entry = _entry_from_brain(clean, out, start)
+    entry["source"]              = "voice"
+    entry["original_transcript"] = transcript
+    entry["tts"]                 = req.tts
     _save(entry)
 
     # Memória cresce com padrões de voz (vida própria)
     try:
         from agents.memory_bridge import MemoryBridge
-        MemoryBridge().save_voice_command(clean, action_intent, "main")
+        MemoryBridge().save_voice_command(clean, out["intent"], "main")
     except Exception:
         pass
 
@@ -390,7 +340,6 @@ async def history():
 async def chat_stream(req: ChatRequest):
     """Chat com streaming token-a-token (SSE)."""
     import json as _j
-    from orchestrator import SYSTEM_MAIN_BRAIN
 
     text = req.message.strip()
     if not text:
@@ -406,75 +355,23 @@ async def chat_stream(req: ChatRequest):
         return StreamingResponse(_blocked(), media_type="text/event-stream",
                                   headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
-    intent = route.get("intent", "conversa")
-    brain  = "conclave" if req.use_conclave else "main"
-
-    # Atalho instantâneo: comandos óbvios e únicos (sem precisar do LLM)
-    # Apenas abridores de app inequívocos — tudo mais vai pro agente inteligente.
-    FAST_PATH = {
-        "abrir_navegador", "abrir_openwebui", "abrir_javis",
-        "abrir_vscode", "abrir_terminal", "abrir_projeto", "status_sistema",
-    }
-    if intent in FAST_PATH and " e " not in f" {text.lower()} " and not _looks_like_question(text):
-        def _action():
-            start = datetime.now()
-            yield f"data: {_j.dumps({'type':'meta','intent':intent,'brain':'main'})}\n\n"
-            result = actions.execute(intent, text)
-            msg = result.get("message", "Feito.")
-            entry = _make_entry("ok", text, route, result, start)
-            entry["response"] = msg
-            _save(entry)
-            yield f"data: {_j.dumps({'type':'done','text':msg,'brain':'main','intent':intent,'ms':entry['ms']})}\n\n"
-            yield "data: [DONE]\n\n"
-        return StreamingResponse(_action(), media_type="text/event-stream",
-                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    intent0 = route.get("intent", "conversa")
+    brain0  = "conclave" if req.use_conclave else "main"
 
     def _generate():
-        from llm_providers import stream_claude
         start = datetime.now()
-        yield f"data: {_j.dumps({'type':'meta','intent':intent,'brain':brain})}\n\n"
-
+        # feedback imediato (orbe acende enquanto pensa)
+        yield f"data: {_j.dumps({'type':'meta','intent':intent0,'brain':brain0})}\n\n"
         try:
-            if brain == "conclave":
-                result = orchestrator.process(text, _get_history_messages())
-                entry  = _make_entry("ok", text, route, {"status":"llm","message":result.response}, start, result)
-                _save(entry)
-                yield f"data: {_j.dumps({'type':'done','text':result.response,'brain':brain,'intent':intent,'ms':entry['ms']})}\n\n"
-                yield "data: [DONE]\n\n"
-                return
-
-            # Cérebro AGENTE (tool-use): entende intenção e encadeia ações
-            import agent
-            ag = agent.respond(text, _get_history_messages())
-            if ag is not None:
-                full = ag["text"] or "Pronto, senhor."
-                # fake-stream palavra a palavra para manter a sensação de digitação
-                for word in full.split(" "):
-                    yield f"data: {_j.dumps({'type':'token','text':word + ' '})}\n\n"
-                used_intent = ag["tools"][0] if ag.get("tools") else intent
-                entry = _make_entry("ok", text, route, {"status":"agent","message":full}, start)
-                entry["response"] = full
-                entry["intent"]   = used_intent
-                _save(entry)
-                yield f"data: {_j.dumps({'type':'done','brain':'main','intent':used_intent,'ms':entry['ms']})}\n\n"
-                yield "data: [DONE]\n\n"
-                return
-
-            # Fallback sem Claude — streaming simples (Ollama/erro)
-            messages = [{"role": "system", "content": SYSTEM_MAIN_BRAIN}]
-            messages.extend(_get_history_messages()[-6:])
-            messages.append({"role": "user", "content": text})
-            full = ""
-            for token in stream_claude(messages):
-                full += token
-                yield f"data: {_j.dumps({'type':'token','text':token})}\n\n"
-            entry = _make_entry("ok", text, route, {"status":"llm","message":full}, start)
-            entry["response"] = full
+            out = _brain(text, _get_history_messages(), req.use_conclave)
+            # fake-stream palavra a palavra (sensação de digitação)
+            for word in (out["text"] or "Pronto, senhor.").split(" "):
+                yield f"data: {_j.dumps({'type':'token','text':word + ' '})}\n\n"
+            entry = _entry_from_brain(text, out, start)
             _save(entry)
-            yield f"data: {_j.dumps({'type':'done','brain':brain,'intent':intent,'ms':entry['ms']})}\n\n"
+            yield f"data: {_j.dumps({'type':'done','brain':out['brain'],'intent':out['intent'],'ms':entry['ms']})}\n\n"
         except Exception as e:
-            yield f"data: {_j.dumps({'type':'done','text':f'⚠️ Erro interno: {e}','brain':brain,'intent':intent,'ms':0})}\n\n"
-
+            yield f"data: {_j.dumps({'type':'done','text':f'⚠️ Erro interno: {e}','brain':brain0,'intent':intent0,'ms':0})}\n\n"
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(
@@ -574,6 +471,75 @@ def _looks_like_question(text: str) -> bool:
     """True se o texto parece pergunta/consulta — nunca deve ir pro atalho de ação."""
     t = f" {text.lower().strip()} "
     return any(h in t for h in _QUESTION_HINTS)
+
+
+# Abridores de app inequívocos → atalho instantâneo (sem gastar LLM)
+FAST_PATH = {
+    "abrir_navegador", "abrir_openwebui", "abrir_javis",
+    "abrir_vscode", "abrir_terminal", "abrir_projeto", "status_sistema",
+}
+
+
+def _is_fast_path(intent: str, text: str) -> bool:
+    return (intent in FAST_PATH
+            and " e " not in f" {text.lower()} "
+            and not _looks_like_question(text))
+
+
+def _brain(text: str, history: list[dict], use_conclave: bool = False) -> dict:
+    """Núcleo ÚNICO de decisão do Jamba (usado por /chat, /chat/stream e /voice).
+
+    Cascata: atalho local → conclave (se pedido) → agente tool-use → fallback Ollama.
+    Retorna {text, intent, brain, status, tools, route, orch}.
+    """
+    route = command_router.route(text)
+    intent = route.get("intent", "conversa")
+
+    # 1) Atalho instantâneo — ação local óbvia
+    if _is_fast_path(intent, text):
+        res = actions.execute(intent, text)
+        return {"text": res.get("message", "Feito, senhor."), "intent": intent,
+                "brain": "main", "status": res.get("status", "ok"),
+                "tools": [intent], "route": route, "orch": None}
+
+    # 2) Conclave — só quando o senhor ativa o debate
+    if use_conclave:
+        try:
+            result = orchestrator.process(text, history)
+            return {"text": result.response or "Sem síntese, senhor.",
+                    "intent": getattr(result, "intent", intent), "brain": "conclave",
+                    "status": "llm", "tools": [], "route": route, "orch": result}
+        except Exception as e:
+            return {"text": f"O conclave falhou, senhor: {e}", "intent": intent,
+                    "brain": "conclave", "status": "error", "tools": [], "route": route, "orch": None}
+
+    # 3) Cérebro AGENTE (tool-use) — entende intenção e encadeia ações
+    import agent
+    ag = agent.respond(text, history)
+    if ag is not None:
+        used = ag["tools"][0] if ag.get("tools") else intent
+        return {"text": ag["text"] or "Pronto, senhor.", "intent": used,
+                "brain": "main", "status": "agent", "tools": ag.get("tools", []),
+                "route": route, "orch": None}
+
+    # 4) Fallback sem Claude/OpenAI → cérebro local (Ollama)
+    try:
+        txt = orchestrator._main_brain(text, history)
+    except Exception as e:
+        txt = f"Estou sem cérebro disponível, senhor: {e}"
+    return {"text": txt, "intent": intent, "brain": "main", "status": "llm",
+            "tools": [], "route": route, "orch": None}
+
+
+def _entry_from_brain(text: str, out: dict, start: datetime) -> dict:
+    """Monta o registro padrão a partir do resultado do _brain."""
+    entry = _make_entry("ok", text, out["route"],
+                        {"status": out["status"], "message": out["text"]},
+                        start, out.get("orch"))
+    entry["response"] = out["text"]
+    entry["intent"]   = out["intent"]
+    entry["brain"]    = out["brain"]
+    return entry
 
 
 def _get_history_messages() -> list[dict]:
