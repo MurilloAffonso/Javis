@@ -29,6 +29,14 @@ _MUSIC_FILLERS = {
 _MAX_IDEA_LEN = 2000
 
 
+def _hora_data(_: str) -> dict:
+    from datetime import datetime
+    dias = ["segunda-feira","terça-feira","quarta-feira","quinta-feira","sexta-feira","sábado","domingo"]
+    meses = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"]
+    n = datetime.now()
+    return {"status":"ok","message":f"São {n.strftime('%H:%M')}, {dias[n.weekday()]}, {n.day} de {meses[n.month-1]} de {n.year}, senhor."}
+
+
 def execute(intent: str, user_text: str = "") -> dict:
     """Despacha para o handler correto e retorna resultado padronizado."""
     handlers = {
@@ -44,6 +52,7 @@ def execute(intent: str, user_text: str = "") -> dict:
         "status_sistema":   _system_status,
         "analisar_site":    _analyze_site,
         "clima":            _weather,
+        "hora_data":        _hora_data,
         "acao_perigosa":    _blocked,
         "conversa":         _to_llm,
         "desconhecido":     _to_llm,

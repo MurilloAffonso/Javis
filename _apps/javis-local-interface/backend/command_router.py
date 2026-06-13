@@ -18,6 +18,8 @@ RULES: list[tuple[str, list[str]]] = [
     ("tocar_musica",   ["toca ", "tocar ", "toque ", "música", "musica", "playlist",
                         "som relaxante", "coloca uma música", "coloca musica",
                         "coloca uma musica", "bota uma música", "play ", "lofi", "lo-fi"]),
+    ("hora_data",      ["que horas", "qual a hora", "me diz a hora", "horário",
+                        "que dia", "qual é a data", "qual é o dia"]),
     ("abrir_youtube",  ["youtube"]),
     ("abrir_openwebui",["open webui", "openwebui", "webui", "localhost:3000",
                         "abre o javis no navegador"]),
@@ -59,6 +61,7 @@ RISK_MAP = {
     "status_sistema": ("low",      False),
     "analisar_site":  ("low",      False),
     "clima":          ("low",      False),
+    "hora_data":      ("low",      False),
     "conversa":       ("none",     False),
     "desconhecido":   ("none",     False),
 }
@@ -76,6 +79,7 @@ ACTION_MAP = {
     "status_sistema":  "check_status",
     "analisar_site":   "analyze_site",
     "clima":           "weather",
+    "hora_data":       "get_time",
     "acao_perigosa":   "blocked",
     "conversa":        "llm_chat",
     "desconhecido":    "llm_chat",
@@ -141,6 +145,7 @@ def _reason(intent: str, text: str) -> str:
         "status_sistema": "palavra-chave de status detectada",
         "analisar_site":  "pedido de análise/recriação de site detectado",
         "clima":          "pergunta sobre clima/tempo detectada",
+        "hora_data":      "pergunta sobre hora/data detectada",
         "conversa":       "sem ação identificada — encaminhar ao LLM",
         "desconhecido":   "texto curto ou sem padrão reconhecido",
     }

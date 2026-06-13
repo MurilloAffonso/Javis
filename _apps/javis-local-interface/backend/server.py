@@ -477,6 +477,7 @@ def _looks_like_question(text: str) -> bool:
 FAST_PATH = {
     "abrir_navegador", "abrir_openwebui", "abrir_javis",
     "abrir_vscode", "abrir_terminal", "abrir_projeto", "status_sistema",
+    "hora_data", "abrir_youtube", "tocar_musica", "listar_lembretes",
 }
 
 
