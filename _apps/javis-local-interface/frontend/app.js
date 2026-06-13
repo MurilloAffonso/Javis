@@ -59,6 +59,20 @@ checkStatus();
 setInterval(checkStatus, 30000);
 setInterval(_tickSession, 1000);
 setInterval(pollReminders, 15000);
+loadChatHistory();
+
+async function loadChatHistory() {
+  try {
+    const r = await fetch(`${API}/history`);
+    if (!r.ok) return;
+    const hist = await r.json();
+    const recent = hist.slice(-30);
+    for (const h of recent) {
+      if (h.role === "user") appendMsg("user", esc(h.content));
+      else if (h.role === "assistant") appendMsg("assistant", renderMarkdown(h.content));
+    }
+  } catch (e) { console.warn("Histórico:", e); }
+}
 
 // Lembretes vencidos → Jamba avisa (mostra no chat + fala)
 async function pollReminders() {

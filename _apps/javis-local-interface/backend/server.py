@@ -33,6 +33,7 @@ from pydantic import BaseModel
 import command_router
 import actions
 import logger
+import history_store
 from orchestrator import Orchestrator
 
 FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
@@ -192,6 +193,8 @@ async def chat(req: ChatRequest):
     out = await run_in_threadpool(_brain, text, _get_history_messages(), req.use_conclave)
     entry = _entry_from_brain(text, out, start)
     _save(entry)
+    history_store.append("user", text)
+    history_store.append("assistant", out["text"])
     return JSONResponse(entry)
 
 
@@ -302,6 +305,8 @@ async def voice_input(req: VoiceRequest):
     entry["original_transcript"] = transcript
     entry["tts"]                 = req.tts
     _save(entry)
+    history_store.append("user", clean)
+    history_store.append("assistant", out["text"])
 
     # Memória cresce com padrões de voz (vida própria)
     try:
@@ -329,9 +334,22 @@ async def rootcause(req: RootcauseRequest):
     return JSONResponse(result)
 
 
-@app.get("/history")
+@app.get("/history/session")
 async def history():
     return JSONResponse({"history": _history[-50:]})
+
+
+@app.get("/history")
+async def get_history():
+    """Retorna histórico de chat persistido em disco."""
+    return JSONResponse(history_store.load())
+
+
+@app.delete("/history")
+async def clear_history():
+    """Limpa o histórico de chat."""
+    history_store.clear()
+    return JSONResponse({"status": "ok"})
 
 
 # ── Streaming chat ────────────────────────────────────────

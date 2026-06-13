@@ -14,28 +14,21 @@ import actions
 CLAUDE_MODEL = os.environ.get("JAVIS_CLAUDE_MODEL", "claude-sonnet-4-6")
 OPENAI_MODEL = os.environ.get("JAVIS_OPENAI_MODEL", "gpt-4o-mini")
 
-SYSTEM_AGENT = """\
-Você é o Jamba, assistente pessoal de Murillo Affonso — um mordomo de IA estilo JARVIS.
+SYSTEM_AGENT = """Você é Jamba, assistente pessoal de Murillo Affonso.
 
-REGRA DE IDIOMA (OBRIGATÓRIA): responda SEMPRE em português do Brasil. NUNCA use inglês
-ou espanhol, mesmo que a pergunta venha noutra língua ou tenha termos estrangeiros.
+REGRAS ABSOLUTAS — NUNCA VIOLAR:
+1. IDIOMA: Responda SEMPRE em português do Brasil. NUNCA em inglês, espanhol ou outro idioma.
+2. TRATAMENTO: Chame o usuário de "senhor" ou "Murillo" — nunca "você" ou "user".
+3. VOZ: Respostas são lidas em voz alta — seja CONCISO. Máximo 2 frases para ações. Sem markdown.
+4. AÇÃO: Quando houver uma ferramenta disponível, USE-A. Não descreva o que faria — faça.
+5. SEM IMPROVISO: Nunca invente dados (preços, horários, endereços). Use as ferramentas.
 
-Trate Murillo sempre por "senhor". Tom sereno, elegante e direto.
-Como suas respostas podem ser FALADAS em voz alta, escreva de forma limpa: frases curtas,
-sem markdown (nada de *, #, listas numeradas longas ou tabelas), sem emojis. Texto corrido.
+PERFIL DE MURILLO:
+- Empreendedor, fundador da Vem Passear em Jampa (turismo em João Pessoa/PB)
+- Usa o Jamba para automatizar tarefas e agilizar operações
+- Prefere respostas diretas e curtas
 
-Você controla o computador do senhor através de ferramentas. Use-as quando ele pedir uma AÇÃO
-(abrir apps, tocar música, ver clima, analisar site, anotar ideia, status do sistema).
-Para conversa normal, responda SEM ferramentas.
-
-Se o senhor pedir mais de uma coisa numa frase ("abre o youtube e toca jazz"), chame
-MAIS DE UMA ferramenta. Depois de executar, confirme brevemente em português, de forma concisa.
-
-IMPORTANTE — conhecimento do senhor:
-Quando ele perguntar sobre o PROJETO, suas NOTAS, IDEIAS, o que está pendente/feito, o
-estado das coisas, decisões anteriores, ou QUALQUER coisa que ele tenha escrito/anotado,
-use SEMPRE a ferramenta `buscar_conhecimento` primeiro e responda com base no que ela trouxer.
-Não confunda isso com `listar_lembretes` (essa é só para lembretes/timers que ele criou).
+Hora atual: {hora_atual}
 """
 
 # Ferramentas expostas ao Claude (formato Anthropic tool-use)
@@ -177,11 +170,20 @@ TOOLS = [
     },
     {
         "name": "pesquisar_google",
-        "description": "Pesquisa um termo no Google e abre os resultados.",
+        "description": "Abre o Google no browser, pesquisa o termo e LÊ os resultados, devolvendo um resumo. Use quando o senhor quiser buscar algo na internet.",
         "input_schema": {
             "type": "object",
             "properties": {"termo": {"type": "string", "description": "O que pesquisar."}},
             "required": ["termo"],
+        },
+    },
+    {
+        "name": "ler_pagina",
+        "description": "Abre uma URL no browser e lê o conteúdo da página, resumindo para o senhor. Use quando precisar ler um site específico.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"url": {"type": "string", "description": "Endereço completo da página (ex.: 'noticias.uol.com.br')."}},
+            "required": ["url"],
         },
     },
     {
@@ -252,8 +254,13 @@ def _exec_tool(name: str, inp: dict) -> str:
         import app_launcher
         return app_launcher.open_site(inp.get("url") or "").get("message", "Feito, senhor.")
     if name == "pesquisar_google":
-        import app_launcher
-        return app_launcher.google_search(inp.get("termo") or "").get("message", "Feito, senhor.")
+        import browser as _browser
+        res = _browser.search_google(inp.get("termo") or "")
+        return res.get("message", "Feito, senhor.")
+    if name == "ler_pagina":
+        import browser as _browser
+        res = _browser.read_page(inp.get("url") or "")
+        return res.get("message", "Feito, senhor.")
     if name == "enviar_whatsapp":
         import integrations
         return integrations.whatsapp_send(inp.get("numero") or "", inp.get("mensagem") or "").get("message", "Feito, senhor.")
@@ -284,12 +291,17 @@ def _rotina_matinal() -> str:
 
 
 def _system() -> str:
-    """System prompt do agente + fatos memorizados sobre o senhor."""
+    from datetime import datetime
+    dias = ["segunda-feira","terça-feira","quarta-feira","quinta-feira","sexta-feira","sábado","domingo"]
+    meses = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"]
+    n = datetime.now()
+    hora = f"{n.strftime('%H:%M')}, {dias[n.weekday()]}, {n.day} de {meses[n.month-1]} de {n.year}"
+    base = SYSTEM_AGENT.replace("{hora_atual}", hora)
     try:
         import profile
-        return SYSTEM_AGENT + profile.context_block()
+        return base + profile.context_block()
     except Exception:
-        return SYSTEM_AGENT
+        return base
 
 
 def _respond_claude(user_text: str, history: list[dict], max_rounds: int) -> dict:
@@ -320,6 +332,52 @@ def _respond_claude(user_text: str, history: list[dict], max_rounds: int) -> dic
             continue
         text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
         return {"text": text.strip(), "tools": used}
+    return {"text": "Executei o que era possível, senhor.", "tools": used}
+
+
+def _respond_openrouter(user_text: str, history: list[dict], max_rounds: int) -> dict:
+    """Tool-use via OpenRouter (Llama 3.3 70B gratuito ou outros modelos)."""
+    from openai import OpenAI
+    model = os.environ.get("JAVIS_OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct:free")
+    client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=os.environ["OPENROUTER_API_KEY"],
+    )
+    oai_tools = [
+        {"type": "function", "function": {
+            "name": t["name"], "description": t["description"], "parameters": t["input_schema"]}}
+        for t in TOOLS
+    ]
+    messages: list[dict] = [{"role": "system", "content": _system()}]
+    for h in history[-6:]:
+        if h.get("content"):
+            messages.append({"role": h.get("role", "user"), "content": h["content"]})
+    messages.append({"role": "user", "content": user_text})
+
+    used: list[str] = []
+    for _ in range(max_rounds):
+        resp = client.chat.completions.create(model=model, messages=messages, tools=oai_tools)
+        msg = resp.choices[0].message
+        if msg.tool_calls:
+            messages.append({
+                "role": "assistant",
+                "content": msg.content or "",
+                "tool_calls": [
+                    {"id": tc.id, "type": "function",
+                     "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
+                    for tc in msg.tool_calls
+                ],
+            })
+            for tc in msg.tool_calls:
+                used.append(tc.function.name)
+                try:
+                    args = json.loads(tc.function.arguments or "{}")
+                except Exception:
+                    args = {}
+                out = _exec_tool(tc.function.name, args)
+                messages.append({"role": "tool", "tool_call_id": tc.id, "content": out or "feito"})
+            continue
+        return {"text": (msg.content or "").strip(), "tools": used}
     return {"text": "Executei o que era possível, senhor.", "tools": used}
 
 
@@ -366,19 +424,28 @@ def _respond_openai(user_text: str, history: list[dict], max_rounds: int) -> dic
 
 
 def respond(user_text: str, history: list[dict] | None = None, max_rounds: int = 5) -> dict | None:
-    """Loop de tool-use. Tenta Claude; se falhar (sem crédito/erro), tenta OpenAI.
-    Retorna {text, tools} ou None se nenhum provedor com tool-use estiver disponível."""
+    """Loop de tool-use. Cascata: OpenAI → Claude → OpenRouter.
+    Retorna {text, tools} ou None se nenhum provedor disponível."""
     history = history or []
 
+    # 1) OpenAI — primário (rápido, estável)
+    if os.environ.get("OPENAI_API_KEY", "").strip():
+        try:
+            return _respond_openai(user_text, history, max_rounds)
+        except Exception:
+            pass
+
+    # 2) Claude (Anthropic) — se tiver crédito
     if os.environ.get("ANTHROPIC_API_KEY", "").strip():
         try:
             return _respond_claude(user_text, history, max_rounds)
         except Exception:
-            pass  # ex.: saldo baixo → cai pro OpenAI
+            pass
 
-    if os.environ.get("OPENAI_API_KEY", "").strip():
+    # 3) OpenRouter — requer cartão cadastrado em openrouter.ai
+    if os.environ.get("OPENROUTER_API_KEY", "").strip():
         try:
-            return _respond_openai(user_text, history, max_rounds)
+            return _respond_openrouter(user_text, history, max_rounds)
         except Exception as e:
             return {"text": f"Tive um problema ao executar, senhor: {e}", "tools": []}
 
