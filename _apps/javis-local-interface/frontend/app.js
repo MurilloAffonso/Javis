@@ -955,9 +955,9 @@ class AutoWhisperEngine {
     this.silTimer    = null;
     this.recStart    = 0;
     this.THRESHOLD   = 0.035;   // calibrado dinamicamente no enable()
-    this.SILENCE_MS  = 1400;
-    this.MIN_REC_MS  = 600;     // ignora gravações muito curtas (ruído pontual)
-    this.MIN_BLOB    = 3000;    // bytes mínimos para enviar ao Whisper
+    this.SILENCE_MS  = 2200;
+    this.MIN_REC_MS  = 800;     // ignora gravações muito curtas (ruído pontual)
+    this.MIN_BLOB    = 4000;    // bytes mínimos para enviar ao Whisper
   }
 
   async enable() {
@@ -1064,8 +1064,11 @@ class AutoWhisperEngine {
           const data = await res.json();
           const text = data.text?.trim();
           // Filtra respostas de ruído (Whisper às vezes retorna "Obrigado." ou "..." para silêncio)
-          const isNoise = !text || text.length < 4 ||
-            /^(obrigado\.?|thanks\.?|thank you\.?|\.{2,}|música\.?)$/i.test(text);
+          const WHISPER_NOISE = /^(obrigado\.?|thanks\.?|thank you\.?|\.{2,}|música\.?|music\.?|legendas?\.?|subtitles?\.?|silence\.?|silêncio\.?|som de fundo\.?|background\.?|applause\.?|aplauso\.?|ruído\.?|noise\.?|beep\.?|bip\.?)$/i;
+          const isNoise = !text
+            || text.length < 4
+            || WHISPER_NOISE.test(text.trim())
+            || (text.length < 8 && /^[.,!?…\s]+$/.test(text));
           if (!isNoise && !sendBtn.disabled) sendVoiceMessage(text);
         }
       } catch (err) { console.warn("Auto whisper error:", err); }
@@ -1307,5 +1310,16 @@ async function speak(text) {
   utt.lang    = "pt-BR";
   utt.rate    = 1.0;
   utt.pitch   = 1.0;
+
+  neuralBrain?.setState("speaking");
+  utt.onboundary = (e) => {
+    const intensity = Math.min(1, (e.charLength || 4) / 12);
+    neuralBrain?.setLevel(0.3 + intensity * 0.7);
+  };
+  utt.onend = () => {
+    neuralBrain?.setLevel(0);
+    if (!sendBtn?.disabled) neuralBrain?.setState("idle");
+  };
+
   window.speechSynthesis.speak(utt);
 }
