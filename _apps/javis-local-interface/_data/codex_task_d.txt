@@ -1,0 +1,156 @@
+Você é um engenheiro frontend sênior trabalhando no projeto Javis (interface AIOS).
+
+IMPORTANTE — FERRAMENTAS: NÃO use nenhuma ferramenta MCP (lean-ctx, ctx_*, etc). Use apenas leitura/escrita de arquivo nativa. Trabalhe a partir da raiz do repo `C:\Users\noteacer\Desktop\javis`.
+
+CONTEXTO: Leia os arquivos `_apps/javis-local-interface/frontend/index.html`, `_apps/javis-local-interface/frontend/style.css` e `_apps/javis-local-interface/frontend/app.js` para entender a estrutura atual. O projeto tem 7 views (chat, agents, workflows, room, projects, train, integrations).
+
+TAREFA: Adicione um PAINEL DE ANALYTICS nas views `view-projects` e `view-train`. NÃO edite index.html nem app.js de forma que quebre funcionalidade existente.
+
+## 1. Analytics no view-projects (Projetos Orquestrados)
+
+No arquivo `frontend/app.js`, modifique a função `renderProjects()` para incluir, ACIMA da grade de projetos (`projects-grid`), um bloco de métricas globais do orquestrador. Adicione no DOM (via innerHTML) um `div.analytics-bar` com:
+
+```html
+<div class="analytics-bar" id="analytics-bar">
+  <div class="ab-card">
+    <div class="ab-val" id="ab-total-tasks">—</div>
+    <div class="ab-lbl">tarefas ativas</div>
+  </div>
+  <div class="ab-card">
+    <div class="ab-val" id="ab-agents-online">5</div>
+    <div class="ab-lbl">agentes online</div>
+  </div>
+  <div class="ab-card">
+    <div class="ab-val" id="ab-completions">—</div>
+    <div class="ab-lbl">completadas hoje</div>
+  </div>
+  <div class="ab-card">
+    <div class="ab-val" id="ab-efficiency">—</div>
+    <div class="ab-lbl">eficiência</div>
+  </div>
+  <div class="ab-chart-wrap">
+    <canvas id="ab-chart" width="200" height="60"></canvas>
+    <div class="ab-chart-lbl">Atividade 7 dias</div>
+  </div>
+</div>
+```
+
+Logo após renderizar o bar, chame `_drawAnalyticsChart()` que desenha um mini sparkline no canvas `ab-chart` simulando atividade dos últimos 7 dias (array de números aleatórios entre 3 e 12, cor `#7c3aed`, linha fina).
+
+Preencha os valores assim:
+- `ab-total-tasks`: soma de tarefas de PROJECTS_DATA (campo `tasks` se existir, ou `3`)
+- `ab-agents-online`: 5 (hardcoded, mas com classe `ab-val online`)
+- `ab-completions`: número aleatório fixo (ex: 14)
+- `ab-efficiency`: "87%"
+
+## 2. Analytics no view-train (SDR Academy)
+
+No arquivo `frontend/app.js`, APÓS a função `renderTrainingQueue()`, adicione uma função `renderTrainStats()` que atualiza um elemento `#train-stats` (que você vai criar no HTML).
+
+No `index.html`, DENTRO de `<div class="train-layout">`, logo ANTES de `<div class="train-queue" id="train-queue">`, adicione:
+
+```html
+<div class="train-stats" id="train-stats">
+  <div class="ts-card"><span class="ts-val" id="ts-total">0</span><span class="ts-lbl">vídeos treinados</span></div>
+  <div class="ts-card"><span class="ts-val" id="ts-chars">0k</span><span class="ts-lbl">chars absorvidos</span></div>
+  <div class="ts-card"><span class="ts-val" id="ts-agents">0</span><span class="ts-lbl">agentes treinados</span></div>
+</div>
+```
+
+A função `renderTrainStats()` deve:
+- Contar vídeos com `status === 'done'` em `_trainingQueue`
+- Somar `chars` de todos os itens done
+- Contar agentes únicos treinados (set de `item.agent` where done)
+- Atualizar os spans com os valores
+
+Chame `renderTrainStats()` dentro de `renderTrainingQueue()` ao final.
+
+## 3. CSS para os novos componentes
+
+No `frontend/style.css`, ao final do arquivo, adicione:
+
+```css
+/* ─── ANALYTICS BAR ─── */
+.analytics-bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: rgba(124,58,237,0.06);
+  border: 1px solid rgba(124,58,237,0.2);
+  border-radius: var(--radius);
+  padding: 14px 20px;
+  margin-bottom: 20px;
+}
+.ab-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 80px;
+}
+.ab-val {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--violet);
+  line-height: 1;
+}
+.ab-val.online { color: var(--emerald); }
+.ab-lbl {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 4px;
+  white-space: nowrap;
+}
+.ab-chart-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.ab-chart-lbl {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ─── TRAIN STATS ─── */
+.train-stats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.ts-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.ts-val {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--cyan);
+}
+.ts-lbl {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+```
+
+## REGRAS RÍGIDAS
+- NÃO remova classes, IDs ou funcionalidade existente
+- NÃO adicione dependências externas
+- NÃO use ferramentas MCP
+- Edições incrementais e cirúrgicas
+
+Ao terminar, liste em 3 linhas o que foi alterado em cada arquivo.

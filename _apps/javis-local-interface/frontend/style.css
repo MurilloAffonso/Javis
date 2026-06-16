@@ -1363,3 +1363,35 @@ body::before {
 .mission-item.active {
   box-shadow: inset 3px 0 0 var(--violet), 0 0 20px rgba(124,58,237,0.10);
 }
+
+/* ─── TOAST NOTIFICATIONS ─── */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.toast {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--violet);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--text);
+  max-width: 300px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  opacity: 0;
+  transform: translateX(20px);
+  transition: opacity 0.25s, transform 0.25s;
+  pointer-events: auto;
+}
+.toast.show { opacity: 1; transform: translateX(0); }
+.toast.success { border-left-color: var(--emerald); }
+.toast.warning { border-left-color: var(--amber); }
+.toast.error   { border-left-color: var(--red); }

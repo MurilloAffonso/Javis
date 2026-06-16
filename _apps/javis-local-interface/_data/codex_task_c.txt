@@ -1,0 +1,84 @@
+Você é um especialista sênior em SEO local, marketing digital para turismo e growth para pequenos negócios no Brasil.
+
+IMPORTANTE — FERRAMENTAS: NÃO use nenhuma ferramenta MCP (lean-ctx, ctx_*). Use apenas leitura/escrita de arquivo nativa. Trabalhe a partir da raiz do repo `C:\Users\noteacer\Desktop\javis`.
+
+CONTEXTO DO NEGÓCIO:
+- Nome: "Vem Passear Jampa" / operado pelo Murillo em João Pessoa (PB)
+- Passeios: Piscinas Naturais do Seixas (R$65), Piscinas do Picãozinho (R$75), Litoral Norte (R$90/adulto), Combo Duplo Seixas+Picãozinho (R$120), Passeio Infantil (R$40)
+- Canal de vendas: WhatsApp + Instagram (sem site próprio ativo)
+- Concorrência: dezenas de outros barqueiros/passeios em João Pessoa
+- Objetivo: aparecer primeiro no Google quando turista pesquisa "passeio João Pessoa", "piscinas naturais João Pessoa", "passeio de barco João Pessoa"
+
+CONTEXTO DO SISTEMA: O agente Midas (tráfego/growth) e Nova (criativa) do Cérebro Jampa vão executar esse plano. Leia `_projetos/cerebro-jampa/linha-editorial.md` para entender o posicionamento e o tom de voz já definido.
+
+TAREFA: Crie um documento completo de SEO e visibilidade digital para Vem Passear Jampa. Salve em `_projetos/cerebro-jampa/seo-plano.md` (crie as pastas se não existirem).
+
+O documento deve conter:
+
+## 1. DIAGNÓSTICO ATUAL
+Análise do cenário: o negócio vende só pelo WhatsApp/Instagram sem site — quais oportunidades e riscos isso representa para visibilidade orgânica. Listar os 5 principais gaps de SEO que um negócio nessa situação tipicamente tem.
+
+## 2. PALAVRAS-CHAVE PRIORITÁRIAS
+Lista de 30 palavras-chave organizadas por prioridade (alta/média/baixa) e intenção (informacional/transacional/navegacional):
+- Foco em João Pessoa, piscinas naturais, passeio de barco, turismo PB
+- Inclua volume estimado (baixo/médio/alto) e dificuldade (fácil/médio/difícil)
+- Identifique 5 "quick wins" (alta intenção, baixa concorrência)
+
+## 3. GOOGLE BUSINESS PROFILE (GBP) — PRIORIDADE #1
+Guia passo a passo para otimizar o perfil gratuito do Google Meu Negócio:
+- Categoria principal e categorias secundárias ideais para passeio turístico
+- Campos obrigatórios a preencher (horários, áreas de serviço, atributos)
+- Estratégia de fotos: quantas, quais tipos, resolução, frequência de atualização
+- Como coletar avaliações: template de mensagem para pedir review no WhatsApp após o passeio
+- Posts no GBP: frequência e formato (ofertas, novidades, fotos de passeio)
+- Como responder avaliações (positivas e negativas) — templates prontos
+- Métricas para monitorar: visualizações, chamadas, direções, cliques no site
+
+## 4. INSTAGRAM SEO (OTIMIZAÇÃO INTERNA)
+- Bio otimizada: modelo com palavras-chave, chamada para WhatsApp, link
+- Alt text para fotos: exemplos de descrição com palavras-chave naturais
+- Hashtag strategy: 3 camadas (nicho local, turismo nacional, tendência) — lista de 40 hashtags classificadas
+- Nome de usuário e nome de exibição ideais
+- Palavras-chave nos captions: como inserir naturalmente sem parecer spam
+- Highlights do Stories: quais criar, como nomear para SEO interno do Instagram
+- Reels SEO: título, legenda com palavras-chave, quando postar
+
+## 5. WHATSAPP BUSINESS SEO
+- Catálogo de produtos/serviços: como criar e otimizar (nomes, descrições, preços, fotos)
+- Descrição do negócio com palavras-chave
+- Mensagem automática de saudação e ausência otimizadas para conversão
+- Link bio do WhatsApp: usar wa.me/ com mensagem pré-preenchida
+
+## 6. ESTRATÉGIA DE LINK BUILDING LOCAL (GRATUITO)
+- 10 diretórios/portais onde cadastrar o negócio gratuitamente (TripAdvisor, Booking Activities, Viator, GetYourGuide, Turismo PB, etc.)
+- Como criar perfil em cada um — o que preencher
+- Parcerias de permuta de link: hotéis, pousadas, blogs de turismo em JP
+- Como abordar blogueiros/influenciadores locais de turismo
+
+## 7. CRIAÇÃO DE CONTEÚDO PARA SEO (BLOG/YOUTUBE)
+Mesmo sem site, o Murillo pode criar conteúdo que ranqueia:
+- 10 ideias de vídeos YouTube com palavras-chave de cauda longa (ex: "piscinas naturais João Pessoa maré")
+- Como otimizar vídeos no YouTube: título, descrição, tags, thumbnail
+- Sugestão de micro-blog gratuito (LinkTree Pro, Notion público, Google Sites) para hospedar conteúdo e capturar tráfego
+- 5 artigos curtos para postar no Google Business Profile como "Updates"
+
+## 8. CALENDÁRIO DE SEO (90 DIAS)
+Roadmap prático mês a mês:
+- Mês 1: Fundação (GBP, WhatsApp Business, diretórios básicos)
+- Mês 2: Conteúdo (fotos GBP, Instagram SEO, primeiros vídeos)
+- Mês 3: Crescimento (link building, avaliações, análise de resultados)
+Para cada mês: 5 ações específicas com responsável (Murillo/Nova/Midas/automático)
+
+## 9. MÉTRICAS E ACOMPANHAMENTO
+- KPIs para medir: visibilidade no Google Maps, seguidores Instagram, taxa de conversão WhatsApp, avaliações GBP
+- Ferramentas gratuitas: Google Search Console, GBP Insights, Instagram Insights, Ubersuggest free
+- Frequência de revisão e o que ajustar
+- Meta de 90 dias: mínimo de avaliações no GBP, posição no Google Maps para "passeio João Pessoa"
+
+## 10. AUTOMAÇÃO COM AGENTES JAVIS
+- Como o agente Midas pode monitorar palavras-chave automaticamente (via busca web periódica)
+- Como o agente Nova pode adaptar legendas para SEO automaticamente
+- Alertas: mencionar no plano que o Javis pode ser programado para monitorar menções da marca
+- Script de coleta de avaliações: Midas envia mensagem WhatsApp pós-passeio solicitando review
+
+Seja específico, acionável e focado no nicho de turismo local em João Pessoa. Português do Brasil. Use tabelas e listas quando facilitar a leitura. Ao final, escreva um RESUMO EXECUTIVO de 10 linhas com as 5 ações mais importantes para fazer nos próximos 7 dias.

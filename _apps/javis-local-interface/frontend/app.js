@@ -1565,10 +1565,26 @@ const WF_NODES = [
 ];
 const WF_EDGES = [['n0','n1'],['n0','n2'],['n1','n3'],['n2','n3'],['n3','n4']];
 
-function initWorkflowCanvas() {
+async function fetchMissions() {
+  try {
+    const r = await fetch(`${API}/missions`);
+    if (!r.ok) return;
+    const data = await r.json();
+    if (data.missions) {
+      data.missions.forEach(m => {
+        const existing = MISSIONS.find(x => x.id === m.id);
+        if (existing) { existing.pct = m.pct; existing.active = m.active; }
+        else MISSIONS.push(m);
+      });
+    }
+  } catch { /* backend offline — use hardcoded */ }
+}
+
+async function initWorkflowCanvas() {
+  await fetchMissions();
   const list = document.getElementById('missions-list');
   if (list) list.innerHTML = MISSIONS.map(m => `
-    <div class="mission-item ${m.active?'active':''}" data-mid="${m.id}">
+    <div class="mission-item ${m.active?'active':''}" data-mid="${m.id}" onclick="selectMission('${m.id}')">
       <div class="mi-name">${m.name}</div>
       <div class="mi-progress-row">
         <div class="mi-bar"><div class="mi-bar-fill" style="width:${m.pct}%"></div></div>
@@ -1590,6 +1606,11 @@ function initWorkflowCanvas() {
     canvas.appendChild(div);
   });
   requestAnimationFrame(() => drawWfEdges());
+}
+
+function selectMission(mid) {
+  MISSIONS.forEach(m => m.active = (m.id === mid));
+  initWorkflowCanvas();
 }
 
 function drawWfEdges() {
@@ -1681,6 +1702,7 @@ document.addEventListener('click', async e => {
       item.status   = 'done';
       item.progress = 100;
       item.chars    = data.chars;
+      showToast(`✅ ${item.agent} absorveu: ${item.title}`, 'success');
     }
     renderTrainingQueue();
   } catch (err) {
@@ -1719,6 +1741,33 @@ const INTEGRATIONS_DATA = [
   { id:'linkedin',  name:'LinkedIn',      icon:'🔗', status:'disconnected', desc:'Prospecção B2B e conexões' },
   { id:'evolution', name:'Evolution API', icon:'⚡', status:'disconnected', desc:'WhatsApp automatizado via API' },
 ];
+
+/* ─── TOAST SYSTEM ─────────────────────────────────────────── */
+function showToast(msg, type = 'info', duration = 3500) {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  container.appendChild(t);
+  requestAnimationFrame(() => { requestAnimationFrame(() => t.classList.add('show')); });
+  setTimeout(() => {
+    t.classList.remove('show');
+    setTimeout(() => t.remove(), 300);
+  }, duration);
+}
+
+/* ─── KEYBOARD SHORTCUTS ────────────────────────────────────── */
+document.addEventListener('keydown', e => {
+  if (e.key === '/' && document.activeElement !== inputEl && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    switchView('chat');
+    inputEl && inputEl.focus();
+  }
+  if (e.key === 'Escape' && document.activeElement === inputEl) {
+    inputEl.blur();
+  }
+});
 
 function renderIntegrations() {
   const grid = document.getElementById('integrations-grid');
