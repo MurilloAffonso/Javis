@@ -1,0 +1,17 @@
+Você é um estrategista de conteúdo e growth sênior, especialista em redes sociais para negócios locais de turismo no Brasil.
+
+IMPORTANTE — FERRAMENTAS: NÃO use nenhuma ferramenta MCP (lean-ctx, ctx_*). Use apenas leitura/escrita de arquivo nativa. Trabalhe a partir da raiz do repo `C:\Users\noteacer\Desktop\javis`.
+
+CONTEXTO DO NEGÓCIO: "Vem Passear Jampa" / "Cérebro Jampa" — empresa de passeios turísticos em João Pessoa (PB): piscinas naturais (Seixas, Picãozinho), litoral norte, combos. Vendas pelo WhatsApp/Instagram. O dono é o Murillo. O sistema Javis orquestra agentes de IA para esse negócio.
+
+TAREFA: Crie um sistema de LINHA EDITORIAL para Instagram, pronto para o squad de agentes executar. Estude (do seu conhecimento) as melhores práticas atuais de conteúdo para turismo local e produza um documento estruturado e acionável. Salve em `_projetos/cerebro-jampa/linha-editorial.md` (crie as pastas se não existirem).
+
+O documento deve conter:
+1. POSICIONAMENTO: tom de voz, pilares de conteúdo (ex: paraíso local, prova social, bastidores, oferta/urgência, educativo sobre os passeios), proporção ideal entre eles.
+2. CALENDÁRIO SEMANAL: o que postar cada dia (feed, reels, stories) — modelo replicável de 7 dias.
+3. FORMATOS DE REEL que performam em turismo (ex: POV chegando na piscina, antes/depois, "3 motivos pra...", depoimento, trend com áudio). Para cada um: estrutura de roteiro (gancho 3s, desenvolvimento, CTA).
+4. FERRAMENTAS DE PRODUÇÃO recomendadas e como encaixam no fluxo: comparar Canva, CapCut, Adobe Express, InShot — pontos fortes, qual usar para quê, quais têm API/automação para integração futura com o Javis. Seja concreto e honesto sobre limitações de API.
+5. PIPELINE DE AUTOMAÇÃO sugerido: como o agente Nova (diretora criativa) + Midas (tráfego) poderiam gerar pauta -> roteiro -> legenda -> hashtags -> agendamento. Indique pontos onde precisa de humano no loop.
+6. 30 IDEIAS DE POST prontas (título + formato + gancho) específicas para os passeios de João Pessoa.
+
+Seja específico para o nicho, nada genérico. Português do Brasil. Ao final, resuma em 5 linhas o que entregou.
