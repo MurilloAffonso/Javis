@@ -54,18 +54,32 @@ Depois:
 
 ---
 
-## Resultado do /doctor e /mcp
+## Resultado (2026-06-11)
 
-> **PENDENTE** — necessário reiniciar o Claude Code para aplicar a mudança no MCP.
-> Após reiniciar, rode `/doctor` e `/mcp` e atualize este arquivo com os resultados.
+**STATUS: OPERACIONAL**
+
+- MCP conectado e respondendo (memory_save, memory_recall, ferramentas completas ativas)
+- Tarefa agendada: `AgentMemory - Javis` (Windows Task Scheduler)
+- Processo: `iii` — reiniciar via task scheduler se travar
+- Porta 3111: API ativa
+- Porta 3113: Dashboard em http://localhost:3113
+
+### Se o processo iii travar (timeout):
+```powershell
+Stop-Process -Name iii -Force
+Start-ScheduledTask -TaskName "AgentMemory - Javis"
+```
 
 ---
 
-## Próximo Passo
+## Vault Javis (2026-06-11)
 
-1. Fechar o Claude Code completamente.
-2. Confirmar que a porta 3111 ainda está ativa (o serviço agentmemory deve estar rodando como Task do Windows).
-3. Abrir o Claude Code novamente na pasta `javis`.
-4. Rodar `/doctor` — esperado: 0 setup issues.
-5. Rodar `/mcp` — esperado: agentmemory aparece como conectado.
-6. Atualizar este STATUS.md com os resultados.
+8 memórias salvas cobrindo:
+- Arquitetura e stack do projeto
+- Regras críticas (dry_run, git, escopo)
+- Protocolo de sessão (abrir/fechar)
+- Ferramentas MCP ativas (lean-ctx, codegraph, playwright)
+- Estado dos testes (189/189 passando)
+- Próximos passos
+- Git/GitHub: https://github.com/MurilloAffonso/Javis.git
+- Obsidian vault (ID: 03722e6d2a77c12e)

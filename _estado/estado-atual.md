@@ -15,7 +15,7 @@
 | Open WebUI | ✅ rodando | localhost:3000 (Docker) |
 | Ollama + llama3.2:3b | ✅ rodando | porta 11434 |
 | voz-sandbox (Open-LLM-VTuber) | ⏸ separado | porta 12393, não integrado ao Javis |
-| Headroom | ❌ não instalado | falhou por incompatibilidade Python 3.14 + PyO3 |
+| Headroom | ✅ instalado | v0.24.0, compilado com Rust, `headroom wrap claude` disponível |
 
 ---
 

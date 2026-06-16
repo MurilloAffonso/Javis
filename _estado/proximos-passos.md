@@ -1,7 +1,7 @@
 # Próximos Passos — Javis
 
-**Atualizado:** 2026-06-11
-**Responsável:** Claude Code — Auditor de Economia de Tokens
+**Atualizado:** 2026-06-13
+**Responsável:** Claude Code
 
 ---
 
@@ -22,24 +22,26 @@
 
 ---
 
-## Prioridade 3 — Voz (APROVAÇÃO NECESSÁRIA)
+## ✅ Prioridade 3 — Voz Fase 2 (CONCLUÍDO 2026-06-13)
 
-- [ ] Fase 2: liberar execução real de 9 intents seguros por voz
-- [ ] dry_run=True → dry_run=False após Murillo validar os logs
-- [ ] Status atual: já implementado em single_conversation.py, só aguarda aprovação
+- [x] dry_run=False ativado em voice_bridge.py
+- [x] 9 intents seguros executam via _brain() em tempo real
+- [x] Logs agora registram `status: executed` ao invés de `dry_run_only`
 
 ---
 
-## Prioridade 4 — Headroom (APROVAÇÃO NECESSÁRIA)
+## ✅ Prioridade 4 — Headroom (CONCLUÍDO 2026-06-13)
 
-- [ ] Workaround: `PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1 pip install headroom-ai`
-- [ ] Aguardando aprovação de Murillo desde 2026-06-10
+- [x] headroom-ai 0.24.0 instalado (compilado com Rust via winget)
+- [x] `headroom.exe` disponível em `AppData\Roaming\Python\Python314\Scripts`
+- [x] Scripts adicionados ao PATH do usuário
 
 ---
 
 ## Backlog
 
 - [ ] git init dentro de javis/ para isolamento do repositório do usuário
-- [ ] `_memoria/murillo.md` com contexto completo (existe mas pode ser expandido)
+- [x] `_memoria/murillo.md` expandido — negócio, setup, estilo de decisão (2026-06-13)
+- [x] `_memoria/perfil.json` — 10 fatos pré-carregados para o agente (2026-06-13)
 - [ ] Definir primeiro projeto ativo em `_projetos/`
-- [ ] Integrar voz-sandbox ao Javis (hoje está separado em `_ferramentas/`)
+- [x] Integrar voz-sandbox ao Javis — avatar usa `/v1/chat/completions` (2026-06-13)

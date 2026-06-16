@@ -1233,16 +1233,23 @@ async function sendVoiceMessage(text) {
   setLoading(true);
   clearAgentActivity();
 
+  // Para áudio anterior
+  if (_currentAudio) { _currentAudio.pause(); _currentAudio = null; }
+  _audioQueue.length = 0;
+  _audioPlaying = false;
+
   const typing = appendTyping("processando voz...");
+  let fullText = "";
+  let msgDiv = null;
 
   try {
-    const res = await fetch(`${API}/voice`, {
+    const res = await fetch(`${API}/voice/stream`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         transcript:   text,
-        model:        modelSel.value,
-        use_conclave: useConclave.checked,
+        model:        modelSel?.value || "",
+        use_conclave: useConclave?.checked || false,
         tts:          useTts?.checked ?? true,
       }),
     });
@@ -1255,15 +1262,56 @@ async function sendVoiceMessage(text) {
       return;
     }
 
-    const data = await res.json();
-    handleResponse(data);
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
 
-    if (data.tts && (useTts?.checked ?? true)) {
-      speak(data.response || "");
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop();
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const raw = line.slice(6).trim();
+        if (raw === "[DONE]") break;
+        let evt;
+        try { evt = JSON.parse(raw); } catch (_) { continue; }
+
+        if (evt.type === "audio") {
+          enqueueAudio(evt.b64);
+          if (evt.sentence) fullText += (fullText ? " " : "") + evt.sentence;
+        } else if (evt.type === "tts_text") {
+          speak(evt.text);
+          fullText = evt.text;
+        } else if (evt.type === "token") {
+          fullText += evt.text;
+        } else if (evt.type === "meta" && evt.text) {
+          fullText = evt.text;
+        } else if (evt.type === "done") {
+          if (evt.text) fullText = evt.text;
+          if (!msgDiv) {
+            msgDiv = appendMsg("assistant", renderMarkdown(fullText),
+                               { intent: evt.intent, brain: evt.brain, ms: evt.ms });
+          }
+          setBrain(evt.brain || "main");
+          _msgCount++;
+          if (statCount)  statCount.textContent  = _msgCount;
+          if (sysCountEl) sysCountEl.textContent = _msgCount;
+          if (evt.ms != null && sysMsEl) sysMsEl.textContent = evt.ms + "ms";
+          if (evt.intent && sysIntentEl) sysIntentEl.textContent = evt.intent;
+        }
+      }
+    }
+
+    if (!msgDiv && fullText) {
+      appendMsg("assistant", renderMarkdown(fullText));
     }
 
   } catch (err) {
-    typing.remove();
+    typing?.remove();
     if (err.name === "TypeError") {
       appendMsg("error", "⚠️ Servidor offline.");
     } else {
@@ -1275,6 +1323,38 @@ async function sendVoiceMessage(text) {
 }
 
 let _currentAudio = null;
+
+// Fila de áudio — reproduz chunks em ordem sem gaps
+const _audioQueue = [];
+let _audioPlaying = false;
+
+function enqueueAudio(b64) {
+  const bytes = atob(b64);
+  const arr = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+  const blob = new Blob([arr], { type: "audio/mpeg" });
+  _audioQueue.push(URL.createObjectURL(blob));
+  _drainAudioQueue();
+}
+
+function _drainAudioQueue() {
+  if (_audioPlaying || _audioQueue.length === 0) return;
+  _audioPlaying = true;
+  const url = _audioQueue.shift();
+  _currentAudio = new Audio(url);
+  neuralBrain?.setState("speaking");
+  _currentAudio.onended = () => {
+    URL.revokeObjectURL(url);
+    _currentAudio = null;
+    _audioPlaying = false;
+    if (_audioQueue.length > 0) {
+      _drainAudioQueue();
+    } else {
+      if (!sendBtn?.disabled) neuralBrain?.setState("idle");
+    }
+  };
+  _currentAudio.play().catch(() => { _audioPlaying = false; });
+}
 
 function cleanForSpeech(text) {
   return String(text || "")

@@ -1,15 +1,30 @@
 @echo off
-:: Javis — Launcher
+:: Javis — Launcher (robusto)
+:: Sobe o servidor se ele nao estiver REALMENTE respondendo e abre o browser.
 
-:: Se o servidor já está rodando, só abre o browser
-netstat -an 2>nul | findstr ":8000 " >nul 2>&1
-if %errorlevel%==0 goto :abrir
+cd /d C:\Users\noteacer\Desktop\javis\_apps\javis-local-interface
 
-:: Inicia o servidor (janela minimizada, fica aberta para ver erros)
-start "Javis Server" /MIN cmd /k "cd /d C:\Users\noteacer\Desktop\javis\_apps\javis-local-interface && C:\Python314\python.exe backend\server.py"
+:: Health check de verdade: o servidor responde em http://localhost:8000 ?
+curl -s -o nul -m 2 http://localhost:8000/ && goto :abrir
 
-:: Aguarda o servidor subir (5s)
-timeout /t 5 /nobreak >nul
+echo.
+echo  [Javis] Servidor nao esta respondendo. Subindo...
+echo.
+
+:: Janela visivel (nao minimizada) para enxergar erros se cair
+start "Javis Server" cmd /k "cd /d C:\Users\noteacer\Desktop\javis\_apps\javis-local-interface && C:\Python314\python.exe backend\server.py"
+
+:: Espera o servidor responder (ate ~25s), checando a cada 1s
+set /a tries=0
+:wait
+timeout /t 1 /nobreak >nul
+curl -s -o nul -m 2 http://localhost:8000/ && goto :abrir
+set /a tries+=1
+if %tries% lss 25 goto :wait
+
+echo.
+echo  [Javis] O servidor nao subiu a tempo. Veja a janela "Javis Server" para o erro.
+echo.
 
 :abrir
 start "" "http://localhost:8000"

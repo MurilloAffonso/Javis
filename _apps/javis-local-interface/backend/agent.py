@@ -14,6 +14,16 @@ import actions
 CLAUDE_MODEL = os.environ.get("JAVIS_CLAUDE_MODEL", "claude-sonnet-4-6")
 OPENAI_MODEL = os.environ.get("JAVIS_OPENAI_MODEL", "gpt-4o-mini")
 
+# Timeout (s) por chamada de LLM — evita que a cascata empilhe espera invisível
+# quando um provedor está lento ou sem crédito (causa nº 1 de "travamento").
+LLM_TIMEOUT = float(os.environ.get("JAVIS_LLM_TIMEOUT", "20"))
+
+
+def _log(msg: str) -> None:
+    """Log visível no console do servidor — para de engolir falhas em silêncio."""
+    import sys
+    print(f"[agent] {msg}", file=sys.stderr, flush=True)
+
 SYSTEM_AGENT = """Você é Jamba, assistente pessoal de Murillo Affonso.
 
 REGRAS ABSOLUTAS — NUNCA VIOLAR:
@@ -143,10 +153,10 @@ TOOLS = [
     },
     {
         "name": "programar",
-        "description": "Delega uma tarefa de PROGRAMAÇÃO ao Codex, que escreve código dentro do projeto. Use quando o senhor pedir para criar/alterar código, scripts ou arquivos do projeto.",
+        "description": "Delega uma tarefa de EXECUÇÃO ao motor de execução (Claude Code pela assinatura): escrever/alterar código, criar arquivos, rodar comandos/testes ou tarefas multi-step dentro do projeto. Use quando o senhor pedir para 'programar', 'criar', 'executar' ou 'fazer' algo no projeto. Roda em segundo plano e avisa ao terminar.",
         "input_schema": {
             "type": "object",
-            "properties": {"tarefa": {"type": "string", "description": "Descrição clara do que programar."}},
+            "properties": {"tarefa": {"type": "string", "description": "Descrição clara da tarefa a executar."}},
             "required": ["tarefa"],
         },
     },
@@ -156,6 +166,15 @@ TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {"nome": {"type": "string", "description": "Nome do app/janela a abrir."}},
+            "required": ["nome"],
+        },
+    },
+    {
+        "name": "abrir_pasta",
+        "description": "Abre uma PASTA nomeada do PC no explorador: Documentos, Downloads, Imagens/Fotos, Vídeos, Música ou Desktop (ou um caminho completo). Use para 'abre minha pasta de documentos', 'abre os downloads', etc. NÃO confundir com abrir_projeto (pasta do Jamba).",
+        "input_schema": {
+            "type": "object",
+            "properties": {"nome": {"type": "string", "description": "Nome da pasta (documentos, downloads, imagens, vídeos, música, desktop) ou caminho completo."}},
             "required": ["nome"],
         },
     },
@@ -245,11 +264,19 @@ def _exec_tool(name: str, inp: dict) -> str:
         n = datetime.now()
         return f"São {n.strftime('%H:%M')}, {dias[n.weekday()]}, {n.day} de {meses[n.month-1]} de {n.year}, senhor."
     if name == "programar":
+        tarefa = inp.get("tarefa") or ""
+        # Execução pela ASSINATURA do Claude (Claude Code headless); Codex como reserva.
+        import claude_exec
+        if claude_exec.available():
+            return claude_exec.dispatch(tarefa)
         import code_agent
-        return code_agent.dispatch(inp.get("tarefa") or "")
+        return code_agent.dispatch(tarefa)
     if name == "abrir_app":
         import app_launcher
         return app_launcher.open_app(inp.get("nome") or "").get("message", "Feito, senhor.")
+    if name == "abrir_pasta":
+        import app_launcher
+        return app_launcher.open_folder(inp.get("nome") or "").get("message", "Feito, senhor.")
     if name == "abrir_site":
         import app_launcher
         return app_launcher.open_site(inp.get("url") or "").get("message", "Feito, senhor.")
@@ -307,7 +334,7 @@ def _system() -> str:
 def _respond_claude(user_text: str, history: list[dict], max_rounds: int) -> dict:
     """Tool-use via Claude (Anthropic). Levanta exceção em erro (p/ permitir fallback)."""
     import anthropic
-    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"], timeout=LLM_TIMEOUT)
     messages: list[dict] = []
     for h in history[-6:]:
         if h.get("content"):
@@ -342,6 +369,7 @@ def _respond_openrouter(user_text: str, history: list[dict], max_rounds: int) ->
     client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=os.environ["OPENROUTER_API_KEY"],
+        timeout=LLM_TIMEOUT,
     )
     oai_tools = [
         {"type": "function", "function": {
@@ -384,7 +412,7 @@ def _respond_openrouter(user_text: str, history: list[dict], max_rounds: int) ->
 def _respond_openai(user_text: str, history: list[dict], max_rounds: int) -> dict:
     """Tool-use via OpenAI (function calling). Levanta exceção em erro."""
     from openai import OpenAI
-    client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+    client = OpenAI(api_key=os.environ["OPENAI_API_KEY"], timeout=LLM_TIMEOUT, max_retries=1)
     oai_tools = [
         {"type": "function", "function": {
             "name": t["name"], "description": t["description"], "parameters": t["input_schema"]}}
@@ -432,21 +460,48 @@ def respond(user_text: str, history: list[dict] | None = None, max_rounds: int =
     if os.environ.get("OPENAI_API_KEY", "").strip():
         try:
             return _respond_openai(user_text, history, max_rounds)
-        except Exception:
-            pass
+        except Exception as e:
+            _log(f"OpenAI (tool-use) falhou, tentando próximo: {e}")
 
     # 2) Claude (Anthropic) — se tiver crédito
     if os.environ.get("ANTHROPIC_API_KEY", "").strip():
         try:
             return _respond_claude(user_text, history, max_rounds)
-        except Exception:
-            pass
+        except Exception as e:
+            _log(f"Claude (tool-use) falhou, tentando próximo: {e}")
 
     # 3) OpenRouter — requer cartão cadastrado em openrouter.ai
     if os.environ.get("OPENROUTER_API_KEY", "").strip():
         try:
             return _respond_openrouter(user_text, history, max_rounds)
         except Exception as e:
+            _log(f"OpenRouter (tool-use) falhou: {e}")
             return {"text": f"Tive um problema ao executar, senhor: {e}", "tools": []}
 
     return None
+
+
+def stream_text(user_text: str, history: list[dict]):
+    """Stream raw text tokens via OpenAI (sem tool-use). Retorna generator ou None se indisponível."""
+    if not os.environ.get("OPENAI_API_KEY", "").strip():
+        return None
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=os.environ["OPENAI_API_KEY"], timeout=LLM_TIMEOUT, max_retries=1)
+        messages: list[dict] = [{"role": "system", "content": _system()}]
+        for h in (history or [])[-6:]:
+            if h.get("content"):
+                messages.append({"role": h.get("role", "user"), "content": h["content"]})
+        messages.append({"role": "user", "content": user_text})
+        stream = client.chat.completions.create(
+            model=OPENAI_MODEL, messages=messages, stream=True
+        )
+
+        def _iter():
+            for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+
+        return _iter()
+    except Exception:
+        return None

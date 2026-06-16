@@ -18,12 +18,38 @@ URLS = {
     "open_openwebui": "http://localhost:3000",
 }
 
+# Sites que o senhor pode pedir pelo nome ("abre o instagram")
+_KNOWN_SITES = {
+    "instagram":   "https://www.instagram.com",
+    "facebook":    "https://www.facebook.com",
+    "whatsapp":    "https://web.whatsapp.com",
+    "gmail":       "https://mail.google.com",
+    "google maps": "https://www.google.com/maps",
+    "maps":        "https://www.google.com/maps",
+    "drive":       "https://drive.google.com",
+    "chatgpt":     "https://chat.openai.com",
+    "google":      "https://www.google.com",
+}
+
+# Palavras de comando removidas ao montar uma busca no navegador
+_BROWSER_FILLERS = {
+    "abra", "abre", "abrir", "entra", "entre", "entrar", "vai", "no", "na",
+    "o", "a", "navegador", "browser", "chrome", "firefox", "edge", "internet",
+    "pra", "para", "mim", "por", "favor", "e", "me", "quero", "que", "você",
+    "voce", "jamba", "site", "pagina", "página", "da", "do", "de",
+    "procura", "procurar", "pesquisa", "pesquisar", "busca", "buscar", "acessa",
+    "acessar", "abre o", "no navegador",
+}
+
 # Termos genéricos que removemos para extrair o que tocar de fato
 _MUSIC_FILLERS = {
     "toca", "tocar", "toque", "coloca", "colocar", "bota", "botar", "play",
     "uma", "um", "o", "a", "de", "do", "da", "no", "na", "som", "música",
     "musica", "playlist", "aí", "ai", "por", "favor", "pra", "para", "mim",
     "jamba", "youtube",
+    # verbos de comando que vazavam para a busca (ex.: "abra o youtube e toque racionais")
+    "abra", "abre", "abrir", "entra", "entre", "entrar", "vai", "quero", "que",
+    "e", "me",
 }
 
 _MAX_IDEA_LEN = 2000
@@ -49,6 +75,7 @@ def execute(intent: str, user_text: str = "") -> dict:
         "abrir_terminal":   _open_terminal,
         "abrir_projeto":    lambda t: _open_javis_folder(t),
         "registrar_ideia":  _register_idea,
+        "listar_lembretes": _list_reminders,
         "status_sistema":   _system_status,
         "analisar_site":    _analyze_site,
         "clima":            _weather,
@@ -66,9 +93,51 @@ def execute(intent: str, user_text: str = "") -> dict:
 
 # --- handlers individuais ---
 
-def _open_browser(_: str) -> dict:
-    webbrowser.open(URLS["open_browser"])
-    return {"status": "ok", "message": "Navegador aberto."}
+def _browser_target(text: str) -> tuple[str, str]:
+    """Decide PRA ONDE abrir o navegador a partir do que o senhor falou.
+    Retorna (url, rótulo amigável)."""
+    import re
+    import urllib.parse
+
+    raw = text or ""
+    low = raw.lower()
+
+    # 1) URL explícita (https://...)
+    m = re.search(r"https?://[^\s]+", raw)
+    if m:
+        url = m.group(0).rstrip(".,;)")
+        return url, url
+
+    # 2) domínio solto (ex.: "vempassearjampa.com.br")
+    m = re.search(r"\b([a-z0-9-]+\.(?:com|com\.br|net|org|io|dev|app|gov|edu)(?:\.[a-z]{2})?)\b", low)
+    if m:
+        return "https://" + m.group(1), m.group(1)
+
+    # 3) Instagram da Vem Passear — só abre o perfil se o handle estiver configurado (.env)
+    if "instagram" in low and ("vem passear" in low or "vempassear" in low or "jampa" in low):
+        handle = os.environ.get("VEMPASSEAR_INSTAGRAM", "").strip().lstrip("@")
+        if handle:
+            return f"https://www.instagram.com/{handle}", f"o Instagram @{handle}"
+
+    # 4) site conhecido pelo nome (instagram, gmail, maps...)
+    for name, url in _KNOWN_SITES.items():
+        if name in low:
+            return url, name.capitalize()
+
+    # 5) sobrou conteúdo? faz uma busca no Google
+    words = [w for w in re.findall(r"[a-zà-ÿ0-9]+", low) if w not in _BROWSER_FILLERS]
+    if words:
+        q = " ".join(words)
+        return "https://www.google.com/search?q=" + urllib.parse.quote(q), f'a busca por "{q}"'
+
+    # 6) nada específico → Google
+    return URLS["open_browser"], "o navegador"
+
+
+def _open_browser(text: str = "") -> dict:
+    url, label = _browser_target(text)
+    webbrowser.open(url)
+    return {"status": "ok", "message": f"Abrindo {label}, senhor."}
 
 
 def _open_youtube(_: str) -> dict:
@@ -199,6 +268,18 @@ def _weather(text: str) -> dict:
     msg = (f"🌡️ {data['city']}: {data['temp']}°C ({data['desc']}), "
            f"sensação {data['feels']}°C, umidade {data['humidity']}%, vento {data['wind']} km/h, senhor.")
     return {"status": "ok", "message": msg}
+
+
+def _list_reminders(_: str) -> dict:
+    try:
+        import reminders
+        pending = reminders.list_pending()
+    except Exception:
+        pending = []
+    if not pending:
+        return {"status": "ok", "message": "Nenhum lembrete pendente, senhor."}
+    lines = [f"  • {r}" for r in pending]
+    return {"status": "ok", "message": "Lembretes pendentes:\n" + "\n".join(lines)}
 
 
 def _blocked(_: str) -> dict:

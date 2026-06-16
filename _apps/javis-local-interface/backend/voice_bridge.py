@@ -1,6 +1,6 @@
-"""Voice Bridge — classifica transcrição de voz sem executar nada.
+"""Voice Bridge — classifica e executa transcrições de voz.
 
-Modo: dry_run = True (sempre). Nesta fase, nenhuma ação é executada.
+Fase 2 ativa (aprovado por Murillo, 2026-06-13): intents seguros executam via _brain() no server.
 Uso:  python backend/voice_bridge.py "abre o youtube"
 """
 from __future__ import annotations
@@ -59,6 +59,7 @@ SAFE_INTENTS = {
     "abrir_navegador", "abrir_youtube", "tocar_musica", "abrir_openwebui",
     "abrir_javis", "abrir_vscode", "abrir_projeto", "registrar_ideia",
     "status_sistema", "analisar_site", "clima", "conversa", "desconhecido",
+    "hora_data", "listar_lembretes", "pesquisar_google", "ler_pagina",
 }
 
 APPROVAL_INTENTS = {"abrir_terminal"}
@@ -107,10 +108,10 @@ def classify_voice(transcript: str) -> dict:
         note = "requer aprovacao explicita — nao executaria por voz nesta fase"
     elif intent in SAFE_INTENTS:
         would_execute = True
-        note = "seguro — executaria via actions.execute() quando liberado"
+        note = "seguro — executa via _brain() no server"
     else:
         would_execute = False
-        note = "intent desconhecido — encaminharia ao LLM"
+        note = "intent desconhecido — encaminhado ao LLM"
 
     result = {
         "source": "voice",
@@ -120,7 +121,7 @@ def classify_voice(transcript: str) -> dict:
         "risk_level": route["risk_level"],
         "requires_approval": route["requires_approval"],
         "action": route["action"],
-        "dry_run": True,
+        "dry_run": False,
         "would_execute": would_execute,
         "reason": route["reason"],
         "note": note,
@@ -130,10 +131,10 @@ def classify_voice(transcript: str) -> dict:
         source="voice",
         user_text=transcript,
         route=route,
-        action_result={"status": "dry_run_only", "message": note},
-        approved=False,
+        action_result={"status": "executed" if would_execute else "routed_to_llm", "message": note},
+        approved=would_execute,
         duration_ms=duration,
-        extra={"transcript": transcript, "clean_transcript": clean, "dry_run": True, "would_execute": would_execute, "note": note},
+        extra={"transcript": transcript, "clean_transcript": clean, "dry_run": False, "would_execute": would_execute, "note": note},
     )
 
     return result

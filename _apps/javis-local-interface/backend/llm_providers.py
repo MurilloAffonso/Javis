@@ -11,20 +11,30 @@ import requests
 
 OLLAMA_URL   = "http://localhost:11434/api/chat"
 OLLAMA_MODEL = os.environ.get("JAVIS_OLLAMA_MODEL", "llama3.2:3b")
-TIMEOUT      = 30
+TIMEOUT      = int(os.environ.get("JAVIS_OLLAMA_TIMEOUT", "8"))
 
 CLAUDE_MODEL = os.environ.get("JAVIS_CLAUDE_MODEL", "claude-sonnet-4-6")
 OPENAI_MODEL = os.environ.get("JAVIS_OPENAI_MODEL", "gpt-4o-mini")
 
 
+def _anthropic_enabled() -> bool:
+    """Anthropic só é usada se houver chave E o senhor ligar explicitamente.
+
+    Default = 100% OpenAI (a chave Anthropic está sem crédito). Para religar:
+    JAVIS_USE_ANTHROPIC=1 no .env.
+    """
+    if not os.environ.get("ANTHROPIC_API_KEY", "").strip():
+        return False
+    return os.environ.get("JAVIS_USE_ANTHROPIC", "0").strip().lower() in ("1", "true", "yes", "on")
+
+
 def call_claude(messages: list[dict], temperature: float = 0.7) -> str:
-    """Cérebro orquestrador — Claude Anthropic."""
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        return _call_ollama(messages)
+    """Cérebro orquestrador. Default 100% OpenAI; Anthropic só se habilitada."""
+    if not _anthropic_enabled():
+        return call_openai(messages, temperature)
     try:
         import anthropic
-        client = anthropic.Anthropic(api_key=api_key)
+        client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
         system_text = "\n\n".join(m["content"] for m in messages if m["role"] == "system")
         user_msgs   = [m for m in messages if m["role"] != "system"]
         resp = client.messages.create(
@@ -35,8 +45,11 @@ def call_claude(messages: list[dict], temperature: float = 0.7) -> str:
             temperature=temperature,
         )
         return resp.content[0].text.strip()
-    except Exception:
-        return _call_ollama(messages)
+    except Exception as e:
+        # Anthropic indisponível (ex.: sem crédito) → OpenAI, que é o cérebro
+        # configurado e tem saldo. Só cai no Ollama se a OpenAI também falhar.
+        print(f"[llm] Claude falhou ({e}); usando OpenAI.", flush=True)
+        return call_openai(messages, temperature)
 
 
 def call_openai(messages: list[dict], temperature: float = 0.7) -> str:
@@ -57,22 +70,33 @@ def call_openai(messages: list[dict], temperature: float = 0.7) -> str:
         return _call_ollama(messages)
 
 
-def stream_claude(messages: list[dict], temperature: float = 0.7):
-    """Gerador síncrono de tokens do Claude — para streaming SSE."""
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+def _stream_openai(messages: list[dict], temperature: float = 0.7):
+    """Streaming real de tokens via OpenAI (cérebro padrão)."""
+    api_key = os.environ.get("OPENAI_API_KEY", "")
     if not api_key:
+        yield _call_ollama(messages)
+        return
+    from openai import OpenAI
+    client = OpenAI(api_key=api_key)
+    stream = client.chat.completions.create(
+        model=OPENAI_MODEL, messages=messages, temperature=temperature, stream=True,
+    )
+    for chunk in stream:
+        if chunk.choices and chunk.choices[0].delta.content:
+            yield chunk.choices[0].delta.content
+
+
+def stream_claude(messages: list[dict], temperature: float = 0.7):
+    """Gerador síncrono de tokens — Anthropic se habilitada, senão OpenAI (padrão)."""
+    if not _anthropic_enabled():
         try:
-            yield _call_ollama(messages)
+            yield from _stream_openai(messages, temperature)
         except Exception as e:
-            yield (
-                "⚠️ Nenhuma API configurada e Ollama está offline.\n"
-                "Configure ANTHROPIC_API_KEY ou OPENAI_API_KEY no arquivo .env "
-                "ou inicie o Ollama."
-            )
+            yield f"⚠️ OpenAI indisponível, senhor: {e}"
         return
     try:
         import anthropic
-        client = anthropic.Anthropic(api_key=api_key)
+        client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
         system_text = "\n\n".join(m["content"] for m in messages if m["role"] == "system")
         user_msgs   = [m for m in messages if m["role"] != "system"]
         with client.messages.stream(
@@ -84,11 +108,14 @@ def stream_claude(messages: list[dict], temperature: float = 0.7):
         ) as stream:
             for token in stream.text_stream:
                 yield token
-    except Exception:
+    except Exception as e:
+        # Claude indisponível (ex.: sem crédito) → OpenAI (não-stream, bloco único),
+        # depois Ollama como último recurso.
+        print(f"[llm] stream Claude falhou ({e}); usando OpenAI.", flush=True)
         try:
-            yield _call_ollama(messages)
-        except Exception as e:
-            yield f"⚠️ Claude e Ollama indisponíveis: {e}"
+            yield call_openai(messages, temperature)
+        except Exception as e2:
+            yield f"⚠️ Claude e OpenAI indisponíveis, senhor: {e2}"
 
 
 def embed(text: str) -> list[float] | None:

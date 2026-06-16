@@ -10,12 +10,41 @@ from __future__ import annotations
 import re
 import requests
 
-_UA = {"User-Agent": "Mozilla/5.0 (Javis SiteAnalyzer)"}
+_UA = {
+    "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                   "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"),
+    "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+}
 _TIMEOUT = 15
+
+# Sites conhecidos do senhor — citados por nome, sem precisar da URL.
+# Casa por substring (sem acento) no texto falado/digitado.
+KNOWN_SITES: dict[str, str] = {
+    "vem passear": "https://vempassearjampa.com",
+    "vempassear": "https://vempassearjampa.com",
+}
+
+
+def _known_site(text: str) -> str | None:
+    """Resolve o site pelo nome próprio (ex.: 'analisa meu site Vem Passear')."""
+    import unicodedata
+    t = unicodedata.normalize("NFKD", (text or "").lower())
+    t = "".join(c for c in t if not unicodedata.combining(c))
+    for alias, url in KNOWN_SITES.items():
+        if alias in t:
+            return url
+    return None
 
 
 def _extract_url(text: str) -> str | None:
     """Acha uma URL no texto falado/digitado."""
+    # Nome próprio conhecido (ex.: "Vem Passear") tem prioridade MÁXIMA — mesmo que
+    # o modelo passe uma URL com TLD errado (https://...com.br que não resolve),
+    # usamos a canônica que funciona.
+    known = _known_site(text)
+    if known:
+        return known
     m = re.search(r"https?://[^\s]+", text)
     if m:
         return m.group(0).rstrip(".,;)")

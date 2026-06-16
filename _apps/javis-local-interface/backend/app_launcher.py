@@ -92,6 +92,66 @@ def _start(cmd: str, label: str) -> dict:
         return {"status": "error", "message": f"Não consegui abrir {label}, senhor: {e}"}
 
 
+def _norm(s: str) -> str:
+    """Minúsculas sem acento, para casar 'imagens'/'músicas'/'área' etc."""
+    import unicodedata
+    s = unicodedata.normalize("NFKD", (s or "").lower())
+    return "".join(c for c in s if not unicodedata.combining(c)).strip()
+
+
+# Aliases de pastas conhecidas → subpasta do perfil do usuário (~).
+KNOWN_FOLDERS: dict[str, str] = {
+    "documentos": "Documents", "documents": "Documents", "docs": "Documents",
+    "downloads": "Downloads", "download": "Downloads", "baixados": "Downloads",
+    "imagens": "Pictures", "fotos": "Pictures", "pictures": "Pictures", "figuras": "Pictures",
+    "videos": "Videos", "video": "Videos",
+    "musica": "Music", "musicas": "Music", "music": "Music", "sons": "Music",
+    "area de trabalho": "Desktop", "desktop": "Desktop",
+    "onedrive": "OneDrive",
+}
+
+
+def open_folder(name: str) -> dict:
+    """Abre uma pasta NOMEADA (Documentos, Downloads, Imagens, Desktop...) ou um caminho.
+
+    Resolve a pasta certa do perfil do Windows em vez de só abrir o Explorer no
+    lugar padrão.
+    """
+    raw = (name or "").strip()
+    if not raw:
+        return {"status": "error", "message": "Qual pasta devo abrir, senhor?"}
+
+    # 1) Caminho absoluto explícito (ex.: C:\... ou /...)
+    if os.path.isabs(raw) and os.path.isdir(raw):
+        target = raw
+    else:
+        # 2) Pasta conhecida do perfil (casa por substring, sem acento)
+        key = _norm(raw)
+        sub = None
+        for alias, folder in KNOWN_FOLDERS.items():
+            if alias in key:
+                sub = folder
+                break
+        home = os.path.expanduser("~")
+        if sub is None:
+            return {"status": "error",
+                    "message": f"Não conheço a pasta '{raw}', senhor. Tente Documentos, Downloads, Imagens, Vídeos, Música ou Desktop."}
+        target = os.path.join(home, sub)
+        # OneDrive costuma espelhar Documentos/Imagens/Desktop — tenta lá se faltar
+        if not os.path.isdir(target):
+            alt = os.path.join(home, "OneDrive", sub)
+            if os.path.isdir(alt):
+                target = alt
+
+    if not os.path.isdir(target):
+        return {"status": "error", "message": f"A pasta não existe no PC, senhor: {target}"}
+    try:
+        os.startfile(target) if os.name == "nt" else subprocess.Popen(["xdg-open", target])
+    except Exception as e:
+        return {"status": "error", "message": f"Não consegui abrir a pasta, senhor: {e}"}
+    return {"status": "ok", "message": f"Pasta aberta: {target}"}
+
+
 def open_site(url: str) -> dict:
     """Abre qualquer site. Aceita 'youtube.com' ou 'https://...'."""
     u = (url or "").strip()

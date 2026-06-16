@@ -27,8 +27,11 @@ RULES: list[tuple[str, list[str]]] = [
                         "editor de codigo", "code ."]),
     ("abrir_terminal", ["terminal", "powershell", "cmd", "prompt de comando",
                         "linha de comando"]),
-    ("abrir_navegador",["navegador", "chrome", "firefox", "edge", "browser", "internet"]),
-    ("abrir_projeto",  ["abre o projeto", "abrir projeto", "projeto "]),
+    ("abrir_navegador",["navegador", "chrome", "firefox", "edge", "browser", "internet",
+                        "instagram", "facebook", "whatsapp", "gmail", "google maps",
+                        "entra no site", "abre o site", "entra na página",
+                        "abre a página", "abre o instagram", "acessa o site"]),
+    ("abrir_projeto",  ["abre o projeto", "abrir projeto", "abre a pasta do projeto"]),
     ("abrir_javis",    ["pasta do javis", "pasta javis", "diretório javis",
                         "abre o javis", "abrir javis"]),
     ("registrar_ideia",["anota", "anotar", "captura ideia", "registra ideia",
@@ -106,11 +109,19 @@ def route(text: str) -> dict:
     }
 
 
+_URL_RE = re.compile(r"https?://\S+")
+_DOMAIN_RE = re.compile(r"\b[a-z0-9-]+\.(?:com|com\.br|net|org|io|dev|app|gov|edu)(?:\.[a-z]{2})?\b", re.I)
+
+
 def _classify(text: str) -> str:
     for intent, keywords in RULES:
         for kw in keywords:
             if kw in text:
                 return intent
+
+    # URL ou domínio solto (ex.: "acessa vempassear.com.br") → abrir no navegador
+    if _URL_RE.search(text) or _DOMAIN_RE.search(text):
+        return "abrir_navegador"
 
     for hint in CONVERSATION_HINTS:
         if hint in text:

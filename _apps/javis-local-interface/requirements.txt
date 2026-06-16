@@ -9,3 +9,6 @@ anthropic>=0.25
 
 # dev
 pytest>=8.0
+playwright>=1.44
+ddgs>=7.0
+beautifulsoup4>=4.12
