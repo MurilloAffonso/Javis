@@ -215,6 +215,27 @@ TOOLS = [
         },
     },
     {
+        "name": "pesquisar_redes",
+        "description": "Pesquisa um tema no Reddit e YouTube e retorna o que as pessoas estão falando. Use quando o senhor quiser saber a opinião/discussão sobre um assunto nas redes.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"tema": {"type": "string", "description": "O tema a pesquisar (ex.: 'turismo João Pessoa', 'Instagram marketing')."}},
+            "required": ["tema"],
+        },
+    },
+    {
+        "name": "analisar_arquivo",
+        "description": "Analisa um arquivo enviado pelo senhor (PDF, Excel, Word, CSV, relatório do Analytics, etc.) e extrai insights. Use quando ele mandar um arquivo.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "caminho": {"type": "string", "description": "Caminho completo do arquivo."},
+                "pergunta": {"type": "string", "description": "Pergunta específica sobre o arquivo (opcional)."},
+            },
+            "required": ["caminho"],
+        },
+    },
+    {
         "name": "enviar_whatsapp",
         "description": "Abre o WhatsApp com a mensagem pronta para um contato. Informe 'numero' (com DDI/DDD, só dígitos) e 'mensagem'. Sem número, apenas abre o WhatsApp.",
         "input_schema": {
@@ -226,10 +247,42 @@ TOOLS = [
             "required": [],
         },
     },
+    {
+        "name": "pensar_profundo",
+        "description": "Aciona o CÉREBRO DE RACIOCÍNIO (Claude Opus 4.8, o modelo mais inteligente) para pensar a fundo numa questão complexa: decisão estratégica, análise de negócio/marketing, conselho ponderado, problema que exige raciocínio cuidadoso. Use SEMPRE que o senhor pedir uma análise profunda, uma decisão importante, ou disser 'analisa a fundo', 'me ajuda a decidir', 'vale a pena', 'pensa direito nisso'. É mais lento (pensa com calma), então NÃO use para conversa casual, perguntas simples ou ações diretas (abrir app, tocar música, hora).",
+        "input_schema": {
+            "type": "object",
+            "properties": {"questao": {"type": "string", "description": "A questão ou decisão a pensar, clara e completa (inclua o contexto que o senhor deu)."}},
+            "required": ["questao"],
+        },
+    },
+    {
+        "name": "consultar_especialistas",
+        "description": "Convoca o CONSELHO DE ESPECIALISTAS (Conclave: um crítico que audita falhas, um advogado que ataca o plano e um sintetizador que integra a melhor solução) para DEBATER uma questão sob múltiplos pontos de vista que se confrontam. Use APENAS quando o senhor pedir explicitamente um DEBATE ou disser 'debate', 'o que vocês acham', 'prós e contras'. Para raciocínio profundo geral, prefira pensar_profundo.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"questao": {"type": "string", "description": "A questão ou decisão a debater, redigida de forma clara e completa (inclua o contexto que o senhor deu)."}},
+            "required": ["questao"],
+        },
+    },
 ]
 
 
-def _exec_tool(name: str, inp: dict) -> str:
+def _history_context(history: list[dict] | None, limit: int = 4) -> str:
+    """Resume as últimas trocas para dar contexto ao cérebro de raciocínio."""
+    if not history:
+        return ""
+    linhas = []
+    for h in history[-limit:]:
+        c = (h.get("content") or "").strip()
+        if not c:
+            continue
+        quem = "Murillo" if h.get("role") == "user" else "Jamba"
+        linhas.append(f"{quem}: {c[:400]}")
+    return "\n".join(linhas)
+
+
+def _exec_tool(name: str, inp: dict, history: list[dict] | None = None) -> str:
     """Traduz a chamada de ferramenta do Claude para actions.execute e retorna a mensagem."""
     inp = inp or {}
     if name == "tocar_musica":
@@ -295,6 +348,43 @@ def _exec_tool(name: str, inp: dict) -> str:
         import knowledge
         ctx = knowledge.answer_context(inp.get("pergunta") or "")
         return ctx or "Não encontrei nada nos seus arquivos sobre isso, senhor."
+    if name == "pesquisar_redes":
+        import social_reader
+        return social_reader.pesquisar_redes(inp.get("tema") or "").get("message", "Feito, senhor.")
+    if name == "analisar_arquivo":
+        import file_analyzer
+        return file_analyzer.analyze(inp.get("caminho") or "", inp.get("pergunta") or "").get("message", "Feito, senhor.")
+    if name == "pensar_profundo":
+        # Cérebro de raciocínio = Claude Opus 4.8 pela ASSINATURA. É o "dois
+        # níveis": gpt-4o roteia rápido aqui na frente, e delega o raciocínio
+        # pesado para o Claude. Se a assinatura não responder, cai no conclave.
+        import claude_brain
+        questao = inp.get("questao") or ""
+        ctx = _history_context(history)
+        if claude_brain.available():
+            resp = claude_brain.answer(questao, context=ctx)
+            if resp:
+                return resp
+            _log("claude_brain vazio; caindo no conclave.")
+        else:
+            _log("Claude Code indisponível; pensar_profundo usa conclave.")
+        from conclave import Conclave
+        try:
+            conc = Conclave().debate(questao, rounds=1)
+            return conc.get("synthesis") or "Não cheguei a uma conclusão, senhor."
+        except Exception as e:
+            return f"Não consegui pensar a fundo agora, senhor: {e}"
+    if name == "consultar_especialistas":
+        # Convoca o Conclave (crítico → advogado → sintetizador) a pedido do
+        # próprio cérebro principal — é assim que os especialistas entram no
+        # fluxo de voz sem o senhor precisar ligar o ⚔️ debate manualmente.
+        from conclave import Conclave
+        try:
+            conc = Conclave().debate(inp.get("questao") or "", rounds=1)
+            return conc.get("synthesis") or "O conselho não chegou a uma conclusão, senhor."
+        except Exception as e:
+            _log(f"consultar_especialistas falhou: {e}")
+            return f"Não consegui reunir o conselho agora, senhor: {e}"
     # ações sem parâmetro
     return actions.execute(name, "").get("message", "Feito, senhor.")
 
@@ -353,7 +443,7 @@ def _respond_claude(user_text: str, history: list[dict], max_rounds: int) -> dic
             for block in resp.content:
                 if getattr(block, "type", "") == "tool_use":
                     used.append(block.name)
-                    out = _exec_tool(block.name, block.input)
+                    out = _exec_tool(block.name, block.input, history)
                     results.append({"type": "tool_result", "tool_use_id": block.id, "content": out or "feito"})
             messages.append({"role": "user", "content": results})
             continue
@@ -402,7 +492,7 @@ def _respond_openrouter(user_text: str, history: list[dict], max_rounds: int) ->
                     args = json.loads(tc.function.arguments or "{}")
                 except Exception:
                     args = {}
-                out = _exec_tool(tc.function.name, args)
+                out = _exec_tool(tc.function.name, args, history)
                 messages.append({"role": "tool", "tool_call_id": tc.id, "content": out or "feito"})
             continue
         return {"text": (msg.content or "").strip(), "tools": used}
@@ -444,7 +534,7 @@ def _respond_openai(user_text: str, history: list[dict], max_rounds: int) -> dic
                     args = json.loads(tc.function.arguments or "{}")
                 except Exception:
                     args = {}
-                out = _exec_tool(tc.function.name, args)
+                out = _exec_tool(tc.function.name, args, history)
                 messages.append({"role": "tool", "tool_call_id": tc.id, "content": out or "feito"})
             continue
         return {"text": (msg.content or "").strip(), "tools": used}

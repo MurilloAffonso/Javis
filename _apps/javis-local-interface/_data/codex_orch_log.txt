@@ -1,0 +1,89 @@
+13:32:54  === Codex Orquestrador iniciado ===
+13:32:54  Tarefa #6: Gere 10 legendas prontas para Instagram da Vem Passear Jampa. ANTES de gerar, le...
+13:32:54  Executando Codex CLI...
+13:35:15  Exit code: 0
+
+--- OUTPUT CODEX ---
+ da memória.
++
++Quer ir sem dúvida? Chama no WhatsApp.
++
++**Hashtags:** #JoaoPessoaPB #PasseiosEmJoaoPessoa #TurismoJoaoPessoa #PiscinasNaturais #Bastidores #VemPassearJampa #Paraiba #PraiasDaParaiba #NordesteBrasil
++
++## 7. Piscina natural com criança
++
++**Formato:** Feed
++
++**Gancho:** Dá para fazer piscina natural com criança? Dá, mas olha isso.
++
++**Legenda completa:**
++
++Piscina natural pode ser uma delícia para fazer em família, principalmente quando o passeio é escolhido com orientação.
++
++O segredo é olhar maré, horário, duração, embarque e o perfil da criança antes de fechar.
++
++Com tudo alinhado, fica mais fácil curtir o mar calmo, fazer fotos bonitas e voltar com aquela sensação de passeio bem aproveitado.
++
++Manda "FAMÍLIA" no WhatsApp que a gente te ajuda a escolher.
++
++**Hashtags:** #JoaoPessoa #ViagemEmFamilia #PiscinasNaturaisJoaoPessoa #PasseiosEmJoaoPessoa #TurismoJoaoPessoa #RoteiroJoaoPessoa #PraiasDaParaiba #Paraiba
++
++## 8. A reação ao primeiro azul
++
++**Formato:** Reel
++
++**Gancho:** A reação de quem vê esse azul pela primeira vez.
++
++**Legenda completa:**
++
++Tem um momento que sempre se repete no passeio: o silêncio de quem chega e fica olhando para o mar.
++
++Depois vem a foto, o sorriso, o "não acredito que é aqui em João Pessoa" e aquela vontade de mandar para todo mundo.
++
++É por isso que a gente gosta tanto de apresentar Jampa do jeito certo: com calma, orientação e maré bem escolhida.
++
++Quer viver esse passeio também? Link na bio.
++
++**Hashtags:** #JoaoPessoa #JoaoPessoaPB #PiscinasNaturais #Picaozinho #Seixas #TurismoJoaoPessoa #PasseiosEmJoaoPessoa #PraiasDaParaiba #NordesteBrasil
++
++## 9. Combo para poucos dias em Jampa
++
++**Formato:** Feed
++
++**Gancho:** Tem poucos dias em João Pessoa? Escolha os passeios com estratégia.
++
++**Legenda completa:**
++
++Se sua viagem para João Pessoa tem 3, 4 ou 5 dias, cada escolha conta.
++
++Piscinas naturais, litoral norte, pôr do sol e praias podem entrar no roteiro, mas o melhor encaixe depende da sua data, da maré e do ritmo da viagem.
++
++A gente te ajuda a montar um combo sem perder tempo escolhendo no escuro.
++
++Manda "COMBO" no WhatsApp e veja as opções.
++
++**Hashtags:** #JoaoPessoa #RoteiroJoaoPessoa #PasseiosEmJoaoPessoa #TurismoJoaoPessoa #PiscinasNaturaisJoaoPessoa #LitoralNortePB #PraiasDaParaiba #Paraiba #NordesteBrasil
++
++## 10. O erro de ignorar a maré
++
++**Formato:** Reel
++
++**Gancho:** Não faça piscina natural em João Pessoa sem olhar isso.
++
++**Legenda completa:**
++
++Maré baixa não é detalhe. É parte principal do passeio.
++
++É ela que ajuda a definir horário, visual, conforto e até se aquele dia faz sentido para o que você espera viver.
++
++Antes de fechar, pergunta. Confere. Se orienta com quem conhece a operação local.
++
++Manda "MARÉ" no WhatsApp e a gente te explica sem complicar.
++
++**Hashtags:** #JoaoPessoaPB #PiscinasNaturais #PiscinasNaturaisJoaoPessoa #TurismoJoaoPessoa #PasseiosEmJoaoPessoa #Seixas #Picaozinho #RoteiroJoaoPessoa #Paraiba
+
+tokens used
+64.168
+
+--- FIM ---
+13:35:15  Tarefa marcada como [x] no backlog.

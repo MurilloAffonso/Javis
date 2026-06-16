@@ -1,29 +1,22 @@
 {
   "collapse-filter": false,
   "search": "",
-  "showTags": true,
+  "showTags": false,
   "showAttachments": false,
   "hideUnresolved": false,
   "showOrphans": true,
   "collapse-color-groups": false,
-  "colorGroups": [
-    { "query": "path:_apps/", "color": { "a": 1, "rgb": 3899166 } },
-    { "query": "path:_docs/", "color": { "a": 1, "rgb": 16744448 } },
-    { "query": "path:_skills/", "color": { "a": 1, "rgb": 5570765 } },
-    { "query": "path:_logs/", "color": { "a": 1, "rgb": 10040115 } },
-    { "query": "path:_estado/", "color": { "a": 1, "rgb": 16776960 } },
-    { "query": "path:_sessoes/", "color": { "a": 1, "rgb": 6750054 } }
-  ],
+  "colorGroups": [],
   "collapse-display": false,
-  "showArrow": true,
+  "showArrow": false,
   "textFadeMultiplier": 0,
-  "nodeSizeMultiplier": 1.2,
+  "nodeSizeMultiplier": 1,
   "lineSizeMultiplier": 1,
   "collapse-forces": false,
   "centerStrength": 0.518713248970312,
   "repelStrength": 10,
   "linkStrength": 1,
-  "linkDistance": 30,
-  "scale": 1,
-  "close": false
+  "linkDistance": 250,
+  "scale": 0.07952528018521576,
+  "close": true
 }

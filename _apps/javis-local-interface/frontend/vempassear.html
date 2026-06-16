@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CÉREBRO · VEM PASSEAR</title>
+  <link rel="stylesheet" href="vempassear.css" />
+</head>
+<body>
+
+  <header class="hdr">
+    <div class="hdr-left">
+      <span class="wave">🌊</span>
+      <span class="brand">VEM PASSEAR</span>
+      <span class="sub">· CÉREBRO</span>
+    </div>
+    <div class="hdr-right">
+      <span class="clock" id="clock">--:--:--</span>
+      <a class="back" href="/">← voltar ao Jamba</a>
+    </div>
+  </header>
+
+  <main class="grid">
+
+    <!-- RESUMO -->
+    <section class="card resume">
+      <div class="card-title">RESUMO OPERACIONAL</div>
+      <div class="resume-row">
+        <div class="stat"><span class="stat-val" id="r-passeios">—</span><span class="stat-lbl">passeios</span></div>
+        <div class="stat"><span class="stat-val" id="r-pessoas">—</span><span class="stat-lbl">pessoas</span></div>
+        <div class="stat"><span class="stat-val" id="r-fat">—</span><span class="stat-lbl">faturamento prev.</span></div>
+        <div class="stat"><span class="stat-val" id="r-leads">—</span><span class="stat-lbl">leads abertos</span></div>
+      </div>
+    </section>
+
+    <!-- SQUAD JAMPA JARVIS -->
+    <section class="card wide">
+      <div class="card-title">🤖 SQUAD JAMPA JARVIS <span class="sub" id="sq-count">—</span></div>
+      <div class="squad-roster" id="sq-roster"><div class="empty">carregando agentes…</div></div>
+      <div class="form" style="margin-top:10px;">
+        <select id="sq-agente">
+          <option value="">🧠 Orion decide (automático)</option>
+        </select>
+        <input type="text" id="sq-tarefa" placeholder="o que o squad deve fazer? (ex: cria uma oferta-relâmpago das piscinas)" />
+        <button class="btn primary" id="sq-run">▶ Acionar squad</button>
+      </div>
+      <div class="output empty" id="sq-output">O squad entrega aqui — aterrado no catálogo real, sem inventar preço.</div>
+      <div class="btn-row" id="sq-actions" style="display:none; margin-top:10px;">
+        <button class="btn mini" id="sq-copy">📋 Copiar</button>
+      </div>
+    </section>
+
+    <!-- CRIAÇÃO DE CONTEÚDO -->
+    <section class="card">
+      <div class="card-title">🎨 CRIAÇÃO DE CONTEÚDO</div>
+      <div class="form">
+        <input type="text" id="ct-tema" placeholder="tema opcional (ex: piscinas do Seixas)" />
+      </div>
+      <div class="btn-row">
+        <button class="btn primary" data-tipo="ideias">💡 Ideias</button>
+        <button class="btn primary" data-tipo="legenda">📝 Legenda</button>
+        <button class="btn primary" data-tipo="reel">🎬 Reel</button>
+        <button class="btn primary" data-tipo="resposta">💬 Resposta Whats</button>
+        <button class="btn primary" data-tipo="oferta">🔥 Oferta</button>
+        <button class="btn primary" data-tipo="stories">📲 Stories</button>
+        <a class="btn" href="https://www.canva.com" target="_blank" rel="noopener">🎨 Canva</a>
+      </div>
+      <div class="output empty" id="ct-output">Clique num botão pra o Jamba gerar o conteúdo.</div>
+      <div class="btn-row" id="ct-actions" style="display:none; margin-top:10px;">
+        <button class="btn mini" id="ct-copy">📋 Copiar</button>
+        <button class="btn mini" id="ct-save">💾 Salvar na biblioteca</button>
+      </div>
+    </section>
+
+    <!-- CONTROLE DE PASSEIOS -->
+    <section class="card">
+      <div class="card-title">🛥️ CONTROLE DE PASSEIOS</div>
+      <div class="form">
+        <select id="p-tipo">
+          <option value="Piscinas Naturais do Seixas">Piscinas Seixas — R$65</option>
+          <option value="Piscinas Naturais de Picãozinho">Piscinas Picãozinho — R$60</option>
+          <option value="Litoral Norte (praias)">Litoral Norte — R$90</option>
+          <option value="Combo Litoral Norte + Areia Vermelha">Combo Norte+Areia — R$170</option>
+          <option value="Combo Litoral Sul + Quadriciclo">Combo Sul+Quadri — R$340</option>
+        </select>
+        <input type="date" id="p-data" />
+        <input type="number" id="p-pessoas" placeholder="pessoas" min="1" value="1" />
+        <input type="number" id="p-valor" placeholder="R$/pessoa" min="0" step="1" />
+        <button class="btn primary" id="p-add">+ Adicionar</button>
+      </div>
+      <div class="list" id="passeios"><div class="empty">carregando…</div></div>
+    </section>
+
+    <!-- LINHA EDITORIAL -->
+    <section class="card">
+      <div class="card-title">🗓️ LINHA EDITORIAL</div>
+      <div class="form">
+        <input type="date" id="pa-data" />
+        <input type="text" id="pa-canal" placeholder="canal (Instagram)" value="Instagram" />
+        <input type="text" id="pa-ideia" placeholder="ideia do post" />
+        <button class="btn primary" id="pa-add">+ Pauta</button>
+      </div>
+      <div class="list" id="pauta"><div class="empty">carregando…</div></div>
+    </section>
+
+    <!-- BIBLIOTECA DE CONTEÚDO -->
+    <section class="card">
+      <div class="card-title">📚 BIBLIOTECA DE CONTEÚDO</div>
+      <div class="list" id="biblioteca"><div class="empty">Conteúdos salvos aparecem aqui.</div></div>
+    </section>
+
+    <!-- WHATSAPP / CLIENTES -->
+    <section class="card wide">
+      <div class="card-title">💬 WHATSAPP · CLIENTES</div>
+      <div class="form">
+        <input type="text" id="c-nome" placeholder="nome do lead" />
+        <input type="text" id="c-contato" placeholder="WhatsApp / contato" />
+        <input type="text" id="c-obs" placeholder="passeio / obs" />
+        <button class="btn primary" id="c-add">+ Novo lead</button>
+      </div>
+      <div class="cols">
+        <div>
+          <div class="col-lbl">🟡 Leads que chegaram</div>
+          <div class="list" id="leads"><div class="empty">—</div></div>
+        </div>
+        <div>
+          <div class="col-lbl">🟢 Clientes que fecharam</div>
+          <div class="list" id="fechados"><div class="empty">—</div></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="foot">
+    <span class="dot" id="conn-dot"></span>
+    <span id="conn-lbl">conectando…</span>
+    <span class="foot-sep">·</span>
+    <span>Cérebro Vem Passear · movido pelo Jamba</span>
+  </footer>
+
+  <script src="vempassear.js"></script>
+</body>
+</html>

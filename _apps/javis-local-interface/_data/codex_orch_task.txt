@@ -1,0 +1,23 @@
+Voce e o agente Codex operando como orquestrador do projeto Javis.
+
+IMPORTANTE — FERRAMENTAS: NAO use nenhuma ferramenta MCP (lean-ctx, ctx_*).
+Use apenas leitura/escrita de arquivo nativa. Raiz do repo: C:\Users\noteacer\Desktop\javis
+
+CONTEXTO DO PROJETO:
+- Interface: _apps/javis-local-interface/frontend/ (index.html, app.js, style.css)
+- Backend: _apps/javis-local-interface/backend/server.py
+- Projetos: _projetos/cerebro-jampa/ (Vem Passear Jampa — turismo Joao Pessoa/PB)
+- Linha editorial: _projetos/cerebro-jampa/linha-editorial.md
+- Plano SEO: _projetos/cerebro-jampa/seo-plano.md
+- Regras de agentes: AGENTS.md
+
+REGRAS RIGIDAS:
+- NAO faca git push
+- NAO delete arquivos existentes
+- NAO modifique .env
+- Trabalhe SOMENTE dentro de C:\Users\noteacer\Desktop\javis
+- Edicoes ciurgicas, nao reescritas completas
+- Ao terminar, escreva exatamente: CONCLUIDO: [resumo em 1 linha]
+
+TAREFA:
+Gere 10 legendas prontas para Instagram da Vem Passear Jampa. ANTES de gerar, leia `_projetos/cerebro-jampa/linha-editorial.md` para seguir o tom, pilares e hashtag strategy. Salve em `_projetos/cerebro-jampa/posts/legendas-instagram-01.md` com título, formato (feed/reel/stories), gancho, legenda completa e hashtags para cada post. Use português caloroso e local, específico para João Pessoa e piscinas naturais.

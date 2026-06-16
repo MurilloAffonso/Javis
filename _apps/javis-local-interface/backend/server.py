@@ -76,6 +76,20 @@ async def _start_integrations():
         print("  Conhecimento: indexando vault em segundo plano [ok]")
     except Exception as e:
         print(f"  Conhecimento: nao iniciado ({e})")
+    # Pré-aquece o cache de TTS dos acks falados — assim o 1º pedido já sai
+    # instantâneo (sem o ~4s de síntese no primeiro uso após o boot).
+    try:
+        import threading
+        def _warm_acks():
+            for phrase in ("Certo, senhor.", "Deixa eu pensar nisso com calma, senhor. Um instante."):
+                try:
+                    _tts_ack(phrase)
+                except Exception:
+                    pass
+        threading.Thread(target=_warm_acks, daemon=True).start()
+        print("  Acks de voz: pré-aquecendo em segundo plano [ok]")
+    except Exception as e:
+        print(f"  Acks de voz: nao iniciado ({e})")
 
 
 @app.post("/knowledge/reindex")
@@ -318,6 +332,65 @@ async def vp_pauta_del(item_id: str):
     return JSONResponse({"status": "ok" if vp_store.remove_pauta(item_id) else "not_found"})
 
 
+# ── Jampa Jarvis: squad de agentes nomeados (carrega skills do CEREBRO.JAMPA) ──
+@app.get("/jampa/agents")
+async def jampa_agents():
+    """Roster dos agentes nomeados para o dashboard."""
+    import jampa_squad
+    if not jampa_squad.available():
+        return JSONResponse({"agents": [], "vault": str(jampa_squad.JAMPA_VAULT), "ok": False})
+    return JSONResponse({"agents": jampa_squad.list_agents(), "ok": True})
+
+
+class JampaSquadRequest(BaseModel):
+    tarefa:   str
+    contexto: str = ""
+    agente:   str = ""     # vazio = Orion escolhe (acionamento semântico)
+    deep:     bool = False
+
+
+@app.post("/jampa/squad")
+async def jampa_squad_run(req: JampaSquadRequest):
+    """Aciona o squad: Orion escolhe o agente (ou força um) e executa, aterrado."""
+    import jampa_squad
+    if not req.tarefa.strip():
+        return JSONResponse({"status": "error", "message": "Tarefa vazia"}, status_code=400)
+    if req.agente:
+        resp = await run_in_threadpool(jampa_squad.run, req.agente, req.tarefa, req.contexto, req.deep)
+        return JSONResponse({"status": "ok", "agente": req.agente, "resposta": resp})
+    out = await run_in_threadpool(jampa_squad.orquestrar, req.tarefa, req.contexto, req.deep)
+    return JSONResponse({"status": "ok", **out})
+
+
+class JampaLeadRequest(BaseModel):
+    nome:      str = ""
+    contato:   str = ""
+    interesse: str = ""
+    obs:       str = ""
+
+
+@app.post("/jampa/responder-lead")
+async def jampa_responder_lead(req: JampaLeadRequest):
+    """Fluxo-dinheiro: gera a resposta de WhatsApp pronta pro lead (aterrada)."""
+    import jampa_squad
+    out = await run_in_threadpool(
+        jampa_squad.responder_lead, req.nome, req.contato, req.interesse, req.obs)
+    return JSONResponse({"status": "ok", **out})
+
+
+class JampaForjarRequest(BaseModel):
+    transcricao: str
+    tema:        str = ""
+
+
+@app.post("/jampa/forjar-skill")
+async def jampa_forjar_skill(req: JampaForjarRequest):
+    """Pipeline Nero: transcrição de expert → skill .md (rascunho p/ Murillo revisar)."""
+    import skill_forge
+    out = await run_in_threadpool(skill_forge.forge, req.transcricao, req.tema)
+    return JSONResponse(out)
+
+
 @app.get("/profile")
 async def get_profile():
     """Fatos que o Jamba sabe sobre o senhor (para o painel)."""
@@ -537,6 +610,64 @@ async def voice_stream(req: VoiceRequest):
             _save_voice_entry(clean, full_text, intent, "fast", transcript, req.tts, start)
             return
 
+        # PRE-ACK — fala imediatamente enquanto _brain() processa (~200ms vs 2400ms percebidos)
+        # Só para intents de ação; conversa e desconhecido respondem direto.
+        _NO_ACK = {"conversa", "desconhecido"}
+        acked = False
+
+        # ACK do RACIOCÍNIO PESADO — pedidos estratégicos roteiam como "conversa"
+        # (caem no _NO_ACK) mas disparam pensar_profundo / Conclave (~20-30s).
+        # Sem aviso, é silêncio puro e parece travamento. Detecta e avisa.
+        if req.tts and _likely_council(clean):
+            ack = "Deixa eu pensar nisso com calma, senhor. Um instante."
+            ack_audio = _tts_ack(ack)
+            if ack_audio:
+                yield f"data: {json.dumps({'type':'audio','b64':base64.b64encode(ack_audio).decode(),'sentence':ack})}\n\n"
+            else:
+                yield f"data: {json.dumps({'type':'tts_text','text':ack})}\n\n"
+            acked = True
+
+        if req.tts and not acked and intent not in _NO_ACK:
+            ack_audio = _tts_ack("Certo, senhor.")
+            if ack_audio:
+                yield f"data: {json.dumps({'type':'audio','b64':base64.b64encode(ack_audio).decode(),'sentence':'Certo, senhor.'})}\n\n"
+            else:
+                yield f"data: {json.dumps({'type':'tts_text','text':'Certo, senhor.'})}\n\n"
+
+        # RACIOCÍNIO PESADO EM STREAMING — pedidos profundos vão DIRETO ao Claude
+        # Opus 4.8 (assinatura), falando frase a frase conforme o Opus pensa.
+        # Pula o gpt-4o (sem double-LLM) e elimina o silêncio de 20-40s: o senhor
+        # ouve a resposta se formando. Só para frases claramente profundas.
+        if not req.use_conclave and _likely_council(clean):
+            try:
+                import claude_brain as _cb
+                import agent as _ag
+            except Exception:
+                _cb = None
+            if _cb and _cb.available():
+                ctx = _ag._history_context(_get_history_messages())
+                spoke = False
+                full_text = ""
+                yield f"data: {json.dumps({'type':'meta','intent':'pensar_profundo','brain':'claude'})}\n\n"
+                for sentence in _accumulate_sentences(_cb.answer_stream(clean, ctx)):
+                    spoke = True
+                    full_text += (" " if full_text else "") + sentence
+                    if req.tts:
+                        audio = _tts_sentence(sentence)
+                        if audio:
+                            yield f"data: {json.dumps({'type':'audio','b64':base64.b64encode(audio).decode(),'sentence':sentence})}\n\n"
+                        else:
+                            yield f"data: {json.dumps({'type':'tts_text','text':sentence})}\n\n"
+                    else:
+                        yield f"data: {json.dumps({'type':'token','text':sentence + ' '})}\n\n"
+                if spoke and full_text.strip():
+                    ms = int((datetime.now() - start).total_seconds() * 1000)
+                    yield f"data: {json.dumps({'type':'done','text':full_text,'intent':'pensar_profundo','brain':'claude','ms':ms})}\n\n"
+                    yield "data: [DONE]\n\n"
+                    _save_voice_entry(clean, full_text, "pensar_profundo", "claude", transcript, req.tts, start)
+                    return
+                # Streaming vazio (Claude falhou) → cai no cérebro completo abaixo.
+
         # CÉREBRO COMPLETO com tool-use — stream_text não passa ferramentas
         # ao GPT, que então inventa que executou sem chamar nada (falso positivo).
         # Voz usa _brain direto; TTS é feito frase a frase após a resposta.
@@ -726,6 +857,28 @@ async def transcribe_audio(file: UploadFile = File(...)):
 
 # ── TTS ──────────────────────────────────────────────────
 
+@app.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    """Recebe um arquivo, salva temporariamente e analisa com file_analyzer."""
+    import tempfile, os, shutil
+    suffix = Path(file.filename or "upload").suffix or ".bin"
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+    try:
+        shutil.copyfileobj(file.file, tmp)
+        tmp.close()
+        import file_analyzer
+        result = await run_in_threadpool(file_analyzer.analyze, tmp.name, "")
+        result["filename"] = file.filename
+        return JSONResponse(result)
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+    finally:
+        try:
+            os.unlink(tmp.name)
+        except Exception:
+            pass
+
+
 class TTSRequest(BaseModel):
     text: str
     voice: str = ""
@@ -826,6 +979,26 @@ def _is_fast_path(intent: str, text: str) -> bool:
     return True
 
 
+# Gatilhos que quase sempre fazem o cérebro acionar o raciocínio pesado
+# (pensar_profundo → Claude Opus 4.8 pela assinatura, ou o Conclave). Servem só
+# para o ACK falado imediato — o senhor ouve o aviso em ~200ms em vez de 20-30s
+# de silêncio. Espelham as frases descritas em pensar_profundo (agent.py).
+_DEEP_HINTS = (
+    "debate", "debat", "analisa a fundo", "analise a fundo", "análise a fundo",
+    "o que voces acham", "o que vocês acham", "me ajuda a decidir",
+    "me ajude a decidir", "vale a pena", "consultar o conselho",
+    "consulta o conselho", "o que o conselho", "pensa direito",
+    "pensa nisso", "pense nisso", "analisa direito", "prós e contras",
+    "pros e contras", "pensa a fundo", "pense a fundo",
+)
+
+
+def _likely_council(text: str) -> bool:
+    """Heurística leve: o pedido provavelmente acionará o raciocínio pesado?"""
+    t = text.lower()
+    return any(h in t for h in _DEEP_HINTS)
+
+
 _SENT_SPLIT = _re.compile(r'(?<=[.!?…])\s+')
 
 
@@ -864,6 +1037,18 @@ def _tts_sentence(text: str) -> bytes | None:
         return resp.content if hasattr(resp, "content") else resp.read()
     except Exception:
         return None
+
+
+_ACK_AUDIO_CACHE: dict[str, bytes] = {}
+
+
+def _tts_ack(phrase: str) -> bytes | None:
+    """TTS com cache em memória — pré-ack imediato após a 1ª chamada."""
+    if phrase not in _ACK_AUDIO_CACHE:
+        audio = _tts_sentence(phrase)
+        if audio:
+            _ACK_AUDIO_CACHE[phrase] = audio
+    return _ACK_AUDIO_CACHE.get(phrase)
 
 
 _VP_CONTEXTO = """Você é copywriter de marketing de turismo da Vem Passear Jampa,
@@ -1100,6 +1285,114 @@ async def oai_models():
     return JSONResponse({
         "object": "list",
         "data": [{"id": "javis", "object": "model", "created": 0, "owned_by": "javis"}],
+    })
+
+
+# ══════════════════════════════════════════════════════════════
+#  AIOS — Treino de Agentes via YouTube + Missões
+# ══════════════════════════════════════════════════════════════
+
+class TrainRequest(BaseModel):
+    url: str
+    agent: str = "khan"
+
+
+def _extract_yt_transcript(url: str) -> dict:
+    """Extrai transcrição de um vídeo YouTube via yt-dlp (bloqueante)."""
+    import yt_dlp
+    import re
+    import requests as _req
+    ydl_opts = {"quiet": True, "no_warnings": True, "skip_download": True}
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+
+    title   = info.get("title", "Vídeo sem título")
+    channel = info.get("channel") or info.get("uploader", "")
+    desc    = (info.get("description") or "").strip()[:3000]
+
+    captions = info.get("automatic_captions") or info.get("subtitles") or {}
+    lang = next((l for l in ["pt", "pt-BR", "pt-br", "en"] if l in captions), None)
+    text = ""
+    if lang:
+        for fmt in captions[lang]:
+            if fmt.get("ext") in ("json3", "vtt", "srv3"):
+                try:
+                    r = _req.get(fmt["url"], timeout=20)
+                    if r.ok:
+                        if fmt["ext"] == "json3":
+                            segs = []
+                            for ev in r.json().get("events", []):
+                                for s in ev.get("segs", []):
+                                    t = (s.get("utf8") or "").replace("\n", " ").strip()
+                                    if t:
+                                        segs.append(t)
+                            text = " ".join(segs)
+                        else:
+                            raw = re.sub(r"<[^>]+>", "", r.text)
+                            raw = re.sub(r"^\d{2}:\d{2}.*$", "", raw, flags=re.M)
+                            raw = re.sub(r"^WEBVTT.*$", "", raw, flags=re.M)
+                            text = re.sub(r"\n{2,}", "\n", raw).strip()
+                        break
+                except Exception:
+                    continue
+    if not text:
+        text = desc or title
+
+    return {"title": title, "channel": channel, "text": text}
+
+
+def _save_training_doc(agent_id: str, title: str, text: str, url: str) -> str:
+    import re
+    from datetime import datetime as _dt
+    save_dir = Path(__file__).resolve().parents[3] / "_memoria" / "treino-agentes"
+    save_dir.mkdir(parents=True, exist_ok=True)
+    safe  = re.sub(r"[^\w\s-]", "", title)[:50].strip().replace(" ", "_")
+    fname = f"{agent_id}_{safe}_{_dt.now().strftime('%Y%m%d_%H%M')}.md"
+    content = (
+        f"# {title}\n"
+        f"Agente: {agent_id}\nFonte: {url}\nData: {_dt.now().strftime('%Y-%m-%d %H:%M')}\n\n"
+        f"## Transcrição\n\n{text}\n"
+    )
+    (save_dir / fname).write_text(content, encoding="utf-8")
+    return fname
+
+
+@app.post("/train/youtube")
+async def train_youtube(req: TrainRequest):
+    """Extrai transcrição de um vídeo YouTube e salva na base de conhecimento do agente."""
+    if not req.url.strip():
+        return JSONResponse({"error": "URL obrigatória"}, status_code=400)
+    try:
+        from starlette.concurrency import run_in_threadpool
+        info = await run_in_threadpool(_extract_yt_transcript, req.url)
+        fname = await run_in_threadpool(
+            _save_training_doc, req.agent, info["title"], info["text"], req.url
+        )
+        try:
+            import knowledge, threading
+            threading.Thread(target=lambda: knowledge.build_index(force=True), daemon=True).start()
+        except Exception:
+            pass
+        return JSONResponse({
+            "status": "ok",
+            "title": info["title"],
+            "channel": info["channel"],
+            "chars": len(info["text"]),
+            "file": fname,
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/missions")
+async def get_missions():
+    """Missões ativas do orquestrador."""
+    return JSONResponse({
+        "missions": [
+            {"id": "m1", "name": "Campanha Lançamento Q1", "pct": 89, "active": True,  "status": "running"},
+            {"id": "m2", "name": "SDR Outbound EN",        "pct": 62, "active": False, "status": "running"},
+            {"id": "m3", "name": "Conteúdo Julho",         "pct": 34, "active": False, "status": "pending"},
+        ]
     })
 
 

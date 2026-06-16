@@ -2,7 +2,13 @@
   "cssEnabledSnippets": [],
   "userIgnoreFilters": [
     "_ferramentas/voz-sandbox",
-    "_referencias"
+    "_referencias",
+    "_ferramentas/voz",
+    "data",
+    "open-webui-data",
+    ".playwright-mcp",
+    ".codegraph",
+    ".git"
   ],
   "alwaysUpdateLinks": true,
   "newFileLocation": "current",

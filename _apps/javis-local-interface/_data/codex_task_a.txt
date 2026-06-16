@@ -1,0 +1,21 @@
+Você é um engenheiro frontend sênior trabalhando no projeto Javis (interface AIOS de orquestração de agentes).
+
+IMPORTANTE — FERRAMENTAS: NÃO use nenhuma ferramenta MCP (lean-ctx, ctx_read, ctx_search, ctx_shell, etc). Elas não estão disponíveis neste modo e travam. Use APENAS suas ferramentas nativas de leitura/edição de arquivo e shell padrão. Trabalhe a partir do diretório do projeto.
+
+CONTEXTO: Leia primeiro os arquivos `frontend/DESIGN_SYSTEM.md` e `frontend/style.css` (e dê uma olhada em `frontend/index.html` só para conhecer as classes/ids — NÃO edite ele). Os caminhos são relativos à raiz do repositório `C:\Users\noteacer\Desktop\javis\_apps\javis-local-interface\`.
+
+TAREFA: Refine SOMENTE o arquivo `frontend/style.css` para aplicar o design system, deixando a interface mais tecnológica, polida e coesa:
+1. Atualize o bloco `:root` com os tokens canônicos do DESIGN_SYSTEM.md. MANTENHA todos os nomes de variáveis que o CSS já usa hoje (--bg, --surface, --surface2, --border, --border2, --cyan, --purple, --green, --orange, --red, --amber, --text, --text-dim, --text-mid, --radius, --font, --font-mono). ADICIONE os que faltam: --violet, --violet-dim, --violet-glow, --emerald, --matrix, --progress. Se já existirem definidos em outro `:root` mais abaixo, unifique sem duplicar.
+2. Adicione glassmorphism (backdrop-filter: blur(12px) + fundo semi-transparente) nos painéis flutuantes (sidebars, painéis laterais, cards de detalhe) — sem quebrar legibilidade.
+3. Use a fonte mono (--font-mono) em métricas, ids, valores de status e labels de "sistema" (ex: .tc-val, .sys-row valores, badges numéricos).
+4. Padronize o hover dos cards (.gallery-card, .project-card, .integration-card): borda violet + translateY(-2px) + sombra suave. Já existe parcialmente — apenas unifique e refine.
+5. Melhore o glow/profundidade geral (sombras, leve grid de fundo onde fizer sentido) seguindo o doc.
+
+REGRAS RÍGIDAS (não quebrar nada):
+- NÃO edite `index.html` nem `app.js`.
+- NÃO renomeie, NÃO remova nenhuma classe ou id existente. Só adicione ou ajuste propriedades CSS.
+- Mantenha o layout 100% funcional (sidebar fixa, views com display none/flex, app-shell flex).
+- Mudanças cirúrgicas e seguras. Não reescreva o arquivo inteiro do zero; edite incrementalmente.
+- Não adicione dependências externas, @import de fontes do Google é permitido (Inter, JetBrains Mono) no topo do CSS.
+
+Ao terminar, faça um resumo em 5 linhas do que mudou.
