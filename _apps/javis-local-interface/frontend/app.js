@@ -1716,7 +1716,11 @@ document.addEventListener('click', async e => {
 function renderTrainingQueue() {
   const el = document.getElementById('train-queue');
   if (!el) return;
-  if (!_trainingQueue.length) { el.innerHTML='<div class="train-empty">Nenhum vídeo em treinamento ainda.</div>'; return; }
+  if (!_trainingQueue.length) {
+    el.innerHTML='<div class="train-empty">Nenhum vídeo em treinamento ainda.</div>';
+    renderTrainStats();
+    return;
+  }
   el.innerHTML = _trainingQueue.map((item,i) => `
     <div class="train-item">
       <div class="ti-icon">🎓</div>
@@ -1728,6 +1732,22 @@ function renderTrainingQueue() {
       <div class="ti-status ${item.status}" id="ti-st-${i}">${item.status==='done'?'✅ Absorvido':item.status==='error'?'Erro':'📚 Estudando'}</div>
     </div>
   `).join('');
+  renderTrainStats();
+}
+
+function renderTrainStats() {
+  const doneItems = _trainingQueue.filter(item => item.status === 'done');
+  const totalVideos = doneItems.length;
+  const totalChars = doneItems.reduce((sum, item) => sum + (item.chars || 0), 0);
+  const trainedAgents = new Set(doneItems.map(item => item.agent).filter(Boolean)).size;
+
+  const totalEl = document.getElementById('ts-total');
+  const charsEl = document.getElementById('ts-chars');
+  const agentsEl = document.getElementById('ts-agents');
+
+  if (totalEl) totalEl.textContent = totalVideos;
+  if (charsEl) charsEl.textContent = Math.round(totalChars / 1000) + 'k';
+  if (agentsEl) agentsEl.textContent = trainedAgents;
 }
 
 /* ─── INTEGRATIONS ───────────────────────────────────────── */
@@ -1943,6 +1963,37 @@ const PROJECTS_DATA = [
 function renderProjects() {
   const grid = document.getElementById('projects-grid');
   if (!grid) return;
+  const totalTasks = PROJECTS_DATA.reduce((sum, p) => sum + (typeof p.tasks === 'number' ? p.tasks : 3), 0);
+  const analyticsHtml = `
+    <div class="analytics-bar" id="analytics-bar">
+      <div class="ab-card">
+        <div class="ab-val" id="ab-total-tasks">${totalTasks}</div>
+        <div class="ab-lbl">tarefas ativas</div>
+      </div>
+      <div class="ab-card">
+        <div class="ab-val online" id="ab-agents-online">5</div>
+        <div class="ab-lbl">agentes online</div>
+      </div>
+      <div class="ab-card">
+        <div class="ab-val" id="ab-completions">14</div>
+        <div class="ab-lbl">completadas hoje</div>
+      </div>
+      <div class="ab-card">
+        <div class="ab-val" id="ab-efficiency">87%</div>
+        <div class="ab-lbl">eficiência</div>
+      </div>
+      <div class="ab-chart-wrap">
+        <canvas id="ab-chart" width="200" height="60"></canvas>
+        <div class="ab-chart-lbl">Atividade 7 dias</div>
+      </div>
+    </div>
+  `;
+  const existingAnalytics = document.getElementById('analytics-bar');
+  if (existingAnalytics) {
+    existingAnalytics.outerHTML = analyticsHtml;
+  } else {
+    grid.insertAdjacentHTML('beforebegin', analyticsHtml);
+  }
   grid.innerHTML = PROJECTS_DATA.map(p => `
     <div class="project-card" style="--accent-grad:${p.grad}">
       <div class="pc-head">
@@ -1960,6 +2011,35 @@ function renderProjects() {
       </div>
     </div>
   `).join('');
+  _drawAnalyticsChart();
+}
+
+function _drawAnalyticsChart() {
+  const canvas = document.getElementById('ab-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const points = Array.from({ length: 7 }, () => Math.floor(Math.random() * 10) + 3);
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const pad = 5;
+  const range = max - min || 1;
+  const step = (canvas.width - pad * 2) / (points.length - 1);
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.beginPath();
+  points.forEach((value, i) => {
+    const x = pad + i * step;
+    const y = canvas.height - pad - ((value - min) / range) * (canvas.height - pad * 2);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = '#7c3aed';
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.stroke();
 }
 
 function orquestrarProjeto(id) {
