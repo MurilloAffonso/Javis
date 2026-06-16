@@ -1,0 +1,59 @@
+Você é um engenheiro Python sênior especialista em geração de imagens com Pillow.
+
+IMPORTANTE — FERRAMENTAS: NÃO use nenhuma ferramenta MCP (lean-ctx, ctx_*). Use apenas leitura/escrita de arquivo nativa. Trabalhe a partir da raiz do repo `C:\Users\noteacer\Desktop\javis`.
+
+CONTEXTO:
+- Projeto: Vem Passear Jampa — turismo em João Pessoa/PB
+- Pillow 12.2.0 já está instalado
+- Leia PRIMEIRO: `_projetos/cerebro-jampa/carrossel-template.md` (especificação completa)
+- Leia TAMBÉM: `_projetos/cerebro-jampa/linha-editorial.md` (tom e conteúdo)
+
+TAREFA: Crie o script `_projetos/cerebro-jampa/gerar_carrossel.py` que gera um carrossel completo de 7 cards PNG prontos para postar no Instagram.
+
+ESPECIFICAÇÕES TÉCNICAS OBRIGATÓRIAS:
+
+1. **Tamanho:** 1080x1350px (4:5 vertical)
+2. **Paleta:**
+   - Fundo: #0a1628 (azul profundo)
+   - Acento primário: #00d4ff (turquesa)
+   - Acento secundário: #f59e0b (dourado)
+   - Texto: #ffffff e #94a3b8
+
+3. **Fontes:**
+   - Baixar Montserrat ExtraBold e Inter Regular via urllib se não existirem em `_projetos/cerebro-jampa/assets/fonts/`
+   - URLs das fontes Google Fonts:
+     - Montserrat ExtraBold 800: https://fonts.gstatic.com/s/montserrat/v26/JTUSjIg1_i6t8kCHKm459Wlhyw.woff2
+     - ATENÇÃO: o woff2 não funciona com Pillow — baixe as versões .ttf do GitHub do Google Fonts ou use a URL:
+       - https://github.com/google/fonts/raw/main/ofl/montserrat/Montserrat%5Bwght%5D.ttf
+       - https://github.com/google/fonts/raw/main/ofl/inter/Inter%5Bwght%5D.ttf
+     - Salvar como: `assets/fonts/Montserrat-ExtraBold.ttf` e `assets/fonts/Inter-Regular.ttf`
+   - Se download falhar: usar PIL default (ImageFont.load_default()) e avisar no print
+
+4. **Conteúdo do dia:** Use um array rotativo baseado no dia da semana (weekday 0-6). Defina 7 temas diferentes hardcoded no script (baseados no template). Cada tema tem: titulo_capa, gancho, topicos (lista de 5), cta, legenda_post, hashtags.
+
+5. **Estrutura dos cards:**
+   - Card 1 (capa): fundo com gradiente simulado (dois retângulos sobrepostos), tag de nicho pequena no topo, título grande centralizado em Montserrat, subtítulo menor em Inter, barra de acento turquesa embaixo
+   - Cards 2-6 (conteúdo): número do tópico em destaque (cor acento, fonte grande), título do tópico, corpo em Inter Regular, bullets com • na cor de acento
+   - Card 7 (CTA): frase de virada, retângulo preenchido turquesa com texto CTA, @vempassearjampa no rodapé
+   - Rodapé em TODOS os cards: linha fina na cor acento + "@vempassearjampa" em Inter pequeno
+
+6. **Output:**
+   - Criar pasta `_projetos/cerebro-jampa/outputs/carrossel-YYYY-MM-DD/`
+   - Salvar card_01.png a card_07.png
+   - Criar legenda.txt com legenda do post + hashtags
+   - Criar meta.json com: data, tema, abordagem, cards gerados
+
+7. **Execução:**
+   ```python
+   if __name__ == "__main__":
+       main()
+   ```
+   Ao rodar, deve imprimir no terminal:
+   - "Tema do dia: [título]"
+   - "Abordagem: [Tendência/Tutorial/Curiosidade]"
+   - "Cards gerados: 7"
+   - "Pasta: _projetos/cerebro-jampa/outputs/carrossel-YYYY-MM-DD/"
+
+IMPORTANTE: O script deve funcionar rodando `python _projetos/cerebro-jampa/gerar_carrossel.py` a partir da raiz do repo. Use caminhos relativos ao `__file__` ou absolutos calculados a partir de `Path(__file__).parent`.
+
+Ao final, escreva "CONCLUIDO: gerar_carrossel.py criado com [N] linhas"
