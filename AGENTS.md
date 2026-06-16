@@ -232,6 +232,80 @@ Todos têm sequência de parada `Acompanhamento` e capabilities perigosas desabi
 
 ---
 
+---
+
+## Codex CLI — Regras para o Agente de Produção
+
+O Codex (`codex` via `codex.ps1`) é o segundo programador do Javis — usa o plano OpenAI do Murillo (gpt-5.5), não consome tokens do Claude. Use-o para tarefas pesadas de produção de código/conteúdo.
+
+### Como disparar Codex
+
+```powershell
+# Escrever prompt em arquivo primeiro (NUNCA inline — stdin em não-interativo)
+$prompt | Out-File -Encoding utf8 "_apps/javis-local-interface/_data/codex_task_X.txt"
+# Disparar via cmd (não PowerShell direto — evita NativeCommandError)
+cmd /c "type _apps\javis-local-interface\_data\codex_task_X.txt | codex exec --sandbox workspace-write > _data\codex_log_X.txt 2>&1"
+```
+
+### Regras invioláveis para prompts Codex
+
+1. **NUNCA mencionar ferramentas MCP** (lean-ctx, ctx_*, ctx_read, ctx_shell, ctx_search) — travam com "user cancelled"
+2. **Sempre incluir no topo do prompt:**
+   ```
+   IMPORTANTE — FERRAMENTAS: NÃO use nenhuma ferramenta MCP (lean-ctx, ctx_*).
+   Use apenas leitura/escrita de arquivo nativa. Trabalhe a partir da raiz do repo.
+   ```
+3. **Caminhos absolutos** `C:\Users\noteacer\Desktop\javis` ou relativos explícitos ao repo raiz
+4. **Sandbox sempre `--sandbox workspace-write`** (não `--full-auto`, deprecado)
+5. **Checar log de conclusão:** monitor `tokens used|user cancelled|stream error` no log
+6. **NÃO chamar Codex de dentro de um subprocesso Claude** sem feed de stdin
+
+### Quando usar Codex vs Claude
+
+| Tarefa | Use |
+|--------|-----|
+| Edição de CSS grande / refactor de arquivo longo | **Codex** (economiza tokens Claude) |
+| Geração de conteúdo longo (editorial, docs, plans) | **Codex** |
+| Debugging de lógica / interpretação de erro | **Claude** (raciocínio) |
+| Decisão arquitetural | **Claude** (contexto completo) |
+| Edição cirúrgica < 30 linhas | **Claude** (mais rápido) |
+| Tarefas paralelas (Claude trabalhando em X enquanto Codex faz Y) | **Ambos** |
+
+### Modelo e versão
+
+- **Modelo:** `gpt-5.5` (ou `o3` para raciocínio pesado — mais caro)
+- **Versão Codex CLI:** 0.139.0 (verificar com `codex --version`)
+- **Cobrança:** plano OpenAI do Murillo — monitorar uso em platform.openai.com
+
+### Arquivos de prompt e log
+
+- Prompts: `_apps/javis-local-interface/_data/codex_task_[letra].txt`
+- Logs: `_apps/javis-local-interface/_data/codex_log_[letra].txt` (ou `_data/` se preferir)
+- Nomear com letra sequencial (a, b, c...) ou descritivo (`codex_css_design.txt`)
+
+---
+
+## Agentes do Javis — Squad Atual
+
+### Javis / Orion (Orquestrador Master)
+- **Role:** coordena todos os outros agentes, decide qual usar para cada tarefa
+- **Backend:** `backend/agent.py` + `backend/claude_brain.py`
+- **Ferramentas ativas:** busca web (DDG/Google), leitura de URL, hora/data, operações locais
+
+### Cérebro Jampa — Squad de Negócio
+- **Nova** (Diretora Criativa) — pauta, roteiro, copy para Vem Passear Jampa
+- **Midas** (Tráfego/Growth) — análise de métricas, tráfego pago, conversão
+- **Recap** (Analista) — síntese de reuniões, relatórios, dashboards
+- **Backend:** `backend/jampa_squad.py`
+- **Linha editorial:** `_projetos/cerebro-jampa/linha-editorial.md`
+
+### SDR Academy
+- **Agente SDR** estuda transcrições de vídeos de vendas do YouTube
+- **Fluxo:** `yt-dlp` → transcrição → `_memoria/treino-agentes/` → RAG rebuild
+- **Endpoint:** `POST /train/youtube` com `{"url": "..."}` 
+
+---
+
 ## Próximo Passo
 
 Verifique LeanCTX com: `lean-ctx doctor`
