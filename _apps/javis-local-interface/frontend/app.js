@@ -129,6 +129,34 @@ form.addEventListener("submit", e => {
   sendMessage(text);
 });
 
+// File upload handler
+const fileInput = document.getElementById("file-input");
+if (fileInput) {
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    fileInput.value = "";
+    removeWelcome();
+    appendMsg("user", `📎 <strong>${file.name}</strong> enviado para análise`);
+    const typingEl = appendTyping("analisando arquivo...");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`${API}/upload`, { method: "POST", body: fd });
+      const data = await res.json();
+      typingEl.remove();
+      if (data.status === "ok") {
+        appendMsg("assistant", renderMarkdown(data.message), { brain: "file-analyzer" });
+      } else {
+        appendMsg("assistant", `Erro ao analisar arquivo: ${data.message}`);
+      }
+    } catch (err) {
+      typingEl.remove();
+      appendMsg("assistant", `Erro ao enviar arquivo: ${err.message}`);
+    }
+  });
+}
+
 // Quick action buttons
 document.querySelectorAll(".qbtn:not(#btn-debate)").forEach(btn => {
   btn.addEventListener("click", () => {
@@ -1416,4 +1444,479 @@ async function speak(text) {
   };
 
   window.speechSynthesis.speak(utt);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   JAVIS AIOS — View Router & Multi-View Logic
+═══════════════════════════════════════════════════════════ */
+
+const VIEW_TITLES = { chat:'Orquestrador', agents:'Agentes', workflows:'Workflows', room:'Sala dos Agentes', projects:'Projetos', train:'SDR Academy', integrations:'Integrações' };
+
+function switchView(viewId) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.sb-item[data-view]').forEach(b => b.classList.remove('active'));
+  const view = document.getElementById('view-' + viewId);
+  if (view) view.classList.add('active');
+  const btn = document.querySelector(`.sb-item[data-view="${viewId}"]`);
+  if (btn) btn.classList.add('active');
+  const titleEl = document.getElementById('topbar-view-title');
+  if (titleEl) titleEl.textContent = VIEW_TITLES[viewId] || viewId;
+  if (viewId === 'agents' && !document.getElementById('gallery-grid').children.length) renderAgentGallery();
+  if (viewId === 'workflows') initWorkflowCanvas();
+  if (viewId === 'integrations' && !document.getElementById('integrations-grid').children.length) renderIntegrations();
+  if (viewId === 'room') initAgentRoom(); else stopAgentRoom();
+  if (viewId === 'projects' && !document.getElementById('projects-grid').children.length) renderProjects();
+}
+
+document.querySelectorAll('.sb-item[data-view]').forEach(btn => {
+  btn.addEventListener('click', () => switchView(btn.dataset.view));
+});
+
+/* ─── AGENT DATA ─────────────────────────────────────────── */
+const GALLERY_AGENTS = [
+  { id:'orion',   name:'Orion',   role:'@master',     emoji:'🧬', squad:'ops',      status:'online',  desc:'Orquestra todos os agentes e decisões estratégicas do sistema.', skills:['Orquestração','Decisão','Priorização'], ints:['slack','gmail','notion'] },
+  { id:'titan',   name:'Titan',   role:'@cro',        emoji:'👑', squad:'ops',      status:'online',  desc:'Orquestra todo o time de vendas, garantindo alinhamento e resultados.', skills:['Liderança','Vendas','KPIs'], ints:['slack','gmail','notion'] },
+  { id:'khan',    name:'Khan',    role:'@bdr-global', emoji:'📞', squad:'vendas',   status:'online',  desc:'Gerencia outbound global, prospecção e qualificação de leads.', skills:['Prospecção','Cold Call','Qualificação'], ints:['whatsapp','gmail','sheets'] },
+  { id:'phantom', name:'Phantom', role:'@closer',     emoji:'🎯', squad:'vendas',   status:'online',  desc:'Conduz negociações e fecha contratos de alto valor.', skills:['Fechamento','Negociação','Follow-up'], ints:['whatsapp','gmail'] },
+  { id:'blade',   name:'Blade',   role:'@bdr-en',     emoji:'⚔️', squad:'vendas',   status:'online',  desc:'Prospecção em inglês para mercados internacionais.', skills:['Outbound EN','LinkedIn','Email'], ints:['gmail','linkedin'] },
+  { id:'vera',    name:'Vera',    role:'@cmo',        emoji:'📢', squad:'criativo', status:'idle',    desc:'Impulsiona presença da marca, estratégias e campanhas criativas.', skills:['Marketing','Conteúdo','Branding'], ints:['instagram','gmail'] },
+  { id:'dara',    name:'Dara',    role:'@data-eng',   emoji:'📊', squad:'dados',    status:'idle',    desc:'Monitora métricas, analisa dados de CRM e alimenta dashboards.', skills:['Analytics','CRM','Relatórios'], ints:['sheets','notion','slack'] },
+  { id:'intel',   name:'Intel',   role:'@call-intel', emoji:'🔍', squad:'dados',    status:'offline', desc:'Pesquisa mercado, concorrentes e oportunidades estratégicas.', skills:['Pesquisa','Inteligência','Insights'], ints:['notion','gmail'] },
+  { id:'prism',   name:'Prism',   role:'@insight',    emoji:'💎', squad:'dados',    status:'idle',    desc:'Transforma dados brutos em insights acionáveis e relatórios.', skills:['Insights','Visualização','Reportes'], ints:['sheets','notion'] },
+  { id:'recap',   name:'Recap',   role:'@followup',   emoji:'🔄', squad:'ops',      status:'online',  desc:'Registra e acompanha follow-ups de todas as interações de vendas.', skills:['Follow-up','CRM','Lembretes'], ints:['whatsapp','gmail','notion'] },
+  { id:'brief',   name:'Brief',   role:'@discovery',  emoji:'📋', squad:'vendas',   status:'idle',    desc:'Conduz descoberta e prepara briefings de prospects qualificados.', skills:['Discovery','Briefing','Qualificação'], ints:['notion','gmail'] },
+  { id:'ana',     name:'Ana',     role:'@analyst',    emoji:'📈', squad:'dados',    status:'idle',    desc:'Analisa execução e gera relatórios de performance de campanhas.', skills:['Análise','Performance','Reportes'], ints:['sheets','notion'] },
+];
+
+const INT_ICONS = { gmail:'📧', whatsapp:'💬', slack:'💼', notion:'📓', sheets:'📊', instagram:'📸', linkedin:'🔗' };
+
+/* ─── AGENT GALLERY ──────────────────────────────────────── */
+let _activeFilter = 'all';
+
+function renderAgentGallery(filter) {
+  filter = filter || _activeFilter;
+  _activeFilter = filter;
+  const grid = document.getElementById('gallery-grid');
+  if (!grid) return;
+  const list = filter === 'all' ? GALLERY_AGENTS : GALLERY_AGENTS.filter(a => a.squad === filter);
+  grid.innerHTML = list.map(a => `
+    <div class="gallery-card" onclick="openAgentChat('${a.id}')">
+      <div class="gc-header">
+        <div class="gc-avatar">${a.emoji}</div>
+        <div class="gc-info"><div class="gc-name">${a.name}</div><div class="gc-role">${a.role}</div></div>
+        <div class="gc-status-dot ${a.status}"></div>
+      </div>
+      <div class="gc-desc">${a.desc}</div>
+      <div class="gc-skills">${a.skills.map(s=>`<span class="gc-skill">${s}</span>`).join('')}</div>
+      <div class="gc-integrations">${a.ints.map(i=>`<div class="gc-int-icon" title="${i}">${INT_ICONS[i]||'🔌'}</div>`).join('')}</div>
+    </div>
+  `).join('');
+  renderActivityFeed();
+}
+
+function openAgentChat(agentId) {
+  const a = GALLERY_AGENTS.find(x => x.id === agentId);
+  if (!a) return;
+  switchView('chat');
+  const inp = document.getElementById('input');
+  if (inp) { inp.value = `Falar com ${a.name} (${a.role}): `; inp.focus(); }
+}
+
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.filter-btn');
+  if (!btn) return;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderAgentGallery(btn.dataset.filter);
+});
+
+function renderActivityFeed() {
+  const feed = document.getElementById('activity-feed');
+  if (!feed) return;
+  const items = [
+    { agent:'Khan @bdr',      text:'Prospectou 3 novos leads via LinkedIn',        time:'2m atrás' },
+    { agent:'Orion @master',  text:'Delegou campanha Q2 para Vera e Dara',         time:'8m atrás' },
+    { agent:'Phantom @closer',text:'Follow-up enviado para MedTech S.A.',           time:'15m atrás' },
+    { agent:'Dara @data',     text:'Dashboard de CRM atualizado com 47 entradas',  time:'22m atrás' },
+    { agent:'Vera @cmo',      text:'Reel gerado: "5 razões para escolher..."',     time:'1h atrás' },
+  ];
+  feed.innerHTML = items.map(i => `
+    <div class="activity-item">
+      <div class="ai-agent">${i.agent}</div>
+      <div class="ai-text">${i.text}</div>
+      <div class="ai-time">${i.time}</div>
+    </div>
+  `).join('');
+}
+
+/* ─── WORKFLOW CANVAS ────────────────────────────────────── */
+const MISSIONS = [
+  { id:'m1', name:'Campanha Lançamento Q1', pct:89, active:true },
+  { id:'m2', name:'SDR Outbound EN',        pct:62, active:false },
+  { id:'m3', name:'Conteúdo Julho',         pct:34, active:false },
+];
+
+const WF_NODES = [
+  { id:'n0', label:'Orion',     type:'orchestrator', x:60,  y:150, status:'online',  pct:100 },
+  { id:'n1', label:'Headlines', type:'copy',         x:240, y:70,  status:'done',    pct:100 },
+  { id:'n2', label:'Body Copy', type:'copy',         x:240, y:230, status:'running', pct:67  },
+  { id:'n3', label:'House G',   type:'review',       x:430, y:150, status:'waiting', pct:0   },
+  { id:'n4', label:'Publish',   type:'publish',      x:610, y:150, status:'waiting', pct:0   },
+];
+const WF_EDGES = [['n0','n1'],['n0','n2'],['n1','n3'],['n2','n3'],['n3','n4']];
+
+function initWorkflowCanvas() {
+  const list = document.getElementById('missions-list');
+  if (list) list.innerHTML = MISSIONS.map(m => `
+    <div class="mission-item ${m.active?'active':''}" data-mid="${m.id}">
+      <div class="mi-name">${m.name}</div>
+      <div class="mi-progress-row">
+        <div class="mi-bar"><div class="mi-bar-fill" style="width:${m.pct}%"></div></div>
+        <span class="mi-pct">${m.pct}%</span>
+      </div>
+    </div>
+  `).join('');
+
+  const canvas = document.getElementById('workflow-canvas');
+  if (!canvas) return;
+  canvas.querySelectorAll('.wf-node').forEach(n => n.remove());
+  WF_NODES.forEach(node => {
+    const div = document.createElement('div');
+    div.className = `wf-node type-${node.type} status-${node.status}`;
+    div.id = 'wfn-' + node.id;
+    div.style.cssText = `left:${node.x}px;top:${node.y}px`;
+    div.innerHTML = `<div class="wf-node-label">${node.label}</div><div class="wf-node-type">${node.type}</div><div class="wf-node-bar"><div class="wf-node-bar-fill" style="width:${node.pct}%"></div></div>`;
+    div.addEventListener('click', () => showTaskDetail(node));
+    canvas.appendChild(div);
+  });
+  requestAnimationFrame(() => drawWfEdges());
+}
+
+function drawWfEdges() {
+  const svg = document.getElementById('wf-connections');
+  const canvas = document.getElementById('workflow-canvas');
+  if (!svg || !canvas) return;
+  svg.innerHTML = '';
+  const cr = canvas.getBoundingClientRect();
+  WF_EDGES.forEach(([fId, tId]) => {
+    const fEl = document.getElementById('wfn-' + fId);
+    const tEl = document.getElementById('wfn-' + tId);
+    if (!fEl || !tEl) return;
+    const fr = fEl.getBoundingClientRect();
+    const tr = tEl.getBoundingClientRect();
+    const x1 = fr.right - cr.left, y1 = (fr.top+fr.bottom)/2 - cr.top;
+    const x2 = tr.left  - cr.left, y2 = (tr.top+tr.bottom)/2  - cr.top;
+    const mx = (x1+x2)/2;
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`);
+    path.setAttribute('stroke', 'rgba(124,58,237,0.4)');
+    path.setAttribute('stroke-width', '1.5');
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke-dasharray', '5 3');
+    svg.appendChild(path);
+  });
+}
+
+function showTaskDetail(node) {
+  const panel = document.getElementById('tdp-content');
+  if (!panel) return;
+  const subtaskMap = {
+    orchestrator: ['Análise de contexto','Delegação de tasks','Monitoramento'],
+    copy:         ['Pesquisa de referências','Rascunho inicial','Revisão de tom'],
+    review:       ['Checklist de qualidade','Aprovação humana','Feedback loop'],
+    publish:      ['Agendamento','Publicação final','Report de alcance'],
+    research:     ['Coleta de dados','Análise','Síntese'],
+  };
+  const tasks = subtaskMap[node.type] || [];
+  const done = Math.floor((node.pct/100)*tasks.length);
+  panel.innerHTML = `
+    <div class="tdp-task-name">${node.label}</div>
+    <div class="tdp-progress-big">${node.pct}%</div>
+    <div class="tdp-section-label">Subtarefas</div>
+    <div class="tdp-subtasks">${tasks.map((t,i)=>`<div class="tdp-subtask ${i<done?'done':''}"><span>${i<done?'✅':'○'}</span><span>${t}</span></div>`).join('')}</div>
+    <div class="tdp-section-label" style="margin-top:12px">Contexto</div>
+    <div class="tdp-context">Agente: <strong>${node.label}</strong><br>Tipo: ${node.type}<br>Status: ${node.status}</div>
+  `;
+}
+
+/* ─── TRAINING VIEW ─────────────────────────────────────── */
+const _trainingQueue = [];
+
+document.addEventListener('click', async e => {
+  if (e.target.id !== 'train-add-btn') return;
+  const urlInp = document.getElementById('train-url');
+  const agSel  = document.getElementById('train-agent-sel');
+  const url    = (urlInp?.value || '').trim();
+  if (!url) return;
+  const agent = agSel?.value || 'khan';
+
+  const idx = _trainingQueue.length;
+  _trainingQueue.push({ url, title: 'Extraindo transcrição...', agent, progress: 5, status: 'studying' });
+  if (urlInp) urlInp.value = '';
+  renderTrainingQueue();
+
+  const fakeId = setInterval(() => {
+    const item = _trainingQueue[idx];
+    if (!item || item.progress >= 85) { clearInterval(fakeId); return; }
+    item.progress = Math.min(85, item.progress + Math.random() * 5 + 2);
+    const bar = document.getElementById('ti-bar-' + idx);
+    if (bar) bar.style.width = item.progress + '%';
+  }, 400);
+
+  try {
+    const res  = await fetch('/train/youtube', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, agent }),
+    });
+    clearInterval(fakeId);
+    const data = await res.json();
+    const item = _trainingQueue[idx];
+    if (data.error) {
+      item.title = '❌ ' + data.error;
+      item.status = 'error';
+      item.progress = 0;
+    } else {
+      item.title    = data.title || item.title;
+      item.status   = 'done';
+      item.progress = 100;
+      item.chars    = data.chars;
+    }
+    renderTrainingQueue();
+  } catch (err) {
+    clearInterval(fakeId);
+    const item = _trainingQueue[idx];
+    if (item) { item.title = '❌ Erro de conexão'; item.status = 'error'; item.progress = 0; }
+    renderTrainingQueue();
+  }
+});
+
+function renderTrainingQueue() {
+  const el = document.getElementById('train-queue');
+  if (!el) return;
+  if (!_trainingQueue.length) { el.innerHTML='<div class="train-empty">Nenhum vídeo em treinamento ainda.</div>'; return; }
+  el.innerHTML = _trainingQueue.map((item,i) => `
+    <div class="train-item">
+      <div class="ti-icon">🎓</div>
+      <div class="ti-info">
+        <div class="ti-title">${item.title}${item.chars ? ' <small style="color:var(--text-dim);font-weight:400">· '+Math.round(item.chars/1000)+'k chars</small>' : ''}</div>
+        <div class="ti-agent">Agente: ${item.agent}</div>
+        <div class="ti-progress"><div class="ti-progress-fill" id="ti-bar-${i}" style="width:${item.progress}%"></div></div>
+      </div>
+      <div class="ti-status ${item.status}" id="ti-st-${i}">${item.status==='done'?'✅ Absorvido':item.status==='error'?'Erro':'📚 Estudando'}</div>
+    </div>
+  `).join('');
+}
+
+/* ─── INTEGRATIONS ───────────────────────────────────────── */
+const INTEGRATIONS_DATA = [
+  { id:'gmail',     name:'Gmail',         icon:'📧', status:'disconnected', desc:'Envio e recebimento de emails' },
+  { id:'whatsapp',  name:'WhatsApp',      icon:'💬', status:'disconnected', desc:'Mensagens via WhatsApp Business' },
+  { id:'slack',     name:'Slack',         icon:'💼', status:'disconnected', desc:'Notificações e alertas de equipe' },
+  { id:'notion',    name:'Notion',        icon:'📓', status:'disconnected', desc:'Documentação e conhecimento' },
+  { id:'sheets',    name:'Google Sheets', icon:'📊', status:'disconnected', desc:'Planilhas e relatórios de dados' },
+  { id:'instagram', name:'Instagram',     icon:'📸', status:'disconnected', desc:'Gestão de conteúdo e DMs' },
+  { id:'linkedin',  name:'LinkedIn',      icon:'🔗', status:'disconnected', desc:'Prospecção B2B e conexões' },
+  { id:'evolution', name:'Evolution API', icon:'⚡', status:'disconnected', desc:'WhatsApp automatizado via API' },
+];
+
+function renderIntegrations() {
+  const grid = document.getElementById('integrations-grid');
+  if (!grid) return;
+  grid.innerHTML = INTEGRATIONS_DATA.map(i => `
+    <div class="integration-card ${i.status}" onclick="toggleIntegration('${i.id}')">
+      <div class="ic-icon">${i.icon}</div>
+      <div class="ic-name">${i.name}</div>
+      <div class="ic-desc">${i.desc}</div>
+      <span class="ic-status ${i.status}">${i.status==='connected'?'✓ Conectado':'Conectar'}</span>
+    </div>
+  `).join('');
+}
+
+function toggleIntegration(id) {
+  const item = INTEGRATIONS_DATA.find(i => i.id===id);
+  if (!item) return;
+  item.status = item.status==='connected' ? 'disconnected' : 'connected';
+  renderIntegrations();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SALA DOS AGENTES — animated room with character sprites
+   ═══════════════════════════════════════════════════════════ */
+const ROOM_AGENTS = [
+  { id:'orion',   name:'Orion',   emoji:'🧬', hx:50, hy:30 },
+  { id:'titan',   name:'Titan',   emoji:'👑', hx:22, hy:48 },
+  { id:'khan',    name:'Khan',    emoji:'📞', hx:38, hy:66 },
+  { id:'phantom', name:'Phantom', emoji:'🎯', hx:62, hy:66 },
+  { id:'blade',   name:'Blade',   emoji:'⚔️', hx:78, hy:48 },
+  { id:'vera',    name:'Vera',    emoji:'📢', hx:15, hy:74 },
+  { id:'dara',    name:'Dara',    emoji:'📊', hx:85, hy:74 },
+  { id:'recap',   name:'Recap',   emoji:'🔄', hx:50, hy:82 },
+];
+const ROOM_TASKS = [
+  'analisando lead novo', 'escrevendo follow-up', 'revisando copy', 'fechando contrato',
+  'pesquisando concorrente', 'gerando relatório', 'qualificando prospect', 'criando reel',
+  'atualizando CRM', 'preparando proposta', 'estudando vídeo de vendas', 'agendando reunião',
+];
+let _roomTimers = [];
+let _roomInited = false;
+
+function initAgentRoom() {
+  const floor = document.getElementById('room-floor');
+  if (!floor) return;
+  if (_roomInited) { _roomTick(); return; }
+  _roomInited = true;
+
+  // build desks + agents
+  ROOM_AGENTS.forEach(a => {
+    const desk = document.createElement('div');
+    desk.className = 'room-desk';
+    desk.style.left = a.hx + '%';
+    desk.style.top  = a.hy + '%';
+    floor.appendChild(desk);
+
+    const el = document.createElement('div');
+    el.className = 'room-agent';
+    el.id = 'ra-' + a.id;
+    el.style.left = a.hx + '%';
+    el.style.top  = a.hy + '%';
+    el.innerHTML = `
+      <span class="room-agent-status-dot idle"></span>
+      <div class="room-bubble" id="rb-${a.id}"></div>
+      <div class="room-agent-body">${a.emoji}</div>
+      <div class="room-agent-name">${a.name}</div>`;
+    el.onclick = () => roomPoke(a);
+    floor.appendChild(el);
+  });
+
+  _roomTick();
+  _roomTimers.push(setInterval(_roomTick, 3200));
+}
+
+function stopAgentRoom() {
+  _roomTimers.forEach(clearInterval);
+  _roomTimers = [];
+}
+
+function _roomTick() {
+  // randomly assign work to ~half the agents each tick
+  let working = 0, idle = 0;
+  ROOM_AGENTS.forEach(a => {
+    const el = document.getElementById('ra-' + a.id);
+    if (!el) return;
+    const dot = el.querySelector('.room-agent-status-dot');
+    const roll = Math.random();
+    if (roll < 0.55) {
+      // working
+      el.classList.add('working');
+      dot.className = 'room-agent-status-dot working';
+      working++;
+      if (Math.random() < 0.5) roomBubble(a, ROOM_TASKS[Math.floor(Math.random()*ROOM_TASKS.length)]);
+    } else if (roll < 0.9) {
+      // idle — wander a bit
+      el.classList.remove('working');
+      dot.className = 'room-agent-status-dot idle';
+      idle++;
+      if (Math.random() < 0.4) {
+        el.style.left = Math.max(8, Math.min(92, a.hx + (Math.random()*16 - 8))) + '%';
+        el.style.top  = Math.max(20, Math.min(86, a.hy + (Math.random()*12 - 6))) + '%';
+      } else {
+        el.style.left = a.hx + '%'; el.style.top = a.hy + '%';
+      }
+    } else {
+      el.classList.remove('working');
+      el.classList.add('offline');
+      dot.className = 'room-agent-status-dot offline';
+    }
+    if (roll >= 0.55) el.classList.remove('offline');
+  });
+  const w = document.getElementById('rstat-working'); if (w) w.textContent = working;
+  const i = document.getElementById('rstat-idle');    if (i) i.textContent = idle;
+  const t = document.getElementById('rstat-tasks');   if (t) t.textContent = working;
+}
+
+function roomBubble(a, text) {
+  const b = document.getElementById('rb-' + a.id);
+  if (!b) return;
+  b.textContent = text;
+  b.classList.add('show');
+  setTimeout(() => b.classList.remove('show'), 2600);
+  roomLog(a.name, text);
+}
+
+function roomPoke(a) {
+  roomBubble(a, 'pronto pra trabalhar, senhor!');
+  const el = document.getElementById('ra-' + a.id);
+  if (el) { el.classList.add('working'); el.querySelector('.room-agent-status-dot').className = 'room-agent-status-dot working'; }
+}
+
+function roomLog(agent, text) {
+  const log = document.getElementById('room-log');
+  if (!log) return;
+  const now = new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  const line = document.createElement('div');
+  line.className = 'rl-line';
+  line.innerHTML = `<span class="rl-time">${now}</span><span class="rl-agent">${agent}</span> · ${text}`;
+  log.insertBefore(line, log.firstChild);
+  while (log.children.length > 30) log.removeChild(log.lastChild);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PROJETOS — Javis as master orchestrator of all projects
+   ═══════════════════════════════════════════════════════════ */
+const PROJECTS_DATA = [
+  {
+    id:'vempassear', icon:'🌊', name:'Vem Passear Jampa', tag:'Turismo · João Pessoa',
+    desc:'Squad de turismo: vendas de passeios, conteúdo, leads e atendimento no WhatsApp.',
+    agents:10, status:'online', statusLabel:'Ativo', grad:'linear-gradient(90deg,#0ea5e9,#06b6d4)',
+    open:'/vempassear', squadEndpoint:'/jampa/agents',
+  },
+  {
+    id:'cerebro-jampa', icon:'🧠', name:'Cérebro Jampa', tag:'Orquestração comercial',
+    desc:'Squad mestre Jampa Jarvis: Orion orquestra Hunter, Atlas, LNS, Nero, Nova e mais.',
+    agents:10, status:'online', statusLabel:'Ativo', grad:'linear-gradient(90deg,#7c3aed,#a855f7)',
+    open:'/vempassear', squadEndpoint:'/jampa/agents',
+  },
+  {
+    id:'javis-core', icon:'⚡', name:'Javis Core', tag:'Orquestrador mestre',
+    desc:'O cérebro central. Coordena todos os projetos, voz, código (Claude + Codex) e memória.',
+    agents:12, status:'online', statusLabel:'Você está aqui', grad:'linear-gradient(90deg,#f59e0b,#ef4444)',
+    open:'/', squadEndpoint:'/agents',
+  },
+  {
+    id:'futuro', icon:'➕', name:'Novo Projeto', tag:'Slot livre',
+    desc:'Plugue um novo projeto aqui. Javis cria o squad e orquestra automaticamente.',
+    agents:0, status:'planned', statusLabel:'Planejado', grad:'linear-gradient(90deg,#475569,#334155)',
+    open:null, squadEndpoint:null,
+  },
+];
+
+function renderProjects() {
+  const grid = document.getElementById('projects-grid');
+  if (!grid) return;
+  grid.innerHTML = PROJECTS_DATA.map(p => `
+    <div class="project-card" style="--accent-grad:${p.grad}">
+      <div class="pc-head">
+        <div class="pc-icon">${p.icon}</div>
+        <div><div class="pc-name">${p.name}</div><div class="pc-tag">${p.tag}</div></div>
+      </div>
+      <div class="pc-desc">${p.desc}</div>
+      <div class="pc-meta">
+        <div class="pc-stat"><b>${p.agents}</b>agentes</div>
+        <div class="pc-stat"><span class="pc-status ${p.status}">${p.status==='online'?'●':'○'} ${p.statusLabel}</span></div>
+      </div>
+      <div class="pc-actions">
+        <button class="pc-btn" ${p.open?`onclick="window.location.href='${p.open}'"`:'disabled'}>${p.open?'Abrir':'Em breve'}</button>
+        <button class="pc-btn" ${p.squadEndpoint?`onclick="orquestrarProjeto('${p.id}')"`:'disabled'}>Orquestrar</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function orquestrarProjeto(id) {
+  const p = PROJECTS_DATA.find(x => x.id===id);
+  if (!p) return;
+  switchView('chat');
+  const inp = document.getElementById('input');
+  if (inp) { inp.value = `Orquestrar projeto ${p.name}: `; inp.focus(); }
 }
