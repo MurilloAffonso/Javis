@@ -16,7 +16,7 @@ Observação sobre dados: volumes e dificuldades de palavras-chave abaixo são e
 
 ## 1. Diagnóstico atual
 
-A Vem Passear Jampa vende por WhatsApp e Instagram, o que e forte para conversão rápida, mas fraco para captura de demanda orgânica no Google. O turista que pesquisa "passeio João Pessoa", "piscinas naturais João Pessoa" ou "passeio de barco João Pessoa" normalmente esta em uma fase de alta intenção: ele já decidiu viajar ou já esta na cidade, só precisa escolher com quem reservar.
+A Vem Passear Jampa vende por WhatsApp e Instagram, o que é forte para conversão rápida, mas fraco para captura de demanda orgânica no Google. O turista que pesquisa "passeio João Pessoa", "piscinas naturais João Pessoa" ou "passeio de barco João Pessoa" normalmente está em uma fase de alta intenção: ele já decidiu viajar ou já está na cidade, só precisa escolher com quem reservar.
 
 Sem site próprio, o negócio perde parte do controle sobre indexação, páginas por passeio, ranqueamento de perguntas frequentes, comparativos e conteúdos como "melhor maré para piscinas naturais em João Pessoa". A boa notícia: para turismo local, o Google Business Profile pode compensar grande parte disso no curto prazo, porque aparece no Google Maps e no painel local mesmo sem site.
 
@@ -40,7 +40,7 @@ Sem site próprio, o negócio perde parte do controle sobre indexação, página
 
 1. Google Business Profile incompleto ou inexistente: sem categoria correta, horário, serviços, fotos, link para WhatsApp e rotina de posts.
 2. Poucas avaliações recentes: sem volume, nota, palavras-chave naturais nos reviews e resposta do dono.
-3. Falta de consistencia NAP: nome, telefone, WhatsApp, cidade e descrição variando entre Google, Instagram, diretórios e portais.
+3. Falta de consistência NAP: nome, telefone, WhatsApp, cidade e descrição variando entre Google, Instagram, diretórios e portais.
 4. Ausência de páginas por serviço: Seixas, Picãozinho, Litoral Norte e Combo não possuem URLs próprias para ranquear.
 5. Conteúdo educativo não indexado: informações sobre maré, crianças, horários, o que levar e diferenças entre passeios ficam presas em Stories/Reels e somem rápido.
 
@@ -48,12 +48,12 @@ Sem site próprio, o negócio perde parte do controle sobre indexação, página
 
 ## 2. Palavras-chave prioritárias
 
-### Criterios
+### Critérios
 
 - Alta prioridade: busca com intenção comercial clara e conexão direta com os passeios.
-- Média prioridade: busca relevante para inspiracao, dúvida ou comparacao.
+- Média prioridade: busca relevante para inspiração, dúvida ou comparação.
 - Baixa prioridade: busca mais ampla, útil para conteúdo e descoberta, mas menos perto da compra.
-- Quick win: termo com alta intenção e concorrência mais manejavel para GBP, Instagram, YouTube ou micro-blog.
+- Quick win: termo com alta intenção e concorrência mais manejável para GBP, Instagram, YouTube ou micro-blog.
 
 | # | Palavra-chave | Prioridade | Intenção | Volume estimado | Dificuldade | Quick win |
 |---:|---|---|---|---|---|---|
@@ -81,8 +81,8 @@ Sem site próprio, o negócio perde parte do controle sobre indexação, página
 | 22 | passeio para família João Pessoa | Média | Transacional | Baixo | Fácil | Sim |
 | 23 | passeio com criança João Pessoa | Média | Transacional | Baixo | Fácil | Sim |
 | 24 | turismo João Pessoa PB | Baixa | Informacional | Alto | Difícil | Não |
-| 25 | praias João Pessoa Paraiba | Baixa | Informacional | Alto | Difícil | Não |
-| 26 | litoral norte Paraiba passeio | Baixa | Informacional/transacional | Médio | Médio | Não |
+| 25 | praias João Pessoa Paraíba | Baixa | Informacional | Alto | Difícil | Não |
+| 26 | litoral norte Paraíba passeio | Baixa | Informacional/transacional | Médio | Médio | Não |
 | 27 | João Pessoa pontos turísticos | Baixa | Informacional | Alto | Difícil | Não |
 | 28 | passeio em grupo João Pessoa | Baixa | Transacional | Baixo | Fácil | Sim |
 | 29 | passeio romantico João Pessoa | Baixa | Informacional/transacional | Baixo | Fácil | Sim |
@@ -108,7 +108,7 @@ Sem site próprio, o negócio perde parte do controle sobre indexação, página
 
 ## 3. Google Business Profile (GBP) - Prioridade #1
 
-Google Business Profile e a primeira frente porque o turista local pesquisa no Google Maps e no Google Search antes de chamar no WhatsApp. O objetivo e ficar elegível para aparecer no pacote local e aumentar ligações, cliques, rotas e conversas.
+Google Business Profile é a primeira frente porque o turista local pesquisa no Google Maps e no Google Search antes de chamar no WhatsApp. O objetivo é ficar elegível para aparecer no pacote local e aumentar ligações, cliques, rotas e conversas.
 
 ### Passo a passo de otimização
 
@@ -132,18 +132,18 @@ Escolher no painel a categoria mais específica disponível, nesta ordem:
 3. Agência de turismo.
 4. Passeio turístico.
 
-Evitar usar "Atracao turistica" como categoria principal se a Vem Passear Jampa não for um ponto físico visitavel. Essa categoria pode confundir o Google e o cliente, porque o negócio vende experiência guiada, não um ponto turístico próprio.
+Evitar usar "Atração turística" como categoria principal se a Vem Passear Jampa não for um ponto físico visitável. Essa categoria pode confundir o Google e o cliente, porque o negócio vende experiência guiada, não um ponto turístico próprio.
 
 ### Categorias secundarias possíveis
 
-Validar no painel, porque os nomes exatos das categorias mudam por pais e idioma:
+Validar no painel, porque os nomes exatos das categorias mudam por país e idioma:
 
 - Agência de turismo.
 - Passeio de barco.
 - Servico de transporte.
 - Servico de aluguel de barcos, somente se houver embarcacao própria ou parceria formal que justifique.
 - Agência de viagens, somente se também vender roteiros/pacotes mais amplos.
-- Atracao turistica, somente se houver ponto físico próprio com atendimento ao público.
+- Atração turística, somente se houver ponto físico próprio com atendimento ao público.
 
 ### Campos obrigatorios
 
@@ -153,41 +153,41 @@ Validar no painel, porque os nomes exatos das categorias mudam por pais e idioma
 | Categoria | Operadora de turismo ou equivalente mais específico |
 | Telefone | WhatsApp principal com DDD |
 | Site | Link para Google Sites, Linktree ou wa.me enquanto não houver site próprio |
-| Area de serviço | João Pessoa, Cabo Branco, Tambau, Manaira, Bessa, Cabedelo e pontos de embarque reais |
+| Área de serviço | João Pessoa, Cabo Branco, Tambaú, Manaíra, Bessa, Cabedelo e pontos de embarque reais |
 | Horario | Horario real de atendimento no WhatsApp, com horários especiais em feriados |
-| Descricao | Texto com João Pessoa, piscinas naturais, Seixas, Picãozinho, Litoral Norte e reserva por WhatsApp |
-| Servicos | Uma ficha por passeio, com preço, duração, ponto de encontro e observação sobre maré |
+| Descrição | Texto com João Pessoa, piscinas naturais, Seixas, Picãozinho, Litoral Norte e reserva por WhatsApp |
+| Serviços | Uma ficha por passeio, com preço, duração, ponto de encontro e observação sobre maré |
 | Atributos | Atendimento por WhatsApp, agendamento necessario, adequado para famílias, pagamento conforme operação real |
 | Perguntas e respostas | Inserir perguntas frequentes com respostas claras |
 | Redes sociais | Instagram oficial e, se houver, Facebook/TikTok/YouTube |
 
-### Descricao sugerida para GBP
+### Descrição sugerida para GBP
 
-Vem Passear Jampa organiza passeios em João Pessoa para piscinas naturais do Seixas, Picãozinho, Litoral Norte, combos e opções para famílias com crianças. Atendimento direto pelo WhatsApp, orientacao sobre maré, horários, vagas e melhor passeio para sua data. Passeios com preço claro, fotos reais e foco em uma experiência tranquila, segura e bem guiada.
+Vem Passear Jampa organiza passeios em João Pessoa para piscinas naturais do Seixas, Picãozinho, Litoral Norte, combos e opções para famílias com crianças. Atendimento direto pelo WhatsApp, orientação sobre maré, horários, vagas e melhor passeio para sua data. Passeios com preço claro, fotos reais e foco em uma experiência tranquila, segura e bem guiada.
 
-### Servicos a cadastrar no GBP
+### Serviços a cadastrar no GBP
 
-| Servico | Preco | Descricao curta |
+| Servico | Preco | Descrição curta |
 |---|---:|---|
-| Piscinas Naturais do Seixas | R$65 | Passeio para as piscinas naturais do Seixas em João Pessoa, com orientacao de maré, horário e reserva pelo WhatsApp. |
+| Piscinas Naturais do Seixas | R$65 | Passeio para as piscinas naturais do Seixas em João Pessoa, com orientação de maré, horário e reserva pelo WhatsApp. |
 | Piscinas Naturais do Picãozinho | R$75 | Passeio para Picãozinho, uma das piscinas naturais mais procuradas de João Pessoa, ideal para fotos e família. |
-| Litoral Norte | R$90 adulto | Passeio pelo litoral norte da Paraiba, indicado para quem quer conhecer mais praias e paisagens em um roteiro guiado. |
+| Litoral Norte | R$90 adulto | Passeio pelo litoral norte da Paraíba, indicado para quem quer conhecer mais praias e paisagens em um roteiro guiado. |
 | Combo Seixas + Picãozinho | R$120 | Combo duplo para quem quer aproveitar duas experiências de piscinas naturais em João Pessoa. |
-| Passeio Infantil | R$40 | Opcao para crianças, com orientacao previa sobre idade, segurança, maré e acompanhamento familiar. |
+| Passeio Infantil | R$40 | Opção para crianças, com orientação prévia sobre idade, segurança, maré e acompanhamento familiar. |
 
 ### Estratégia de fotos
 
-Meta inicial: 60 fotos no primeiro mes e atualizacao semanal.
+Meta inicial: 60 fotos no primeiro mês e atualização semanal.
 
 | Tipo de foto | Quantidade inicial | Frequencia | Observação |
 |---|---:|---|---|
 | Capa forte | 1 | Trocar quando houver foto melhor | Mar azul, pessoas pequenas no enquadramento, sem texto pesado |
 | Logo | 1 | Atualizar quando mudar identidade | Fundo limpo, legivel em circulo |
 | Piscinas do Seixas | 12 | 3 por semana em alta temporada | Fotos reais, luz natural, sem filtro exagerado |
-| Picãozinho | 12 | 3 por semana em alta temporada | Mostrar agua, barco, família, experiência |
+| Picãozinho | 12 | 3 por semana em alta temporada | Mostrar água, barco, família, experiência |
 | Litoral Norte | 10 | 2 por semana | Mostrar roteiro e variedade |
-| Bastidores | 8 | 1 por semana | Embarque, equipe, cuidado, organizacao |
-| Prova social | 8 | 2 por semana | Clientes com autorizacao clara de imagem |
+| Bastidores | 8 | 1 por semana | Embarque, equipe, cuidado, organização |
+| Prova social | 8 | 2 por semana | Clientes com autorização clara de imagem |
 | Fotos informativas | 6 | Quinzenal | Ponto de encontro, o que levar, placa, embarque |
 | Videos curtos | 5 | 1 por semana | Ate 30 segundos, vertical ou horizontal, 720p+ |
 
@@ -197,7 +197,7 @@ Padrao técnico:
 - Resolucao recomendada mínima: 720 x 720 px; usar 1080 x 1080 ou 1080 x 1350 quando possível.
 - Tamanho leve, sem compressao excessiva.
 - Foto em foco, bem iluminada e representando a experiência real.
-- Evitar arte com muito texto, marca d'agua pesada ou filtro que muda a cor real da agua.
+- Evitar arte com muito texto, marca d'água pesada ou filtro que muda a cor real da água.
 
 ### Como coletar avaliações
 
@@ -213,14 +213,14 @@ Fluxo ideal:
 Template WhatsApp pos-passeio:
 
 ```text
-Oi, [nome]! Aqui e o Murillo da Vem Passear Jampa.
+Oi, [nome]! Aqui é o Murillo da Vem Passear Jampa.
 
 Obrigado por passear com a gente hoje em João Pessoa. Sua avaliação ajuda outros turistas a escolherem o passeio com mais segurança.
 
-Se puder deixar um comentario rápido no Google contando como foi sua experiência, ajuda demais:
+Se puder deixar um comentário rápido no Google contando como foi sua experiência, ajuda demais:
 [link de avaliação]
 
-Pode ser sincero(a), principalmente sobre atendimento, organizacao, passeio e orientacao de maré. Obrigado!
+Pode ser sincero(a), principalmente sobre atendimento, organização, passeio e orientação de maré. Obrigado!
 ```
 
 Template lembrete leve:
@@ -241,14 +241,14 @@ Frequencia ideal em alta temporada: 3 posts por semana.
 | Tipo | Frequencia | Formato | Exemplo |
 |---|---:|---|---|
 | Update educativo | 1x/semana | Foto + 500 a 800 caracteres + CTA | "Como escolher o melhor dia para piscinas naturais em João Pessoa" |
-| Oferta | 1x/semana | Foto + data + condicao real | "Vagas para Seixas e Picãozinho nesta semana" |
-| Evento/janela de maré | Quando houver | Data específica + explicacao | "Semana com boa janela de maré para piscinas naturais" |
-| Prova social | Quinzenal | Foto autorizada + comentario | "Familia aproveitando Picãozinho" |
+| Oferta | 1x/semana | Foto + data + condição real | "Vagas para Seixas e Picãozinho nesta semana" |
+| Evento/jánela de maré | Quando houver | Data específica + explicacao | "Semana com boa jánela de maré para piscinas naturais" |
+| Prova social | Quinzenal | Foto autorizada + comentário | "Família aproveitando Picãozinho" |
 
 CTA padrão:
 
 - "Chame no WhatsApp e envie sua data em João Pessoa."
-- "Mande 'MARE' para saber o melhor passeio para sua viagem."
+- "Mande 'MARÉ' para saber o melhor passeio para sua viagem."
 - "Consulte vagas desta semana pelo WhatsApp."
 
 ### Templates para responder avaliações positivas
@@ -256,7 +256,7 @@ CTA padrão:
 Resposta curta:
 
 ```text
-[Nome], obrigado pela avaliação! Foi um prazer receber você na Vem Passear Jampa. Ficamos felizes que tenha curtido o passeio em João Pessoa e a orientacao da nossa equipe. Volte sempre!
+[Nome], obrigado pela avaliação! Foi um prazer receber você na Vem Passear Jampa. Ficamos felizes que tenha curtido o passeio em João Pessoa e a orientação da nossa equipe. Volte sempre!
 ```
 
 Resposta com palavra-chave natural:
@@ -268,7 +268,7 @@ Resposta com palavra-chave natural:
 Resposta para família:
 
 ```text
-[Nome], obrigado por confiar sua família a nossa equipe. Ficamos muito felizes em saber que o passeio foi tranquilo e seguro. João Pessoa fica ainda mais especial quando a experiência vira boa memoria. Um abraco da Vem Passear Jampa!
+[Nome], obrigado por confiar sua família a nossa equipe. Ficamos muito felizes em saber que o passeio foi tranquilo e seguro. João Pessoa fica ainda mais especial quando a experiência vira boa memória. Um abraço da Vem Passear Jampa!
 ```
 
 ### Templates para responder avaliações negativas
@@ -282,13 +282,13 @@ Resposta quando ha problema operacional:
 Resposta quando envolve clima/maré:
 
 ```text
-[Nome], obrigado pelo feedback. As condicoes de maré e clima podem mudar a experiência nas piscinas naturais, e por isso reforcamos sempre a orientacao antes do passeio. Sentimos muito que sua percepção não tenha sido a esperada. Vamos usar seu comentario para melhorar ainda mais nossa comunicação previa.
+[Nome], obrigado pelo feedback. As condições de maré e clima podem mudar a experiência nas piscinas naturais, e por isso reforçamos sempre a orientação antes do passeio. Sentimos muito que sua percepção não tenha sido a esperada. Vamos usar seu comentário para melhorar ainda mais nossa comunicação prévia.
 ```
 
 Resposta quando ha informação incorreta:
 
 ```text
-[Nome], obrigado por avaliar. Sentimos muito pela impressao negativa. Pelo que verificamos, houve uma divergencia de informação sobre [ponto]. Queremos entender melhor e resolver com cuidado; por favor, fale conosco pelo WhatsApp para continuarmos o atendimento.
+[Nome], obrigado por avaliar. Sentimos muito pela impressão negativa. Pelo que verificamos, houve uma divergência de informação sobre [ponto]. Queremos entender melhor e resolver com cuidado; por favor, fale conosco pelo WhatsApp para continuarmos o atendimento.
 ```
 
 ### Métricas para monitorar no GBP
@@ -297,11 +297,11 @@ Resposta quando ha informação incorreta:
 |---|---:|---|
 | Visualizacoes no Maps/Search | Crescimento mensal de 30% | Indica mais descoberta local |
 | Termos de busca | 10+ termos relevantes aparecendo | Indica associacao com passeio, piscinas, Seixas, Picãozinho |
-| Cliques no site/link | 100+ no mes 3 | Usar para medir interesse antes do WhatsApp |
-| Chamadas | 30+ no mes 3 | Alta intenção, principalmente em turista local |
-| Rotas | 20+ no mes 3 | Relevante se houver ponto de encontro cadastrado |
+| Cliques no site/link | 100+ no mês 3 | Usar para medir interesse antes do WhatsApp |
+| Chamadas | 30+ no mês 3 | Alta intenção, principalmente em turista local |
+| Rotas | 20+ no mês 3 | Relevante se houver ponto de encontro cadastrado |
 | Mensagens/conversas | Crescimento mensal de 20% | Principal indicador comercial |
-| Avaliacoes | 60 a 100 em 90 dias | Prioridade maxima para autoridade local |
+| Avaliações | 60 a 100 em 90 dias | Prioridade maxima para autoridade local |
 | Nota media | 4,8+ | Abaixo disso, investigar gargalos |
 | Fotos visualizadas | Crescimento semanal | Fotos boas puxam decisao em turismo |
 
@@ -309,7 +309,7 @@ Resposta quando ha informação incorreta:
 
 ## 4. Instagram SEO - Otimização interna
 
-Instagram não substitui Google, mas ajuda o turista a validar confiança, ver prova social e chamar no WhatsApp. A otimização interna deve facilitar descoberta por busca no Instagram e reforcar as palavras-chave que o turista usa.
+Instagram não substitui Google, mas ajuda o turista a validar confiança, ver prova social e chamar no WhatsApp. A otimização interna deve facilitar descoberta por busca no Instagram e reforçar as palavras-chave que o turista usa.
 
 ### Nome de usuário e nome de exibição
 
@@ -319,7 +319,7 @@ Usuario ideal:
 
 Alternativas se necessario:
 
-- `@vem.passear.jampa`
+- `@vem.passear.jámpa`
 - `@vempassearjp`
 - `@passeiosjampa`
 
@@ -365,8 +365,8 @@ Chame no WhatsApp
 
 Prioridade:
 
-1. Link direto `wa.me` com mensagem pre-preenchida.
-2. Linktree/Beacons com botões para WhatsApp, Catalogo, Avaliacoes Google, YouTube e Roteiro.
+1. Link direto `wa.me` com mensagem pré-preenchida.
+2. Linktree/Beacons com botões para WhatsApp, Catálogo, Avaliações Google, YouTube e Roteiro.
 3. Google Sites próprio quando criado.
 
 Mensagem pre-preenchida sugerida:
@@ -381,9 +381,9 @@ Usar descrições naturais, sem empilhar palavras-chave.
 
 Exemplos:
 
-- "Turistas em passeio de barco para as piscinas naturais do Seixas em João Pessoa, com agua clara e maré baixa."
-- "Familia aproveitando o passeio para Picãozinho em João Pessoa com a Vem Passear Jampa."
-- "Vista do litoral norte da Paraiba durante passeio turístico saindo de João Pessoa."
+- "Turistas em passeio de barco para as piscinas naturais do Seixas em João Pessoa, com água clara e maré baixa."
+- "Família aproveitando o passeio para Picãozinho em João Pessoa com a Vem Passear Jampa."
+- "Vista do litoral norte da Paraíba durante passeio turístico saindo de João Pessoa."
 - "Cliente sorrindo durante passeio em piscinas naturais de João Pessoa, com barco ao fundo."
 - "Mar calmo em João Pessoa durante passeio para piscinas naturais na maré baixa."
 
@@ -403,16 +403,16 @@ Piscinas naturais em João Pessoa dependem da maré certa.
 
 Quando o horário encaixa, o passeio fica mais bonito, tranquilo e seguro para curtir com calma.
 
-Se você vem para JP nos próximos dias, manda "MARE" no WhatsApp que a gente te orienta sobre Seixas, Picãozinho e vagas da semana.
+Se você vem para JP nos próximos dias, manda "MARÉ" no WhatsApp que a gente te orienta sobre Seixas, Picãozinho e vagas da semana.
 
 #PiscinasNaturaisJoaoPessoa #PasseiosEmJoaoPessoa #JoaoPessoaPB #Seixas #Picãozinho #TurismoJoaoPessoa
 ```
 
 ### Hashtag strategy - 3 camadas
 
-Usar 6 a 12 hashtags por post, misturando 3 a 5 locais, 2 a 4 de turismo nacional e 1 a 3 de tendencia/contexto.
+Usar 6 a 12 hashtags por post, misturando 3 a 5 locais, 2 a 4 de turismo nacional e 1 a 3 de tendência/contexto.
 
-#### Camada 1 - Nicho local e alta relevancia
+#### Camada 1 - Nicho local e alta relevância
 
 | Hashtag | Uso |
 |---|---|
@@ -431,7 +431,7 @@ Usar 6 a 12 hashtags por post, misturando 3 a 5 locais, 2 a 4 de turismo naciona
 | #ParaibaTurismo | Regional |
 | #TurismoPB | Regional |
 | #CaboBranco | Bairro/praia |
-| #Tambau | Bairro/praia |
+| #Tambaú | Bairro/praia |
 
 #### Camada 2 - Turismo nacional
 
@@ -439,18 +439,18 @@ Usar 6 a 12 hashtags por post, misturando 3 a 5 locais, 2 a 4 de turismo naciona
 |---|---|
 | #NordesteBrasil | Alcance nacional |
 | #ViagemNordeste | Planejamento de viagem |
-| #PraiasDoNordeste | Inspiracao |
+| #PraiasDoNordeste | Inspiração |
 | #ViagemEmFamilia | Familias |
 | #ViagemEmCasal | Casais |
 | #RoteiroDeViagem | Conteúdo educativo |
 | #DicasDeViagem | Conteúdo educativo |
 | #TurismoBrasil | Amplo |
-| #ViajarPeloBrasil | Inspiracao |
+| #ViajarPeloBrasil | Inspiração |
 | #FeriasNoNordeste | Alta temporada |
 | #DestinoBrasil | Descoberta |
-| #PraiasBrasileiras | Inspiracao |
+| #PraiasBrasileiras | Inspiração |
 
-#### Camada 3 - Tendencia, formato e contexto
+#### Camada 3 - Tendência, formato e contexto
 
 | Hashtag | Uso |
 |---|---|
@@ -469,7 +469,7 @@ Usar 6 a 12 hashtags por post, misturando 3 a 5 locais, 2 a 4 de turismo naciona
 
 ### Highlights dos Stories
 
-Nomear com termos simples e pesquisaveis:
+Nomear com termos simples e pesquisáveis:
 
 - `Seixas`
 - `Picãozinho`
@@ -478,7 +478,7 @@ Nomear com termos simples e pesquisaveis:
 - `Valores`
 - `Maré`
 - `Criancas`
-- `Avaliacoes`
+- `Avaliações`
 - `Como reservar`
 - `Dicas JP`
 
@@ -486,7 +486,7 @@ Conteúdo mínimo por highlight:
 
 - Foto/vídeo real do passeio.
 - Preco ou "consulte data".
-- Duracao e ponto de encontro.
+- Duração e ponto de encontro.
 - O que levar.
 - CTA para WhatsApp.
 - Print autorizado de prova social.
@@ -514,7 +514,7 @@ Exemplos de títulos:
 
 ## 5. WhatsApp Business SEO
 
-WhatsApp Business não e SEO tradicional, mas e a principal etapa de conversão. O objetivo e fazer o cliente entender rápido o que vende, quanto custa, qual passeio combina com a data e como reservar.
+WhatsApp Business não é SEO tradicional, mas é a principal etapa de conversão. O objetivo é fazer o cliente entender rápido o que vende, quanto custa, qual passeio combina com a data e como reservar.
 
 ### Perfil do negócio
 
@@ -524,12 +524,12 @@ Nome:
 
 Categoria:
 
-- Turismo e viagens, Agência de turismo ou Servicos locais, conforme opções disponíveis.
+- Turismo e viagens, Agência de turismo ou Serviços locais, conforme opções disponíveis.
 
-Descricao sugerida:
+Descrição sugerida:
 
 ```text
-Passeios em João Pessoa para Piscinas Naturais do Seixas, Picãozinho, Litoral Norte, combos e famílias. Atendimento por WhatsApp com orientacao de maré, vagas, horários e reserva.
+Passeios em João Pessoa para Piscinas Naturais do Seixas, Picãozinho, Litoral Norte, combos e famílias. Atendimento por WhatsApp com orientação de maré, vagas, horários e reserva.
 ```
 
 Endereco:
@@ -541,17 +541,17 @@ Horario:
 - Atendimento: exemplo `Todos os dias, 8h as 20h`.
 - Se responder fora do horário em alta temporada, ajustar para refletir a rotina real.
 
-### Catalogo de produtos/serviços
+### Catálogo de produtos/serviços
 
 Criar um item para cada passeio. Nome do item deve combinar produto + local + termo de busca.
 
-| Item do catálogo | Preco | Descricao sugerida |
+| Item do catálogo | Preco | Descrição sugerida |
 |---|---:|---|
-| Piscinas Naturais do Seixas - João Pessoa | R$65 | Passeio para as piscinas naturais do Seixas, com orientacao de maré, horário e vagas pelo WhatsApp. Ideal para fotos, família e quem quer uma experiência classica em João Pessoa. |
+| Piscinas Naturais do Seixas - João Pessoa | R$65 | Passeio para as piscinas naturais do Seixas, com orientação de maré, horário e vagas pelo WhatsApp. Ideal para fotos, família e quem quer uma experiência clássica em João Pessoa. |
 | Piscinas Naturais do Picãozinho - João Pessoa | R$75 | Passeio para Picãozinho em João Pessoa. Consulte a melhor data de acordo com a maré e veja disponibilidade de vagas. |
-| Litoral Norte da Paraiba | R$90 adulto | Roteiro pelo litoral norte, indicado para quem quer conhecer mais praias e paisagens da Paraiba em um passeio guiado. |
-| Combo Seixas + Picãozinho | R$120 | Combo para aproveitar duas experiências de piscinas naturais em João Pessoa. Consulte datas, horários e condicoes de maré. |
-| Passeio Infantil em João Pessoa | R$40 | Opcao para famílias com crianças. A equipe orienta sobre idade, segurança, maré, horário e melhor passeio para a família. |
+| Litoral Norte da Paraíba | R$90 adulto | Roteiro pelo litoral norte, indicado para quem quer conhecer mais praias e paisagens da Paraíba em um passeio guiado. |
+| Combo Seixas + Picãozinho | R$120 | Combo para aproveitar duas experiências de piscinas naturais em João Pessoa. Consulte datas, horários e condições de maré. |
+| Passeio Infantil em João Pessoa | R$40 | Opção para famílias com crianças. A equipe orienta sobre idade, segurança, maré, horário e melhor passeio para a família. |
 
 Fotos do catálogo:
 
@@ -594,7 +594,7 @@ Se quiser adiantar, envie sua data de viagem, quantidade de pessoas e se deseja 
 | `/combo` | O combo Seixas + Picãozinho sai por R$120. A disponibilidade depende da agenda e da maré. Qual sua data em João Pessoa? |
 | `/review` | Obrigado por passear com a gente! Se puder deixar uma avaliação no Google, ajuda muito outros turistas: [link] |
 
-### Link wa.me com mensagem pre-preenchida
+### Link wa.me com mensagem pré-preenchida
 
 Formato:
 
@@ -617,7 +617,7 @@ Objetivo: aumentar presenca da marca, criar citações locais consistentes e ger
 - Nome: Vem Passear Jampa.
 - Cidade: João Pessoa, PB.
 - Telefone/WhatsApp: mesmo número do GBP.
-- Descricao curta: passeios em João Pessoa para Seixas, Picãozinho, Litoral Norte e combos.
+- Descrição curta: passeios em João Pessoa para Seixas, Picãozinho, Litoral Norte e combos.
 - Link principal: Google Sites ou Linktree/WhatsApp enquanto não houver site próprio.
 - Fotos: 10 a 20 reais e recentes.
 
@@ -630,7 +630,7 @@ Objetivo: aumentar presenca da marca, criar citações locais consistentes e ger
 | 3 | Tripadvisor | Turismo/reviews | Perfil, descrição, fotos, telefone, site/link, pedido de avaliações reais |
 | 4 | Viator | Marketplace | Cadastro como fornecedor, produtos por passeio, políticas, fotos e comissões |
 | 5 | GetYourGuide | Marketplace | Produtos, calendário, preço, ponto de encontro, requisitos e fotos |
-| 6 | Civitatis | Marketplace | Proposta de atividade, idioma portugues, roteiro e condicoes |
+| 6 | Civitatis | Marketplace | Proposta de atividade, idioma portugues, roteiro e condições |
 | 7 | Bing Places | Mapa/local | Sincronizar com Google quando possível, telefone, horário, fotos |
 | 8 | Apple Business Connect | Mapa/local | Perfil para Apple Maps, fotos, categoria e chamada para reservar |
 | 9 | Facebook Page | Social/local | Pagina local com botao WhatsApp, fotos, reviews e posts cruzados |
@@ -640,7 +640,7 @@ Extras para avaliar:
 
 - Foursquare.
 - Yelp.
-- Portal de Turismo da Paraiba.
+- Portal de Turismo da Paraíba.
 - Portal de Turismo de João Pessoa.
 - Grupos e guias locais de hoteis/pousadas.
 - Booking.com Attractions, quando houver canal de cadastro elegível ou parceiro.
@@ -660,27 +660,27 @@ Checklist padrão:
 9. Registrar login e URL do perfil em planilha interna.
 10. Revisar mensalmente horários, preço, fotos e mensagens.
 
-### Descricao curta padrão
+### Descrição curta padrão
 
 ```text
-Passeios em João Pessoa para Piscinas Naturais do Seixas, Picãozinho, Litoral Norte, combos e famílias. Atendimento por WhatsApp com orientacao de maré, vagas e horários.
+Passeios em João Pessoa para Piscinas Naturais do Seixas, Picãozinho, Litoral Norte, combos e famílias. Atendimento por WhatsApp com orientação de maré, vagas e horários.
 ```
 
-### Descricao longa padrão
+### Descrição longa padrão
 
 ```text
-A Vem Passear Jampa organiza passeios em João Pessoa com foco em orientacao, segurança e experiência tranquila. Atendemos turistas que querem conhecer as Piscinas Naturais do Seixas, Picãozinho, Litoral Norte da Paraiba, combos e opções para famílias com crianças. Pelo WhatsApp, ajudamos o cliente a escolher o melhor passeio de acordo com data, maré, horário, quantidade de pessoas e disponibilidade de vagas.
+A Vem Passear Jampa organiza passeios em João Pessoa com foco em orientação, segurança e experiência tranquila. Atendemos turistas que querem conhecer as Piscinas Naturais do Seixas, Picãozinho, Litoral Norte da Paraíba, combos e opções para famílias com crianças. Pelo WhatsApp, ajudamos o cliente a escolher o melhor passeio de acordo com data, maré, horário, quantidade de pessoas e disponibilidade de vagas.
 ```
 
 ### Parcerias de permuta de link
 
 Alvos locais:
 
-- Hoteis em Tambau, Cabo Branco, Manaira e Bessa.
+- Hoteis em Tambaú, Cabo Branco, Manaíra e Bessa.
 - Pousadas e hostels próximos a orla.
 - Restaurantes que recebem turistas.
 - Guias locais e receptivos.
-- Blogs de turismo sobre Paraiba/Nordeste.
+- Blogs de turismo sobre Paraíba/Nordeste.
 - Perfis de roteiro em João Pessoa.
 - Motoristas de transfer e locadoras.
 
@@ -697,7 +697,7 @@ Template de abordagem para hotel/pousada:
 ```text
 Oi, [nome]. Tudo bem? Sou Murillo, da Vem Passear Jampa.
 
-A gente organiza passeios em João Pessoa para Seixas, Picãozinho, Litoral Norte e famílias, com atendimento direto pelo WhatsApp e orientacao de maré.
+A gente organiza passeios em João Pessoa para Seixas, Picãozinho, Litoral Norte e famílias, com atendimento direto pelo WhatsApp e orientação de maré.
 
 Queria propor uma parceria simples para ajudar seus hospedes: posso enviar um material com valores, fotos reais, QR code e explicacao dos melhores dias pela maré. Também posso indicar o [hotel/pousada] quando o turista pedir hospedagem.
 
@@ -710,7 +710,7 @@ Selecionar perfis com:
 
 - Publico de turistas ou moradores que recebem visitantes.
 - Conteúdo real de João Pessoa, não apenas repost.
-- Engajamento nos comentarios.
+- Engajamento nos comentários.
 - Historico de recomendacoes locais.
 
 Template:
@@ -718,9 +718,9 @@ Template:
 ```text
 Oi, [nome]. Sou Murillo, da Vem Passear Jampa.
 
-Vi seu conteúdo sobre João Pessoa e acho que combina com quem quer conhecer as piscinas naturais com orientacao de maré e reserva simples pelo WhatsApp.
+Vi seu conteúdo sobre João Pessoa e acho que combina com quem quer conhecer as piscinas naturais com orientação de maré e reserva simples pelo WhatsApp.
 
-Queria te convidar para viver um passeio com a gente e produzir um conteúdo honesto sobre a experiência. Sem promessa engessada: a ideia e mostrar como funciona, cuidados com a maré, embarque, fotos e dicas para turistas.
+Queria te convidar para viver um passeio com a gente e produzir um conteúdo honesto sobre a experiência. Sem promessa engessada: a ideia é mostrar como funciona, cuidados com a maré, embarque, fotos e dicas para turistas.
 
 Se fizer sentido, te envio datas possíveis e detalhes.
 ```
@@ -729,7 +729,7 @@ Se fizer sentido, te envio datas possíveis e detalhes.
 
 ## 7. Criação de conteúdo para SEO - Blog/YouTube
 
-Mesmo sem site próprio, a Vem Passear Jampa pode ranquear usando YouTube, Google Business Profile, Google Sites e páginas publicas simples. A lógica e responder perguntas que o turista faz antes de comprar.
+Mesmo sem site próprio, a Vem Passear Jampa pode ranquear usando YouTube, Google Business Profile, Google Sites e páginas públicas simples. A lógica é responder perguntas que o turista faz antes de comprar.
 
 ### 10 ideias de vídeos YouTube com cauda longa
 
@@ -741,9 +741,9 @@ Mesmo sem site próprio, a Vem Passear Jampa pode ranquear usando YouTube, Googl
 | 4 | Piscinas Naturais do Seixas: como e o passeio, preço e dicas | Piscinas Naturais do Seixas | Review/guia |
 | 5 | Picãozinho em João Pessoa vale a pena? Veja antes de reservar | Picãozinho vale a pena | Review/guia |
 | 6 | O que levar para piscinas naturais em João Pessoa | o que levar piscinas naturais João Pessoa | Checklist |
-| 7 | Passeio com criança em João Pessoa: cuidados e melhores opções | passeio com criança João Pessoa | Familia |
+| 7 | Passeio com criança em João Pessoa: cuidados e melhores opções | passeio com criança João Pessoa | Família |
 | 8 | Roteiro de 3 dias em João Pessoa com piscinas naturais | roteiro João Pessoa 3 dias | Roteiro |
-| 9 | Litoral Norte da Paraiba: como funciona o passeio saindo de João Pessoa | litoral norte Paraiba passeio | Guia |
+| 9 | Litoral Norte da Paraíba: como funciona o passeio saindo de João Pessoa | litoral norte Paraíba passeio | Guia |
 | 10 | Erros que turistas cometem ao reservar piscinas naturais em João Pessoa | reservar piscinas naturais João Pessoa | Educativo |
 
 ### Como otimizar vídeos no YouTube
@@ -754,7 +754,7 @@ Titulo:
 - Evitar título generico como "Passeio lindo".
 - Exemplo: "Piscinas Naturais do Seixas: preço, maré e como reservar em João Pessoa".
 
-Descricao:
+Descrição:
 
 ```text
 Neste vídeo, a Vem Passear Jampa mostra como funciona o passeio para as Piscinas Naturais do Seixas em João Pessoa. Veja dicas sobre maré, horário, o que levar, preço e como reservar pelo WhatsApp.
@@ -788,8 +788,8 @@ Tags:
 Thumbnail:
 
 - Foto real forte, sem excesso de texto.
-- Texto curto: "SEIXAS", "PICAOZINHO", "MARE CERTA", "VALE A PENA?".
-- Rosto/cliente feliz se houver autorizacao.
+- Texto curto: "SEIXAS", "PICAOZINHO", "MARÉ CERTA", "VALE A PENA?".
+- Rosto/cliente feliz se houver autorização.
 - Contraste alto e legibilidade no celular.
 
 Estrutura do vídeo:
@@ -802,20 +802,20 @@ Estrutura do vídeo:
 
 ### Micro-blog gratuito
 
-Recomendacao principal: Google Sites.
+Recomendação principal: Google Sites.
 
-Motivo: e gratuito, indexável, simples, permite páginas por passeio e facilita medir cliques com Search Console depois.
+Motivo: é gratuito, indexável, simples, permite páginas por passeio e facilita medir cliques com Search Console depois.
 
 Estrutura sugerida:
 
 - Home: "Passeios em João Pessoa - Vem Passear Jampa".
 - Pagina 1: "Piscinas Naturais do Seixas".
 - Pagina 2: "Piscinas Naturais do Picãozinho".
-- Pagina 3: "Litoral Norte da Paraiba".
+- Pagina 3: "Litoral Norte da Paraíba".
 - Pagina 4: "Combo Seixas + Picãozinho".
 - Pagina 5: "Passeios com crianças em João Pessoa".
 - Pagina 6: "Como escolher o melhor dia pela maré".
-- Pagina 7: "Avaliacoes e fotos reais".
+- Pagina 7: "Avaliações e fotos reais".
 - Pagina 8: "Contato e reservas pelo WhatsApp".
 
 Alternativas:
@@ -831,12 +831,12 @@ Alternativas:
 2. Seixas ou Picãozinho: entenda a diferença antes de reservar.
 3. O que levar para um passeio de barco em João Pessoa.
 4. Passeio com criança em João Pessoa: dicas para uma experiência tranquila.
-5. Semana com boa janela de maré: como consultar vagas para Seixas e Picãozinho.
+5. Semana com boa jánela de maré: como consultar vagas para Seixas e Picãozinho.
 
 Modelo de update:
 
 ```text
-Vai fazer piscinas naturais em João Pessoa? A maré e um dos pontos mais importantes para escolher o melhor horário. Na Vem Passear Jampa, a gente confere sua data e orienta entre Seixas, Picãozinho, Litoral Norte ou combo.
+Vai fazer piscinas naturais em João Pessoa? A maré é um dos pontos mais importantes para escolher o melhor horário. Na Vem Passear Jampa, a gente confere sua data e orienta entre Seixas, Picãozinho, Litoral Norte ou combo.
 
 Chame no WhatsApp, envie sua data da viagem e veja as vagas da semana.
 ```
@@ -853,7 +853,7 @@ Objetivo: criar base local confiável, rastreavel e pronta para converter.
 |---:|---|---|---|
 | 1 | Criar/reivindicar Google Business Profile | Murillo | Perfil verificado ou em verificacao |
 | 1 | Padronizar NAP em documento interno | Midas | Nome, telefone, descrição, links e fotos base |
-| 1 | Configurar WhatsApp Business completo | Murillo | Perfil, catálogo, saudacao, ausência e respostas rapidas |
+| 1 | Configurar WhatsApp Business completo | Murillo | Perfil, catálogo, saudacao, ausência e respostas rápidas |
 | 2 | Cadastrar serviços no GBP | Midas | 5 serviços com preço, descrição e foto |
 | 2 | Subir 40 fotos iniciais no GBP | Nova | Fotos por passeio, capa, logo e bastidores |
 | 2 | Criar link/QR de avaliação Google | Midas | Link pronto para WhatsApp e material físico |
@@ -862,17 +862,17 @@ Objetivo: criar base local confiável, rastreavel e pronta para converter.
 | 4 | Publicar 4 posts GBP | Nova | 2 educativos, 1 oferta, 1 prova social |
 | 4 | Criar rotina de pedido de review | Murillo | Pedido enviado para todo cliente real |
 
-Meta do mes 1:
+Meta do mês 1:
 
 - GBP 100% preenchido.
 - 40 a 60 fotos publicadas.
 - 15 a 25 avaliações reais.
-- Catalogo WhatsApp completo.
+- Catálogo WhatsApp completo.
 - Primeiros 3 diretórios locais ativos.
 
 ### Mes 2 - Conteúdo
 
-Objetivo: aumentar relevancia por palavras-chave, fotos recentes e conteúdo educativo.
+Objetivo: aumentar relevância por palavras-chave, fotos recentes e conteúdo educativo.
 
 | Semana | Ação | Responsavel | Entrega |
 |---:|---|---|---|
@@ -880,12 +880,12 @@ Objetivo: aumentar relevancia por palavras-chave, fotos recentes e conteúdo edu
 | 5 | Otimizar bio, highlights e nome de exibição do Instagram | Nova | Perfil alinhado a SEO e conversão |
 | 6 | Publicar 2 vídeos YouTube | Nova | Videos sobre maré e Seixas/Picãozinho |
 | 6 | Criar 10 alt texts padrão para fotos | Nova | Banco reutilizavel |
-| 7 | Publicar 8 posts GBP no mes | Nova | 2 por semana com CTA WhatsApp |
+| 7 | Publicar 8 posts GBP no mês | Nova | 2 por semana com CTA WhatsApp |
 | 7 | Cadastrar Tripadvisor e Cadastur | Midas/Murillo | Perfis iniciados ou aprovados |
 | 8 | Criar carrosseis de FAQ SEO | Nova | Maré, o que levar, crianças, valores |
 | 8 | Revisar termos de busca do GBP | Midas | Lista de termos encontrados e ajustes |
 
-Meta do mes 2:
+Meta do mês 2:
 
 - 30 a 50 avaliações acumuladas.
 - 8 posts GBP publicados.
@@ -906,9 +906,9 @@ Objetivo: ganhar autoridade local, links, reviews e aprendizado comercial.
 | 11 | Rodar auditoria de posição no Maps | Midas | Ranking manual por termo e bairro |
 | 11 | Criar campanha de reviews pos-passeio | Murillo/Midas | QR code físico + mensagem padrão |
 | 12 | Revisar páginas do Google Sites com termos reais do GBP | Midas | Ajustes de títulos e CTAs |
-| 12 | Relatorio de 90 dias | Midas | KPIs, aprendizados, próximas apostas |
+| 12 | Relatório de 90 dias | Midas | KPIs, aprendizados, próximas apostas |
 
-Meta do mes 3:
+Meta do mês 3:
 
 - 60 a 100 avaliações acumuladas.
 - 100+ fotos no GBP.
@@ -922,12 +922,12 @@ Meta do mes 3:
 
 ### KPIs principais
 
-| Area | KPI | Meta 90 dias |
+| Área | KPI | Meta 90 dias |
 |---|---|---:|
 | Google Maps | Posição para "passeio João Pessoa" | Top 5 local em área de orla; top 3 como meta agressiva |
 | Google Maps | Posição para "passeio de barco João Pessoa" | Top 3 local |
 | Google Maps | Posição para "Piscinas do Seixas" | Top 3 local |
-| GBP | Avaliacoes | 60 a 100 |
+| GBP | Avaliações | 60 a 100 |
 | GBP | Nota media | 4,8+ |
 | GBP | Fotos | 100+ |
 | GBP | Cliques/chamadas/mensagens | Crescimento mensal de 20% a 30% |
@@ -952,7 +952,7 @@ Meta do mes 3:
 
 Semanal:
 
-- Avaliacoes novas e respostas pendentes.
+- Avaliações novas e respostas pendentes.
 - Fotos novas para GBP.
 - Posts GBP publicados.
 - Leads por origem.
@@ -980,16 +980,16 @@ Trimestral:
 |---|---|
 | Muitas visualizacoes e poucos cliques | Melhorar foto de capa, descrição, CTA e reviews |
 | Muitas conversas e poucas reservas | Melhorar script de atendimento e clareza de preço/vaga |
-| Reviews citam atraso/confusao | Ajustar comunicação previa e ponto de encontro |
+| Reviews citam atraso/confusao | Ajustar comunicação prévia e ponto de encontro |
 | Instagram gera curtida mas não WhatsApp | Inserir CTA mais direto e Stories de oferta |
 | GBP não aparece para termos principais | Revisar categoria, serviços, fotos, reviews e citações locais |
-| YouTube tem visualizacao sem lead | Colocar WhatsApp no primeiro paragrafo e comentario fixado |
+| YouTube tem visualizacao sem lead | Colocar WhatsApp no primeiro paragrafo e comentário fixado |
 
 ---
 
 ## 10. Automação com agentes Javis
 
-O Javis deve atuar como apoio de inteligencia, organizacao e rascunho. Acoes externas, envios em massa, alteracoes sensíveis e mensagens automatizadas para clientes precisam respeitar aprovacao humana e boas práticas de consentimento.
+O Javis deve atuar como apoio de inteligência, organização e rascunho. Ações externas, envios em massa, alterações sensíveis e mensagens automatizadas para clientes precisam respeitar aprovação humana e boas práticas de consentimento.
 
 ### Midas - monitoramento de palavras-chave
 
@@ -1013,7 +1013,7 @@ Rotina semanal:
    - Perguntas frequentes para responder.
    - Conteudos que Nova deve criar.
 
-Formato de relatorio semanal:
+Formato de relatório semanal:
 
 ```text
 Semana:
@@ -1043,7 +1043,7 @@ Nova deve transformar cada pauta em:
 Prompt interno sugerido para Nova:
 
 ```text
-Crie uma legenda para Instagram da Vem Passear Jampa usando o tom local, caloroso e consultivo. Palavra-chave principal: [termo]. Passeio: [Seixas/Picãozinho/Litoral Norte/Combo]. Objetivo: [desejo/dúvida/prova social/venda]. Evite prometer agua cristalina ou clima perfeito. Inclua CTA para WhatsApp.
+Crie uma legenda para Instagram da Vem Passear Jampa usando o tom local, caloroso e consultivo. Palavra-chave principal: [termo]. Passeio: [Seixas/Picãozinho/Litoral Norte/Combo]. Objetivo: [desejo/dúvida/prova social/venda]. Evite prometer água cristalina ou clima perfeito. Inclua CTA para WhatsApp.
 ```
 
 ### Alertas de mencoes da marca
@@ -1093,11 +1093,11 @@ Campos da planilha:
 Mensagem personalizada:
 
 ```text
-Oi, [nome]! Aqui e o Murillo da Vem Passear Jampa.
+Oi, [nome]! Aqui é o Murillo da Vem Passear Jampa.
 
 Que bom receber você no passeio para [passeio]. Sua avaliação no Google ajuda outros turistas a escolherem com segurança os passeios em João Pessoa.
 
-Se puder deixar seu comentario sincero, o link e este:
+Se puder deixar seu comentário sincero, o link é este:
 [link]
 
 Obrigado por confiar na gente!
@@ -1107,32 +1107,32 @@ Obrigado por confiar na gente!
 
 | Automação | Agente | Risco | Regra |
 |---|---|---|---|
-| Relatorio semanal de palavras-chave | Midas | Baixo | Pode gerar automaticamente |
-| Sugestao de legendas SEO | Nova | Baixo | Pode gerar automaticamente |
+| Relatório semanal de palavras-chave | Midas | Baixo | Pode gerar automaticamente |
+| Sugestão de legendas SEO | Nova | Baixo | Pode gerar automaticamente |
 | Rascunho de GBP posts | Nova | Baixo | Murillo revisa informação de preço/maré |
 | Lista de clientes para review | Midas | Médio | Exige cuidado com dados pessoais |
-| Envio de WhatsApp pos-passeio | Midas/Murillo | Médio | Envio manual ou com aprovacao explicita |
+| Envio de WhatsApp pos-passeio | Midas/Murillo | Médio | Envio manual ou com aprovação explícita |
 | Resposta a review negativo | Midas/Nova | Médio | Murillo aprova antes de publicar |
-| Alteracao de preço em perfis | Midas | Médio | Murillo aprova |
+| Alteração de preço em perfis | Midas | Médio | Murillo aprova |
 
 ---
 
 ## Resumo executivo - próximos 7 dias
 
 1. Criar ou reivindicar o Google Business Profile da Vem Passear Jampa e preencher categoria, telefone, horário, área de serviço, descrição e serviços.
-2. Subir pelo menos 40 fotos reais no GBP, separando Seixas, Picãozinho, Litoral Norte, bastidores e clientes com autorizacao.
-3. Configurar WhatsApp Business com catálogo completo, mensagens automaticas, respostas rapidas e link `wa.me` com mensagem pre-preenchida.
+2. Subir pelo menos 40 fotos reais no GBP, separando Seixas, Picãozinho, Litoral Norte, bastidores e clientes com autorização.
+3. Configurar WhatsApp Business com catálogo completo, mensagens automáticas, respostas rápidas e link `wa.me` com mensagem pré-preenchida.
 4. Criar link/QR code de avaliação Google e pedir review para todos os clientes reais após o passeio, sem incentivo ou desconto.
 5. Otimizar Instagram: nome de exibição com "Passeios João Pessoa", bio com WhatsApp, highlights de Seixas/Picãozinho/Maré/Valores e CTAs claros.
 6. Publicar 2 posts no GBP nesta semana: um educativo sobre maré e um de oferta/vagas reais.
 7. Criar planilha de acompanhamento com origem do lead, passeio, data, status, valor e review.
-8. Cadastrar o negócio em Bing Places, Apple Business Connect e Facebook Page com NAP identico ao GBP.
+8. Cadastrar o negócio em Bing Places, Apple Business Connect e Facebook Page com NAP idêntico ao GBP.
 9. Nova deve produzir 5 Reels com SEO: maré, Seixas, Picãozinho, crianças e comparativo Seixas x Picãozinho.
 10. Midas deve fazer a primeira auditoria manual no Google Maps para "passeio João Pessoa", "passeio de barco João Pessoa" e "piscinas naturais João Pessoa", registrando concorrentes, reviews e fotos.
 
 ## Referências operacionais
 
-- Google Business Profile Help: orientacoes de perfil, fotos, posts, reviews, performance e ranking local.
+- Google Business Profile Help: orientações de perfil, fotos, posts, reviews, performance e ranking local.
 - WhatsApp Business: uso do app para pequenos negócios, catálogo e conversas comerciais.
 - Instagram/Meta Business: boas práticas de perfil profissional, conteúdo, insights e conversão para mensagem.
 
