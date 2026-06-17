@@ -332,6 +332,14 @@ async def vp_pauta_del(item_id: str):
     return JSONResponse({"status": "ok" if vp_store.remove_pauta(item_id) else "not_found"})
 
 
+# ── Registry de projetos externos conectados (Javis = orquestrador mestre) ──
+@app.get("/projects/registry")
+async def projects_registry():
+    """Estado real (lido do disco, read-only) dos projetos externos plugados no Javis."""
+    import project_registry
+    return JSONResponse({"projects": project_registry.list_projects()})
+
+
 # ── Jampa Jarvis: squad de agentes nomeados (carrega skills do CEREBRO.JAMPA) ──
 @app.get("/jampa/agents")
 async def jampa_agents():
@@ -470,6 +478,16 @@ async def memory_recall(q: str = ""):
     return JSONResponse({"results": mb.recent_decisions(5)})
 
 
+@app.get("/briefing")
+async def briefing_endpoint():
+    """Saudação proativa + estado do projeto para a interface receber o senhor."""
+    try:
+        import briefing
+        return JSONResponse(briefing.briefing_dict())
+    except Exception as e:
+        return JSONResponse({"saudacao": "Bom dia, senhor.", "estado": "", "erro": str(e)})
+
+
 @app.get("/status")
 async def status():
     services = {}
@@ -497,6 +515,19 @@ async def agents_list():
         "meta":     META_AGENTS_INFO,
         "total":    len(get_agents_info()) + len(conclave) + len(META_AGENTS_INFO),
     })
+
+
+class AgentRunRequest(BaseModel):
+    agent_id: str
+    task: str
+
+
+@app.post("/agents/run")
+async def agents_run(req: AgentRunRequest):
+    """Executa um agente com skill + RAG + cérebro forte (Claude/assinatura)."""
+    import agent_runner
+    out = await run_in_threadpool(agent_runner.run_agent, req.agent_id, req.task)
+    return JSONResponse(out)
 
 
 class VoiceRequest(BaseModel):
@@ -646,6 +677,13 @@ async def voice_stream(req: VoiceRequest):
                 _cb = None
             if _cb and _cb.available():
                 ctx = _ag._history_context(_get_history_messages())
+                try:
+                    import briefing as _bf
+                    estado = _bf.estado_resumido()
+                    if estado:
+                        ctx = (ctx + "\n\n" if ctx else "") + "Estado atual do projeto Javis:\n" + estado
+                except Exception:
+                    pass
                 spoke = False
                 full_text = ""
                 yield f"data: {json.dumps({'type':'meta','intent':'pensar_profundo','brain':'claude'})}\n\n"
@@ -1384,16 +1422,48 @@ async def train_youtube(req: TrainRequest):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+@app.get("/treinamento/status")
+async def treinamento_status():
+    """Estado real da pasta _treinamento/ — quanto material por área já foi
+    despejado (_entrada) e quanto já foi resumido (_resumos, vai pro RAG)."""
+    import trend_scout
+    return JSONResponse({"areas": trend_scout.all_status()})
+
+
+@app.post("/treinamento/scout/{area}")
+async def treinamento_scout_area(area: str):
+    """Esquadrão de estudo de uma área: busca vídeo (YouTube) + repo (GitHub)
+    relevantes e joga em _treinamento/<area>/_entrada/ (sem duplicar)."""
+    from starlette.concurrency import run_in_threadpool
+    import trend_scout
+    result = await run_in_threadpool(trend_scout.scout_area, area)
+    return JSONResponse(result)
+
+
+@app.post("/treinamento/scout-all")
+async def treinamento_scout_all():
+    """Roda o esquadrão de estudo de todas as áreas de uma vez."""
+    from starlette.concurrency import run_in_threadpool
+    import trend_scout
+    results = await run_in_threadpool(trend_scout.scout_all)
+    return JSONResponse({"results": results})
+
+
 @app.get("/missions")
 async def get_missions():
-    """Missões ativas do orquestrador."""
-    return JSONResponse({
-        "missions": [
-            {"id": "m1", "name": "Campanha Lançamento Q1", "pct": 89, "active": True,  "status": "running"},
-            {"id": "m2", "name": "SDR Outbound EN",        "pct": 62, "active": False, "status": "running"},
-            {"id": "m3", "name": "Conteúdo Julho",         "pct": 34, "active": False, "status": "pending"},
-        ]
-    })
+    """Missões reais: derivadas do backlog do Codex (_data/codex_backlog.md)."""
+    import mission_board
+    missions = mission_board.get_missions()
+    return JSONResponse({"missions": [
+        {k: v for k, v in m.items() if k != "nodes"} for m in missions
+    ]})
+
+
+@app.get("/missions/{mission_id}/nodes")
+async def get_mission_nodes(mission_id: str):
+    """Tarefas (nodes) de uma missão específica, pra desenhar o canvas."""
+    import mission_board
+    return JSONResponse({"nodes": mission_board.get_mission_nodes(mission_id)})
 
 
 if __name__ == "__main__":

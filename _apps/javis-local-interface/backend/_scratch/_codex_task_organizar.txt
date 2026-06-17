@@ -1,0 +1,22 @@
+Você é o Codex trabalhando no projeto Javis (assistente pessoal de Murillo).
+Diretório: C:\Users\noteacer\Desktop\javis\_apps\javis-local-interface\backend
+
+TAREFA: organizar e documentar a pasta backend, SEM mexer em lógica.
+
+1) Crie a pasta `_scratch/` dentro de backend e mova para lá APENAS estes 6 scripts avulsos de rascunho/debug (já confirmei que NENHUM é importado por outro módulo):
+   - _debug_google.py
+   - _debug_ddg.py
+   - _read_codandoai.py
+   - _read_superpowers.py
+   - _run_conclave_vp.py
+   - _test_openrouter.py
+   Crie `_scratch/README.md` explicando que são scripts soltos de teste/depuração, não fazem parte do servidor.
+
+2) Crie `ARQUITETURA.md` na raiz de backend documentando, em português com acentuação correta, o que cada módulo .py de produção faz (uma linha por módulo). Agrupe por função: servidor/rotas, cérebros e LLM (claude_brain, claude_exec, agent, llm_providers, conclave), memória e conhecimento (knowledge, agents/memory_bridge, profile, history_store, vp_store), voz (voice_bridge, voice_elevenlabs), integrações e ações (integrations, actions, app_launcher, telegram_bridge, browser, site_analyzer, file_analyzer, social_reader), orquestração (mission_board, project_registry, trend_scout, codex_orchestrator, code_agent, skill_forge, jampa_squad), utilitários (logger, command_router, reminders, main). Leia o topo de cada arquivo (docstring) para descrever com precisão — não invente.
+
+REGRAS ABSOLUTAS:
+- NÃO toque nestes arquivos (estou editando agora): server.py, agent.py, claude_brain.py, knowledge.py, integrations.py, agents/memory_bridge.py, e nada no frontend.
+- NÃO rode git add, git commit nem git push em hipótese alguma. Murillo revisa e comita pessoalmente.
+- NÃO instale pacotes nem altere requirements.
+- Acentuação correta em português em tudo que escrever.
+Ao terminar, liste o que moveu e o que criou.

@@ -56,11 +56,15 @@ def _env() -> dict:
     return env
 
 
-def answer(question: str, context: str = "") -> str:
+def answer(question: str, context: str = "", system: str | None = None, timeout: int | None = None) -> str:
     """Raciocina sobre a pergunta com o Claude (assinatura) e retorna o texto.
 
     Retorna "" se o Claude Code não estiver disponível, para o chamador cair no
     fallback (ex.: conclave OpenAI).
+
+    `system`  — sobrescreve o system prompt (por padrão usa o de voz, curto).
+                Os agentes (ex.: Architect) passam a própria persona+skill aqui.
+    `timeout` — sobrescreve o teto de tempo (agentes de design podem precisar mais).
     """
     question = (question or "").strip()
     if not question:
@@ -76,14 +80,15 @@ def answer(question: str, context: str = "") -> str:
         "--permission-mode", "default",
         # Raciocínio puro: bloqueia ações para não tentar mexer no projeto.
         "--disallowedTools", "Bash", "Edit", "Write",
-        "--append-system-prompt", _SYSTEM,
+        "--append-system-prompt", system or _SYSTEM,
     ]
     try:
         proc = subprocess.run(
             cmd, cwd=str(JAVIS_ROOT), env=_env(),
             # stdin fechado: sem isso o claude espera 3s por stdin (latência morta).
             stdin=subprocess.DEVNULL,
-            capture_output=True, text=True, timeout=_TIMEOUT,
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=timeout or _TIMEOUT,
         )
         out = (proc.stdout or "").strip()
         if not out:

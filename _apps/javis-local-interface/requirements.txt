@@ -12,3 +12,4 @@ pytest>=8.0
 playwright>=1.44
 ddgs>=7.0
 beautifulsoup4>=4.12
+youtube-transcript-api>=1.2

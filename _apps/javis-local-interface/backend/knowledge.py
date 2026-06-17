@@ -18,6 +18,7 @@ INDEX_FILE = JAVIS_ROOT / "_memoria" / "knowledge_index.json"
 _KNOWLEDGE_DIRS = [
     "_memoria", "_ideias", "_projetos", "_logs", "_estado",
     "_prompts", "_skills", "_inbox", "_outbox", "_ferramentas",
+    "_treinamento",
 ]
 # subpastas a pular mesmo dentro das de conhecimento (caches, libs, lixo)
 _SKIP_DIRS = {

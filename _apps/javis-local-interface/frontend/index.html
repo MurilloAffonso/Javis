@@ -29,6 +29,10 @@
         <span class="sb-item-icon">🤖</span>
         <span class="sb-item-label">Agentes</span>
       </button>
+      <button class="sb-item" data-view="mente">
+        <span class="sb-item-icon">🧠</span>
+        <span class="sb-item-label">Mente</span>
+      </button>
       <button class="sb-item" data-view="workflows">
         <span class="sb-item-icon">⚡</span>
         <span class="sb-item-label">Workflows</span>
@@ -56,14 +60,13 @@
     <div class="sb-agents-section">
       <div class="sb-section-label">AGENTES</div>
       <div class="sb-agents-list" id="sb-agents-list">
-        <div class="sb-agent"><span class="sb-agent-dot online"></span><span class="sb-agent-name">Orion</span><span class="sb-agent-role">@master</span></div>
-        <div class="sb-agent"><span class="sb-agent-dot online"></span><span class="sb-agent-name">Khan</span><span class="sb-agent-role">@bdr</span></div>
-        <div class="sb-agent"><span class="sb-agent-dot online"></span><span class="sb-agent-name">Phantom</span><span class="sb-agent-role">@closer</span></div>
-        <div class="sb-agent"><span class="sb-agent-dot idle"></span><span class="sb-agent-name">Vera</span><span class="sb-agent-role">@cmo</span></div>
-        <div class="sb-agent"><span class="sb-agent-dot idle"></span><span class="sb-agent-name">Dara</span><span class="sb-agent-role">@data-eng</span></div>
-        <div class="sb-agent"><span class="sb-agent-dot offline"></span><span class="sb-agent-name">Intel</span><span class="sb-agent-role">@analyst</span></div>
-        <div class="sb-agent"><span class="sb-agent-dot online"></span><span class="sb-agent-name">Titan</span><span class="sb-agent-role">@cro</span></div>
-        <div class="sb-agent"><span class="sb-agent-dot online"></span><span class="sb-agent-name">Blade</span><span class="sb-agent-role">@bdr-en</span></div>
+        <div class="sb-agent"><span class="sb-agent-dot online"></span><span class="sb-agent-name">AIOS Master</span><span class="sb-agent-role">orquestra</span></div>
+        <div class="sb-agent"><span class="sb-agent-dot online"></span><span class="sb-agent-name">Architect</span><span class="sb-agent-role">estrutura</span></div>
+        <div class="sb-agent"><span class="sb-agent-dot online"></span><span class="sb-agent-name">Developer</span><span class="sb-agent-role">código</span></div>
+        <div class="sb-agent"><span class="sb-agent-dot online"></span><span class="sb-agent-name">QA Tester</span><span class="sb-agent-role">qualidade</span></div>
+        <div class="sb-agent"><span class="sb-agent-dot idle"></span><span class="sb-agent-name">UX Designer</span><span class="sb-agent-role">interface</span></div>
+        <div class="sb-agent"><span class="sb-agent-dot online"></span><span class="sb-agent-name">Sintetizador</span><span class="sb-agent-role">conclave</span></div>
+        <div class="sb-agent"><span class="sb-agent-dot online"></span><span class="sb-agent-name">Jarvis Soul</span><span class="sb-agent-role">alma</span></div>
       </div>
     </div>
 
@@ -266,10 +269,11 @@
               <h2 class="view-title">Escolha um Agente</h2>
               <div class="view-filters">
                 <button class="filter-btn active" data-filter="all">Todos</button>
-                <button class="filter-btn" data-filter="vendas">Vendas</button>
-                <button class="filter-btn" data-filter="criativo">Criativo</button>
-                <button class="filter-btn" data-filter="dados">Dados</button>
-                <button class="filter-btn" data-filter="ops">Ops</button>
+                <button class="filter-btn" data-filter="produto">Produto</button>
+                <button class="filter-btn" data-filter="construcao">Construção</button>
+                <button class="filter-btn" data-filter="qualidade">Qualidade</button>
+                <button class="filter-btn" data-filter="conclave">Conclave</button>
+                <button class="filter-btn" data-filter="meta">Meta</button>
               </div>
             </div>
             <div class="gallery-grid" id="gallery-grid"></div>
@@ -282,6 +286,21 @@
             </div>
             <div class="activity-feed" id="activity-feed"></div>
           </aside>
+        </div>
+      </div>
+
+      <!-- VIEW: MENTE (organograma dos agentes) -->
+      <div class="view" id="view-mente">
+        <div class="view-header">
+          <h2 class="view-title">🧠 Mente — Hierarquia dos Agentes</h2>
+          <div class="org-legend">
+            <span class="ol-item"><span class="ol-dot oc-online"></span>online</span>
+            <span class="ol-item"><span class="ol-dot oc-idle"></span>idle</span>
+            <span class="ol-item"><span class="ol-dot oc-offline"></span>offline</span>
+          </div>
+        </div>
+        <div class="org-scroll">
+          <div class="org-chart" id="org-chart"></div>
         </div>
       </div>
 
@@ -317,10 +336,10 @@
           <div class="train-agent-select">
             <label>Agente a treinar:</label>
             <select id="train-agent-sel">
-              <option value="khan">Khan (@bdr)</option>
-              <option value="phantom">Phantom (@closer)</option>
-              <option value="vera">Vera (@cmo)</option>
-              <option value="orion">Orion (@master)</option>
+              <option value="analyst">Analyst (pesquisa)</option>
+              <option value="architect">Architect (estrutura)</option>
+              <option value="developer">Developer (código)</option>
+              <option value="aios_master">AIOS Master (orquestra)</option>
             </select>
           </div>
           <div class="train-url-input">
@@ -335,6 +354,14 @@
           <div class="train-queue" id="train-queue">
             <div class="train-empty">Nenhum vídeo em treinamento ainda.</div>
           </div>
+
+          <div class="train-areas-sep"></div>
+          <div class="ta-header-row">
+            <h2 class="view-title" style="margin:0">Áreas de Estudo</h2>
+            <button class="ta-scout-all-btn" id="ta-scout-all-btn" onclick="scoutAllAreas()">🔍 Esquadrões: buscar tudo</button>
+          </div>
+          <p class="train-subtitle">Pasta <code>_treinamento/&lt;área&gt;/_entrada</code> recebe material bruto (vídeo, repo, PDF) — manual ou coletado pelo esquadrão (YouTube + GitHub). <code>_resumos</code> recebe o resumo (hoje via NotebookLM manual) e entra automaticamente na base de conhecimento (RAG) do Javis.</p>
+          <div class="train-areas-grid" id="train-areas-grid"></div>
         </div>
       </div>
 

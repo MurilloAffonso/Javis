@@ -416,9 +416,22 @@ def _system() -> str:
     base = SYSTEM_AGENT.replace("{hora_atual}", hora)
     try:
         import profile
-        return base + profile.context_block()
+        base = base + profile.context_block()
     except Exception:
-        return base
+        pass
+    # Injeta o ESTADO REAL do projeto: assim o cérebro sabe "o que a gente fez"
+    # sem depender de acionar a ferramenta de conhecimento.
+    try:
+        import briefing
+        estado = briefing.estado_resumido()
+        if estado:
+            base += (
+                "\n\n## Estado atual do projeto Javis (use para responder o que foi "
+                "feito e o que está pendente; não invente nada fora disto):\n" + estado
+            )
+    except Exception:
+        pass
+    return base
 
 
 def _respond_claude(user_text: str, history: list[dict], max_rounds: int) -> dict:

@@ -32,15 +32,16 @@ class BaseAgent:
     def __init__(self, model: str = DEFAULT_MODEL):
         self.model = model
 
-    def execute(self, task: str, context: str = "") -> str:
+    def execute(self, task: str, context: str = "", system: str | None = None) -> str:
         content = f"{context}\n\nTarefa: {task}" if context else task
+        sys_prompt = system or self.system_prompt
         try:
             resp = requests.post(
                 OLLAMA_URL,
                 json={
                     "model": self.model,
                     "messages": [
-                        {"role": "system", "content": self.system_prompt},
+                        {"role": "system", "content": sys_prompt},
                         {"role": "user",   "content": content},
                     ],
                     "stream": False,

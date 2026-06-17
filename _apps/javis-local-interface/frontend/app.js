@@ -59,7 +59,19 @@ checkStatus();
 setInterval(checkStatus, 30000);
 setInterval(_tickSession, 1000);
 setInterval(pollReminders, 15000);
-loadChatHistory();
+loadChatHistory().then(loadBriefing);
+
+// Saudação proativa: ao abrir, o Javis recebe o senhor sabendo o que foi feito.
+async function loadBriefing() {
+  try {
+    const r = await fetch(`${API}/briefing`);
+    if (!r.ok) return;
+    const b = await r.json();
+    if (!b.saudacao) return;
+    const div = appendMsg("assistant", `<span class="briefing-greet">👋 ${esc(b.saudacao)}</span>`);
+    if (div) div.classList.add("msg-briefing");
+  } catch (e) { console.warn("Briefing:", e); }
+}
 
 async function loadChatHistory() {
   try {
@@ -1450,7 +1462,7 @@ async function speak(text) {
    JAVIS AIOS — View Router & Multi-View Logic
 ═══════════════════════════════════════════════════════════ */
 
-const VIEW_TITLES = { chat:'Orquestrador', agents:'Agentes', workflows:'Workflows', room:'Sala dos Agentes', projects:'Projetos', train:'SDR Academy', integrations:'Integrações' };
+const VIEW_TITLES = { chat:'Orquestrador', agents:'Agentes', mente:'Mente', workflows:'Workflows', room:'Sala dos Agentes', projects:'Projetos', train:'SDR Academy', integrations:'Integrações' };
 
 function switchView(viewId) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -1462,10 +1474,120 @@ function switchView(viewId) {
   const titleEl = document.getElementById('topbar-view-title');
   if (titleEl) titleEl.textContent = VIEW_TITLES[viewId] || viewId;
   if (viewId === 'agents' && !document.getElementById('gallery-grid').children.length) renderAgentGallery();
+  if (viewId === 'mente') renderOrgChart();
   if (viewId === 'workflows') initWorkflowCanvas();
   if (viewId === 'integrations' && !document.getElementById('integrations-grid').children.length) renderIntegrations();
   if (viewId === 'room') initAgentRoom(); else stopAgentRoom();
   if (viewId === 'projects' && !document.getElementById('projects-grid').children.length) renderProjects();
+  if (viewId === 'train') renderTrainAreas();
+}
+
+// ─── Mente: organograma dos 17 agentes da "mente", por fase ──────────
+// AIOS Master no topo → Produto / Construção / Qualidade / Conclave,
+// com Jarvis Soul · Squad Creator · Rootcause numa faixa "meta" no topo.
+const MENTE_TREE = {
+  root: 'aios_master',
+  groups: [
+    { id:'produto',    label:'Produto',    ids:['po', 'pm', 'scrum'] },
+    { id:'construcao', label:'Construção', ids:['architect', 'developer', 'ux_designer', 'devops', 'data_engineer'] },
+    { id:'qualidade',  label:'Qualidade',  ids:['qa', 'analyst'] },
+    { id:'conclave',   label:'Conclave',   ids:['critico', 'advogado', 'sintetizador'] },
+  ],
+  meta: ['jarvis_soul', 'squad_creator', 'rootcause'],
+};
+
+function _agentById(id) { return AGENTS.find(a => a.id === id); }
+
+function _orgCard(a, opts = {}) {
+  if (!a) return '';
+  const nome = opts.stripConclave ? a.name.replace(/^Conclave\s+/, '') : a.name;
+  return `
+    <div class="org-card oc-${a.phase}" onclick="openAgentChat('${a.id}')" title="Abrir chat com ${esc(a.name)}">
+      <div class="oc-top">
+        <span class="oc-emoji">${a.emoji}</span>
+        <span class="oc-status oc-${a.status}" title="${a.status}"></span>
+      </div>
+      <div class="oc-name">${esc(nome)}</div>
+      <div class="oc-role">${esc(a.tag || '')}</div>
+    </div>`;
+}
+
+function _orgGroup(g) {
+  const cards = g.ids.map(id => `<li>${_orgCard(_agentById(id), { stripConclave: g.id === 'conclave' })}</li>`).join('');
+  return `<li>
+    <div class="org-group og-${g.id}">${g.label}</div>
+    <ul>${cards}</ul>
+  </li>`;
+}
+
+function renderOrgChart() {
+  const host = document.getElementById('org-chart');
+  if (!host) return;
+  if (!AGENTS.length) { loadAgents().then(renderOrgChart); return; }
+  const root = _orgCard(_agentById(MENTE_TREE.root));
+  const band = MENTE_TREE.meta.map(id => _orgCard(_agentById(id))).join('');
+  const groups = MENTE_TREE.groups.map(_orgGroup).join('');
+  host.innerHTML = `
+    <div class="org-meta-band"><span class="omb-label">META</span>${band}</div>
+    <ul class="org-root"><li>
+      ${root}
+      <ul>${groups}</ul>
+    </li></ul>`;
+}
+
+async function renderTrainAreas() {
+  const grid = document.getElementById('train-areas-grid');
+  if (!grid) return;
+  const AREA_LABELS = {
+    vendas: { icon: '🎯', label: 'Vendas' },
+    conteudo: { icon: '🎨', label: 'Conteúdo' },
+    tecnico: { icon: '⚙️', label: 'Técnico' },
+    estrategia: { icon: '🧭', label: 'Estratégia' },
+  };
+  let areas = [];
+  try {
+    const r = await fetch('/treinamento/status');
+    const j = await r.json();
+    areas = j.areas || [];
+  } catch { /* backend offline */ }
+  grid.innerHTML = areas.map(a => {
+    const meta = AREA_LABELS[a.area] || { icon: '📁', label: a.area };
+    return `
+      <div class="ta-card" id="ta-card-${a.area}">
+        <div class="ta-icon">${meta.icon}</div>
+        <div class="ta-name">${meta.label}</div>
+        <div class="ta-stats">
+          <span><b>${a.entrada}</b> em entrada</span>
+          <span><b>${a.resumos}</b> resumidos</span>
+        </div>
+        <button class="ta-scout-btn" onclick="scoutArea('${a.area}')">🔍 buscar tendência</button>
+      </div>
+    `;
+  }).join('') || `<div class="train-empty">_treinamento/ ainda sem áreas.</div>`;
+}
+
+async function scoutArea(area) {
+  const card = document.getElementById(`ta-card-${area}`);
+  const btn = card ? card.querySelector('.ta-scout-btn') : null;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ buscando...'; }
+  try {
+    const r = await fetch(`/treinamento/scout/${area}`, { method: 'POST' });
+    const j = await r.json();
+    if (btn) btn.textContent = j.novos > 0 ? `✓ +${j.novos} novos` : '— nada novo';
+  } catch {
+    if (btn) btn.textContent = '✗ erro';
+  }
+  await renderTrainAreas();
+}
+
+async function scoutAllAreas() {
+  const btn = document.getElementById('ta-scout-all-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ esquadrões em campo...'; }
+  try {
+    await fetch('/treinamento/scout-all', { method: 'POST' });
+  } catch { /* ignore */ }
+  if (btn) { btn.disabled = false; btn.textContent = '🔍 Esquadrões: buscar tudo'; }
+  await renderTrainAreas();
 }
 
 document.querySelectorAll('.sb-item[data-view]').forEach(btn => {
@@ -1473,22 +1595,86 @@ document.querySelectorAll('.sb-item[data-view]').forEach(btn => {
 });
 
 /* ─── AGENT DATA ─────────────────────────────────────────── */
-const GALLERY_AGENTS = [
+// Roster de orquestração = os 17 agentes da "mente" (servidos por GET /agents).
+// O array de vendas foi preservado abaixo (não usado na UI) caso volte a fazer sentido.
+const _LEGACY_SALES_AGENTS = [
   { id:'orion',   name:'Orion',   role:'@master',     emoji:'🧬', squad:'ops',      status:'online',  desc:'Orquestra todos os agentes e decisões estratégicas do sistema.', skills:['Orquestração','Decisão','Priorização'], ints:['slack','gmail','notion'] },
   { id:'titan',   name:'Titan',   role:'@cro',        emoji:'👑', squad:'ops',      status:'online',  desc:'Orquestra todo o time de vendas, garantindo alinhamento e resultados.', skills:['Liderança','Vendas','KPIs'], ints:['slack','gmail','notion'] },
   { id:'khan',    name:'Khan',    role:'@bdr-global', emoji:'📞', squad:'vendas',   status:'online',  desc:'Gerencia outbound global, prospecção e qualificação de leads.', skills:['Prospecção','Cold Call','Qualificação'], ints:['whatsapp','gmail','sheets'] },
   { id:'phantom', name:'Phantom', role:'@closer',     emoji:'🎯', squad:'vendas',   status:'online',  desc:'Conduz negociações e fecha contratos de alto valor.', skills:['Fechamento','Negociação','Follow-up'], ints:['whatsapp','gmail'] },
   { id:'blade',   name:'Blade',   role:'@bdr-en',     emoji:'⚔️', squad:'vendas',   status:'online',  desc:'Prospecção em inglês para mercados internacionais.', skills:['Outbound EN','LinkedIn','Email'], ints:['gmail','linkedin'] },
   { id:'vera',    name:'Vera',    role:'@cmo',        emoji:'📢', squad:'criativo', status:'idle',    desc:'Impulsiona presença da marca, estratégias e campanhas criativas.', skills:['Marketing','Conteúdo','Branding'], ints:['instagram','gmail'] },
-  { id:'dara',    name:'Dara',    role:'@data-eng',   emoji:'📊', squad:'dados',    status:'idle',    desc:'Monitora métricas, analisa dados de CRM e alimenta dashboards.', skills:['Analytics','CRM','Relatórios'], ints:['sheets','notion','slack'] },
-  { id:'intel',   name:'Intel',   role:'@call-intel', emoji:'🔍', squad:'dados',    status:'offline', desc:'Pesquisa mercado, concorrentes e oportunidades estratégicas.', skills:['Pesquisa','Inteligência','Insights'], ints:['notion','gmail'] },
-  { id:'prism',   name:'Prism',   role:'@insight',    emoji:'💎', squad:'dados',    status:'idle',    desc:'Transforma dados brutos em insights acionáveis e relatórios.', skills:['Insights','Visualização','Reportes'], ints:['sheets','notion'] },
-  { id:'recap',   name:'Recap',   role:'@followup',   emoji:'🔄', squad:'ops',      status:'online',  desc:'Registra e acompanha follow-ups de todas as interações de vendas.', skills:['Follow-up','CRM','Lembretes'], ints:['whatsapp','gmail','notion'] },
-  { id:'brief',   name:'Brief',   role:'@discovery',  emoji:'📋', squad:'vendas',   status:'idle',    desc:'Conduz descoberta e prepara briefings de prospects qualificados.', skills:['Discovery','Briefing','Qualificação'], ints:['notion','gmail'] },
-  { id:'ana',     name:'Ana',     role:'@analyst',    emoji:'📈', squad:'dados',    status:'idle',    desc:'Analisa execução e gera relatórios de performance de campanhas.', skills:['Análise','Performance','Reportes'], ints:['sheets','notion'] },
 ];
 
-const INT_ICONS = { gmail:'📧', whatsapp:'💬', slack:'💼', notion:'📓', sheets:'📊', instagram:'📸', linkedin:'🔗' };
+// Metadados de apresentação (o backend não tem fase nem status visual).
+const PHASE_LABEL = { produto:'Produto', construcao:'Construção', qualidade:'Qualidade', conclave:'Conclave', meta:'Meta' };
+const AGENT_PRESENTATION = {
+  aios_master:   { phase:'meta',       status:'online', tag:'Orquestrador' },
+  po:            { phase:'produto',    status:'online', tag:'Produto' },
+  pm:            { phase:'produto',    status:'online', tag:'Projeto' },
+  scrum:         { phase:'produto',    status:'idle',   tag:'Processo' },
+  architect:     { phase:'construcao', status:'online', tag:'Arquitetura' },
+  developer:     { phase:'construcao', status:'online', tag:'Código' },
+  ux_designer:   { phase:'construcao', status:'idle',   tag:'UX' },
+  devops:        { phase:'construcao', status:'idle',   tag:'Infra' },
+  data_engineer: { phase:'construcao', status:'idle',   tag:'Dados' },
+  qa:            { phase:'qualidade',  status:'online', tag:'Qualidade' },
+  analyst:       { phase:'qualidade',  status:'idle',   tag:'Análise' },
+  critico:       { phase:'conclave',   status:'online', tag:'Crítico' },
+  advogado:      { phase:'conclave',   status:'idle',   tag:'Advogado' },
+  sintetizador:  { phase:'conclave',   status:'online', tag:'Síntese' },
+  jarvis_soul:   { phase:'meta',       status:'online', tag:'Alma' },
+  squad_creator: { phase:'meta',       status:'idle',   tag:'Squads' },
+  rootcause:     { phase:'meta',       status:'idle',   tag:'Diagnóstico' },
+};
+
+// Fallback local caso GET /agents falhe (mesmos dados do backend).
+const MIND_AGENTS_FALLBACK = [
+  { id:'aios_master',   name:'AIOS Master',           role:'Coordena a squad e decide quem executa', emoji:'🧬', color:'#00e5ff' },
+  { id:'po',            name:'Product Owner',         role:'Priorização e visão de produto',         emoji:'🎯', color:'#8b5cf6' },
+  { id:'pm',            name:'Project Manager',       role:'Planejamento, etapas e prazos',          emoji:'📋', color:'#3b82f6' },
+  { id:'scrum',         name:'Scrum Master',          role:'Gestão de tarefas e impedimentos',       emoji:'⚙️', color:'#6366f1' },
+  { id:'architect',     name:'Architect',             role:'Design de sistemas e estrutura',         emoji:'🏗️', color:'#00e5ff' },
+  { id:'developer',     name:'Developer',             role:'Programação e implementação',            emoji:'💻', color:'#00e5ff' },
+  { id:'ux_designer',   name:'UX Designer',           role:'Interfaces, UX e usabilidade',           emoji:'🎨', color:'#ec4899' },
+  { id:'devops',        name:'DevOps',                role:'Deploy, infraestrutura e operação',      emoji:'🚀', color:'#f97316' },
+  { id:'data_engineer', name:'Data Engineer',         role:'Banco de dados, pipelines e dados',      emoji:'🗄️', color:'#14b8a6' },
+  { id:'qa',            name:'QA Tester',             role:'Testes, qualidade e validação',          emoji:'🔍', color:'#22c55e' },
+  { id:'analyst',       name:'Analyst',               role:'Pesquisa, análise e estratégia',         emoji:'📊', color:'#a855f7' },
+  { id:'critico',       name:'Conclave Crítico',      role:'Audita lógica e falhas',                 emoji:'🔴', color:'#ef4444' },
+  { id:'advogado',      name:'Conclave Advogado',     role:'Ataca o plano e expõe riscos',           emoji:'⚔️', color:'#f97316' },
+  { id:'sintetizador',  name:'Conclave Sintetizador', role:'Integra a melhor solução',               emoji:'✅', color:'#22c55e' },
+  { id:'jarvis_soul',   name:'Jarvis Soul',           role:'Identidade, tom e personalidade',        emoji:'✨', color:'#f59e0b' },
+  { id:'squad_creator', name:'Squad Creator',         role:'Monta squads dinamicamente',             emoji:'⚡', color:'#f59e0b' },
+  { id:'rootcause',     name:'Rootcause',             role:'Diagnóstico de falhas e aprendizado',    emoji:'🔬', color:'#ef4444' },
+];
+
+let AGENTS = [];
+
+function _mergePresentation(a) {
+  const p = AGENT_PRESENTATION[a.id] || {};
+  return {
+    id: a.id, name: a.name, role: a.role,
+    emoji: a.emoji || a.icon || '🤖', color: a.color,
+    phase: p.phase || 'meta', status: p.status || 'idle', tag: p.tag || '',
+  };
+}
+
+// Fonte única: puxa os 17 do backend (/agents). Cai no fallback local se falhar.
+async function loadAgents() {
+  try {
+    const r = await fetch(`${API}/agents`);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    const flat = [...(data.agents || []), ...(data.conclave || []), ...(data.meta || [])];
+    if (!flat.length) throw new Error('lista vazia');
+    AGENTS = flat.map(_mergePresentation);
+  } catch (e) {
+    console.warn('Agents → fallback local:', e);
+    AGENTS = MIND_AGENTS_FALLBACK.map(_mergePresentation);
+  }
+  return AGENTS;
+}
 
 /* ─── AGENT GALLERY ──────────────────────────────────────── */
 let _activeFilter = 'all';
@@ -1498,28 +1684,69 @@ function renderAgentGallery(filter) {
   _activeFilter = filter;
   const grid = document.getElementById('gallery-grid');
   if (!grid) return;
-  const list = filter === 'all' ? GALLERY_AGENTS : GALLERY_AGENTS.filter(a => a.squad === filter);
+  if (!AGENTS.length) { loadAgents().then(() => renderAgentGallery(filter)); return; }
+  const list = filter === 'all' ? AGENTS : AGENTS.filter(a => a.phase === filter);
+  if (!list.length) {
+    grid.innerHTML = `<div class="gallery-empty">Nenhum agente nesta fase ainda.</div>`;
+    renderActivityFeed();
+    return;
+  }
   grid.innerHTML = list.map(a => `
-    <div class="gallery-card" onclick="openAgentChat('${a.id}')">
+    <div class="gallery-card gc-${a.phase}" onclick="openAgentChat('${a.id}')">
       <div class="gc-header">
         <div class="gc-avatar">${a.emoji}</div>
-        <div class="gc-info"><div class="gc-name">${a.name}</div><div class="gc-role">${a.role}</div></div>
+        <div class="gc-info"><div class="gc-name">${esc(a.name)}</div><div class="gc-role">${esc(a.tag || '')}</div></div>
         <div class="gc-status-dot ${a.status}"></div>
       </div>
-      <div class="gc-desc">${a.desc}</div>
-      <div class="gc-skills">${a.skills.map(s=>`<span class="gc-skill">${s}</span>`).join('')}</div>
-      <div class="gc-integrations">${a.ints.map(i=>`<div class="gc-int-icon" title="${i}">${INT_ICONS[i]||'🔌'}</div>`).join('')}</div>
+      <div class="gc-desc">${esc(a.role)}</div>
+      <div class="gc-footer">
+        <span class="gc-phase-tag og-${a.phase}">${esc(PHASE_LABEL[a.phase] || a.phase)}</span>
+        <button class="gc-convocar-btn" onclick="event.stopPropagation(); convocarAgente('${a.id}')">Convocar</button>
+      </div>
     </div>
   `).join('');
   renderActivityFeed();
 }
 
-function openAgentChat(agentId) {
-  const a = GALLERY_AGENTS.find(x => x.id === agentId);
+async function openAgentChat(agentId) {
+  const a = _agentById(agentId);
+  if (!a) return;
+  const task = window.prompt(`Tarefa para ${a.name}:`, '');
+  if (!task || !task.trim()) return;
+
+  switchView('chat');
+  removeWelcome();
+  appendMsg('user', esc(`@${a.name}: ${task}`));
+  const typing = appendTyping(`${a.name} pensando...`);
+  setLoading(true);
+
+  try {
+    const r = await fetch(`${API}/agents/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent_id: agentId, task }),
+    });
+    const data = await r.json();
+    typing.remove();
+    if (!r.ok || data.status !== 'ok') {
+      appendMsg('error', `⚠️ ${esc(data.message || 'Falha ao executar o agente.')}`);
+    } else {
+      appendMsg('assistant', renderMarkdown(data.result || 'Sem resposta.'), { brain: data.brain });
+    }
+  } catch (e) {
+    typing.remove();
+    appendMsg('error', `⚠️ Erro ao chamar ${esc(a.name)}: ${esc(e.message)}`);
+  } finally {
+    setLoading(false);
+  }
+}
+
+function convocarAgente(agentId) {
+  const a = _agentById(agentId);
   if (!a) return;
   switchView('chat');
   const inp = document.getElementById('input');
-  if (inp) { inp.value = `Falar com ${a.name} (${a.role}): `; inp.focus(); }
+  if (inp) { inp.value = `@${a.name} `; inp.focus(); }
 }
 
 document.addEventListener('click', e => {
@@ -1534,11 +1761,11 @@ function renderActivityFeed() {
   const feed = document.getElementById('activity-feed');
   if (!feed) return;
   const items = [
-    { agent:'Khan @bdr',      text:'Prospectou 3 novos leads via LinkedIn',        time:'2m atrás' },
-    { agent:'Orion @master',  text:'Delegou campanha Q2 para Vera e Dara',         time:'8m atrás' },
-    { agent:'Phantom @closer',text:'Follow-up enviado para MedTech S.A.',           time:'15m atrás' },
-    { agent:'Dara @data',     text:'Dashboard de CRM atualizado com 47 entradas',  time:'22m atrás' },
-    { agent:'Vera @cmo',      text:'Reel gerado: "5 razões para escolher..."',     time:'1h atrás' },
+    { agent:'AIOS Master',           text:'Montou a squad para a tarefa de interface',  time:'2m atrás' },
+    { agent:'Architect',             text:'Definiu a estrutura da ponte de briefing',   time:'10m atrás' },
+    { agent:'Developer',             text:'Implementou a aba Mente no frontend',        time:'18m atrás' },
+    { agent:'QA Tester',             text:'Validou a galeria: 17 agentes, zero erro',   time:'25m atrás' },
+    { agent:'Conclave Sintetizador', text:'Integrou a decisão sobre o roster da mente', time:'40m atrás' },
   ];
   feed.innerHTML = items.map(i => `
     <div class="activity-item">
@@ -1549,49 +1776,60 @@ function renderActivityFeed() {
   `).join('');
 }
 
-/* ─── WORKFLOW CANVAS ────────────────────────────────────── */
-const MISSIONS = [
-  { id:'m1', name:'Campanha Lançamento Q1', pct:89, active:true },
-  { id:'m2', name:'SDR Outbound EN',        pct:62, active:false },
-  { id:'m3', name:'Conteúdo Julho',         pct:34, active:false },
-];
+/* ─── WORKFLOW CANVAS — quadro de orquestramento real (backlog do Codex) ─── */
+let MISSIONS = [];
+let WF_NODES = [];
+let WF_EDGES = [];
 
-const WF_NODES = [
-  { id:'n0', label:'Orion',     type:'orchestrator', x:60,  y:150, status:'online',  pct:100 },
-  { id:'n1', label:'Headlines', type:'copy',         x:240, y:70,  status:'done',    pct:100 },
-  { id:'n2', label:'Body Copy', type:'copy',         x:240, y:230, status:'running', pct:67  },
-  { id:'n3', label:'House G',   type:'review',       x:430, y:150, status:'waiting', pct:0   },
-  { id:'n4', label:'Publish',   type:'publish',      x:610, y:150, status:'waiting', pct:0   },
-];
-const WF_EDGES = [['n0','n1'],['n0','n2'],['n1','n3'],['n2','n3'],['n3','n4']];
+async function fetchMissionNodes(missionId) {
+  try {
+    const r = await fetch(`${API}/missions/${missionId}/nodes`);
+    if (!r.ok) return [];
+    const data = await r.json();
+    const nodes = data.nodes || [];
+    return nodes.map((n, i) => ({
+      ...n,
+      type: i === 0 ? 'orchestrator' : (n.status === 'done' ? 'review' : 'copy'),
+      x: 60 + i * 190,
+      y: 150 + ((i % 3) - 1) * 80,
+    }));
+  } catch { return []; }
+}
 
 async function fetchMissions() {
   try {
     const r = await fetch(`${API}/missions`);
     if (!r.ok) return;
     const data = await r.json();
-    if (data.missions) {
-      data.missions.forEach(m => {
-        const existing = MISSIONS.find(x => x.id === m.id);
-        if (existing) { existing.pct = m.pct; existing.active = m.active; }
-        else MISSIONS.push(m);
-      });
-    }
-  } catch { /* backend offline — use hardcoded */ }
+    if (data.missions) MISSIONS = data.missions;
+  } catch { /* backend offline — sem missões pra mostrar */ }
 }
 
-async function initWorkflowCanvas() {
-  await fetchMissions();
+let _selectedMissionId = null;
+
+function renderMissionsList() {
   const list = document.getElementById('missions-list');
-  if (list) list.innerHTML = MISSIONS.map(m => `
-    <div class="mission-item ${m.active?'active':''}" data-mid="${m.id}" onclick="selectMission('${m.id}')">
+  if (!list) return;
+  list.innerHTML = MISSIONS.length ? MISSIONS.map(m => `
+    <div class="mission-item ${m.id === _selectedMissionId ? 'active' : ''}" data-mid="${m.id}" onclick="selectMission('${m.id}')">
       <div class="mi-name">${m.name}</div>
       <div class="mi-progress-row">
         <div class="mi-bar"><div class="mi-bar-fill" style="width:${m.pct}%"></div></div>
         <span class="mi-pct">${m.pct}%</span>
       </div>
+      <div class="mi-meta">${m.tasks_done}/${m.tasks_total} tarefas${m.last_activity ? ' · ' + m.last_activity : ''}</div>
     </div>
-  `).join('');
+  `).join('') : `<div class="mi-empty">Nenhuma missão no backlog do Codex.</div>`;
+}
+
+async function renderCanvasForMission(mission) {
+  const titleEl = document.getElementById('wf-canvas-title');
+  if (titleEl) titleEl.textContent = mission ? mission.name : 'Sem missão ativa';
+  const statusEl = document.querySelector('.wf-canvas-status');
+  if (statusEl) statusEl.textContent = mission ? (mission.status === 'concluida' ? 'Concluída' : mission.status === 'running' ? 'Em execução' : 'Pendente') : '—';
+
+  WF_NODES = mission ? await fetchMissionNodes(mission.id) : [];
+  WF_EDGES = WF_NODES.slice(0, -1).map((n, i) => [n.id, WF_NODES[i + 1].id]);
 
   const canvas = document.getElementById('workflow-canvas');
   if (!canvas) return;
@@ -1608,9 +1846,20 @@ async function initWorkflowCanvas() {
   requestAnimationFrame(() => drawWfEdges());
 }
 
+async function initWorkflowCanvas() {
+  await fetchMissions();
+  if (!_selectedMissionId || !MISSIONS.some(m => m.id === _selectedMissionId)) {
+    const active = MISSIONS.find(m => m.active) || MISSIONS[0];
+    _selectedMissionId = active ? active.id : null;
+  }
+  renderMissionsList();
+  await renderCanvasForMission(MISSIONS.find(m => m.id === _selectedMissionId));
+}
+
 function selectMission(mid) {
-  MISSIONS.forEach(m => m.active = (m.id === mid));
-  initWorkflowCanvas();
+  _selectedMissionId = mid;
+  renderMissionsList();
+  renderCanvasForMission(MISSIONS.find(m => m.id === mid));
 }
 
 function drawWfEdges() {
@@ -1945,6 +2194,7 @@ const PROJECTS_DATA = [
     desc:'Squad mestre Jampa Jarvis: Orion orquestra Hunter, Atlas, LNS, Nero, Nova e mais.',
     agents:10, status:'online', statusLabel:'Ativo', grad:'linear-gradient(90deg,#7c3aed,#a855f7)',
     open:'/vempassear', squadEndpoint:'/jampa/agents',
+    registrySlug:'cerebro-jampa', external:true,
   },
   {
     id:'javis-core', icon:'⚡', name:'Javis Core', tag:'Orquestrador mestre',
@@ -1959,6 +2209,21 @@ const PROJECTS_DATA = [
     open:null, squadEndpoint:null,
   },
 ];
+
+let _registryCache = null;
+
+async function _fetchRegistry() {
+  if (_registryCache) return _registryCache;
+  try {
+    const r = await fetch('/projects/registry');
+    const j = await r.json();
+    _registryCache = {};
+    (j.projects || []).forEach(p => { _registryCache[p.slug] = p; });
+  } catch (e) {
+    _registryCache = {};
+  }
+  return _registryCache;
+}
 
 function renderProjects() {
   const grid = document.getElementById('projects-grid');
@@ -1995,16 +2260,18 @@ function renderProjects() {
     grid.insertAdjacentHTML('beforebegin', analyticsHtml);
   }
   grid.innerHTML = PROJECTS_DATA.map(p => `
-    <div class="project-card" style="--accent-grad:${p.grad}">
+    <div class="project-card" style="--accent-grad:${p.grad}" id="pc-${p.id}">
       <div class="pc-head">
         <div class="pc-icon">${p.icon}</div>
         <div><div class="pc-name">${p.name}</div><div class="pc-tag">${p.tag}</div></div>
+        ${p.external ? '<span class="pc-ext-badge" title="Projeto externo conectado por registry — Javis não absorve, só orquestra">🔗 externo</span>' : ''}
       </div>
       <div class="pc-desc">${p.desc}</div>
       <div class="pc-meta">
         <div class="pc-stat"><b>${p.agents}</b>agentes</div>
         <div class="pc-stat"><span class="pc-status ${p.status}">${p.status==='online'?'●':'○'} ${p.statusLabel}</span></div>
       </div>
+      <div class="pc-extra" id="pc-extra-${p.id}"></div>
       <div class="pc-actions">
         <button class="pc-btn" ${p.open?`onclick="window.location.href='${p.open}'"`:'disabled'}>${p.open?'Abrir':'Em breve'}</button>
         <button class="pc-btn" ${p.squadEndpoint?`onclick="orquestrarProjeto('${p.id}')"`:'disabled'}>Orquestrar</button>
@@ -2012,6 +2279,25 @@ function renderProjects() {
     </div>
   `).join('');
   _drawAnalyticsChart();
+  _hydrateRegistryCards();
+}
+
+async function _hydrateRegistryCards() {
+  const reg = await _fetchRegistry();
+  PROJECTS_DATA.filter(p => p.registrySlug).forEach(p => {
+    const data = reg[p.registrySlug];
+    const slot = document.getElementById(`pc-extra-${p.id}`);
+    if (!slot) return;
+    if (!data || data.status !== 'online') {
+      slot.innerHTML = `<div class="pc-extra-row pc-extra-warn">⚠ projeto externo offline (caminho não encontrado)</div>`;
+      return;
+    }
+    slot.innerHTML = `
+      <div class="pc-extra-row"><span>fase</span><b>${data.fase_atual} · ${data.descricao_fase}</b></div>
+      <div class="pc-extra-row"><span>skills ativas</span><b>${data.skills_ativas}/${data.skills_total}</b></div>
+      <div class="pc-extra-row"><span>fonte-da-verdade</span><b>${data.fonte_da_verdade_atualizada_em || '—'}</b></div>
+    `;
+  });
 }
 
 function _drawAnalyticsChart() {

@@ -1,0 +1,30 @@
+Crie um arquivo Figma NOVO e monte nele um organograma (hierarquia em árvore)
+dos agentes do Javis, em estilo DESIGN DE UI (dashboard escuro caprichado),
+espelhando a referência visual de um board "AI Agents for Sales".
+
+PASSOS:
+1. Confirme com a ferramenta Figma `_whoami` em qual conta está logado e inclua
+   isso no relato final.
+2. Leia a especificação completa em `_prompts/figma-hierarquia-agentes-javis.md`
+   (hierarquia, mapa exato dos agentes, estilo dos cards). Use EXATAMENTE os
+   11 agentes e a árvore definidos lá. Pode conferir os dados em
+   `_apps/javis-local-interface/frontend/app.js` (const GALLERY_AGENTS).
+3. Use `_create_new_file` para criar um arquivo novo chamado
+   "Javis — Esquadrão de Agentes".
+4. Gere o design (use `_generate_figma_design` ou as ferramentas adequadas):
+   cada agente é um CARD de UI (fundo escuro tipo #16162a, cantos arredondados,
+   borda sutil) com: emoji/avatar no topo, nome em negrito, @papel menor, tag
+   do esquadrão colorida (VENDAS, DADOS, CRIATIVO, OPS), 1 linha de descrição,
+   tags de skills, e um ponto de status (verde=online, amarelo=idle,
+   cinza=offline). Conecte pai→filhos com linhas (cotovelo), na hierarquia:
+     - Orion (🧬 @master) no TOPO, sozinho.
+     - Nível 2 ligado ao Orion: Titan (👑 @cro/VENDAS), Vera (📢 @cmo/CRIATIVO),
+       Dara (📊 @data-eng/DADOS), Recap (🔄 @followup/OPS).
+     - Sob Titan (squad VENDAS): Khan, Phantom, Blade, Brief.
+     - Sob Dara (squad DADOS): Intel, Prism, Ana.
+5. Ao terminar, devolva a URL/link do arquivo Figma criado.
+
+REGRAS ABSOLUTAS:
+- NÃO rode git add/commit/push.
+- Acentuação correta em português em todos os textos dos cards.
+- Não altere nenhum arquivo do projeto; só crie no Figma.

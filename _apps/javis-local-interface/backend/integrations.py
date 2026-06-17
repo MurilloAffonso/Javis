@@ -45,6 +45,92 @@ def youtube_watch_url(query: str) -> str | None:
     return None
 
 
+def youtube_search_many(query: str, max_results: int = 5) -> list[dict]:
+    """Busca vários vídeos (título, canal, url, data). Lista vazia se sem key/erro."""
+    api_key = os.environ.get("YOUTUBE_API_KEY", "").strip()
+    if not api_key or not query.strip():
+        return []
+    try:
+        resp = requests.get(
+            "https://www.googleapis.com/youtube/v3/search",
+            params={
+                "part": "snippet",
+                "q": query,
+                "type": "video",
+                "order": "relevance",
+                "maxResults": max_results,
+                "videoEmbeddable": "true",
+                "key": api_key,
+            },
+            timeout=_TIMEOUT,
+        )
+        resp.raise_for_status()
+        out = []
+        for it in resp.json().get("items", []):
+            vid = it.get("id", {}).get("videoId")
+            sn = it.get("snippet", {})
+            if not vid:
+                continue
+            out.append({
+                "title": sn.get("title", ""),
+                "channel": sn.get("channelTitle", ""),
+                "published": (sn.get("publishedAt") or "")[:10],
+                "url": f"https://www.youtube.com/watch?v={vid}",
+            })
+        return out
+    except Exception:
+        return []
+
+
+def youtube_transcript(video_url_or_id: str, langs: tuple[str, ...] = ("pt", "pt-BR", "en")) -> str | None:
+    """Busca a transcrição real de um vídeo do YouTube (sem precisar de API key).
+
+    Retorna o texto completo da legenda, ou None se o vídeo não tiver
+    legenda disponível nesses idiomas ou a busca falhar.
+    """
+    try:
+        from youtube_transcript_api import YouTubeTranscriptApi
+    except ImportError:
+        return None
+    video_id = video_url_or_id
+    if "watch?v=" in video_url_or_id:
+        video_id = video_url_or_id.split("watch?v=")[-1].split("&")[0]
+    elif "youtu.be/" in video_url_or_id:
+        video_id = video_url_or_id.split("youtu.be/")[-1].split("?")[0]
+    try:
+        api = YouTubeTranscriptApi()
+        snippets = api.fetch(video_id, languages=list(langs))
+        return " ".join(s.text for s in snippets).strip() or None
+    except Exception:
+        return None
+
+
+def github_search_repos(query: str, max_results: int = 5) -> list[dict]:
+    """Busca repositórios no GitHub (API pública, sem token — sujeita a rate limit baixo)."""
+    if not query.strip():
+        return []
+    try:
+        resp = requests.get(
+            "https://api.github.com/search/repositories",
+            params={"q": query, "sort": "stars", "order": "desc", "per_page": max_results},
+            headers={"Accept": "application/vnd.github+json"},
+            timeout=_TIMEOUT,
+        )
+        resp.raise_for_status()
+        out = []
+        for it in resp.json().get("items", []):
+            out.append({
+                "title": it.get("full_name", ""),
+                "channel": f"⭐ {it.get('stargazers_count', 0)}",
+                "published": (it.get("pushed_at") or "")[:10],
+                "url": it.get("html_url", ""),
+                "description": it.get("description") or "",
+            })
+        return out
+    except Exception:
+        return []
+
+
 def weather(city: str = "") -> dict | None:
     """Clima atual via OpenWeather. Retorna dict resumido ou None (sem key/erro)."""
     api_key = os.environ.get("OPENWEATHER_API_KEY", "").strip()
@@ -100,4 +186,5 @@ def available() -> dict:
         "spotify":    has("SPOTIFY_CLIENT_ID") and has("SPOTIFY_CLIENT_SECRET"),
         "openweather":has("OPENWEATHER_API_KEY"),
         "telegram":   has("TELEGRAM_BOT_TOKEN"),
+        "elevenlabs": has("ELEVENLABS_API_KEY"),
     }

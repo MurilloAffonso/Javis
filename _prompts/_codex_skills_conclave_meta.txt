@@ -1,0 +1,28 @@
+Trabalhe no projeto Javis. Diretório: C:\Users\noteacer\Desktop\javis
+
+TAREFA: criar skills SKILL.md para os agentes de conclave e meta (e Jarvis Soul) que ainda não têm.
+
+1. Leia o MODELO EXATO: `_skills/agente-architect.md` (formato).
+2. Fontes de verdade dos papéis:
+   - jarvis_soul → `_apps/javis-local-interface/backend/agents/specialized.py` (classe JarvisSoul)
+   - aios_master, squad_creator, rootcause → `_apps/javis-local-interface/backend/agents/meta.py`
+     (system prompts + META_AGENTS_INFO)
+   - critico, advogado, sintetizador → `_apps/javis-local-interface/backend/conclave.py`
+     (papéis Crítico/Advogado/Sintetizador) e o endpoint /agents em server.py (name/role).
+3. Crie `_skills/agente-<id>.md` para CADA um destes 7 (id EXATO no nome e no frontmatter):
+   - jarvis_soul (Jarvis Soul — identidade, tom e personalidade)
+   - aios_master (AIOS Master — coordena a squad, decide quais agentes usar)
+   - squad_creator (Squad Creator — monta squads dinamicamente)
+   - rootcause (Rootcause — diagnóstico de falhas e aprendizado)
+   - critico (Conclave Crítico — audita lógica e falhas)
+   - advogado (Conclave Advogado — ataca o plano, expõe riscos)
+   - sintetizador (Conclave Sintetizador — integra a melhor solução)
+4. Mesmo formato do agente-architect.md (frontmatter name: agente-<id>, description,
+   version "1.0", status: ativa, agente: <id>, atualizado: "2026-06-17" + corpo:
+   IDENTIDADE, Quando usar, Processo numerado, Saída esperada, REGRAS INVIOLÁVEIS).
+   Específico por papel — não genérico. PT-BR, acentuação correta.
+
+REGRAS ABSOLUTAS:
+- NÃO toque em código. Só crie os 7 arquivos .md em `_skills/`.
+- NÃO rode git add/commit/push.
+- Liste os arquivos criados no fim.

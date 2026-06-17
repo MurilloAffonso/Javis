@@ -1,0 +1,29 @@
+Trabalhe no projeto Javis. Diretório: C:\Users\noteacer\Desktop\javis
+
+TAREFA: criar skills no padrão SKILL.md para os agentes especialistas que ainda não têm.
+
+1. Leia o MODELO EXATO: `_skills/agente-architect.md` (frontmatter + seções
+   IDENTIDADE, Quando usar, Processo, Saída esperada, REGRAS INVIOLÁVEIS).
+2. Leia `_apps/javis-local-interface/backend/agents/specialized.py` — cada classe
+   tem meta (id, name, role) e um system_prompt com a persona. Use como base de verdade.
+3. Crie `_skills/agente-<id>.md` para CADA um destes 9 agentes (use o id EXATO no
+   nome do arquivo e no frontmatter):
+   - developer (Developer — Programação e implementação)
+   - ux_designer (UX Designer — Interfaces, UX e usabilidade)
+   - qa (QA Tester — Testes, qualidade e validação)
+   - pm (Project Manager — Planejamento, etapas e prazos)
+   - po (Product Owner — Priorização e visão de produto)
+   - scrum (Scrum Master — Gestão de tarefas e impedimentos)
+   - analyst (Analyst — Pesquisa, análise e estratégia)
+   - devops (DevOps — Deploy, infraestrutura e operação)
+   - data_engineer (Data Engineer — Banco de dados, pipelines e dados)
+4. Cada skill segue EXATAMENTE o formato do agente-architect.md:
+   frontmatter (name: agente-<id>, description, version: "1.0", status: ativa,
+   agente: <id>, atualizado: "2026-06-17") + corpo (IDENTIDADE, Quando usar,
+   Processo numerado, Saída esperada, REGRAS INVIOLÁVEIS). Conteúdo ESPECÍFICO e
+   acionável pra cada papel — não genérico. Português do Brasil, acentuação correta.
+
+REGRAS ABSOLUTAS:
+- NÃO toque em código (.py/.js/.html/.css). Só crie os 9 arquivos .md em `_skills/`.
+- NÃO rode git add/commit/push.
+- Ao terminar, liste os 9 arquivos criados.

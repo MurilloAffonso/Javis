@@ -1,0 +1,29 @@
+Trabalhe no projeto Javis. Diretório: C:\Users\noteacer\Desktop\javis
+
+CONTEXTO: cada agente tem uma skill em `_skills/agente-<id>.md`. Os 17 ids são:
+architect, developer, ux_designer, qa, pm, po, scrum, analyst, devops, data_engineer,
+jarvis_soul, aios_master, squad_creator, rootcause, critico, advogado, sintetizador.
+
+TAREFA A — teste de consistência (guardrail):
+Crie `_apps/javis-local-interface/tests/test_skills_consistency.py` com testes pytest
+que verificam, para CADA um dos 17 ids:
+  - o arquivo `_skills/agente-<id>.md` existe
+  - começa com '---' (frontmatter) e contém `agente: <id>`
+  - contém as seções IDENTIDADE, Processo e REGRAS
+A raiz do projeto a partir do arquivo de teste é `Path(__file__).resolve().parents[3]`
+(tests → javis-local-interface → _apps → javis). NÃO dependa de servidor rodando.
+DEPOIS rode, de dentro de `_apps/javis-local-interface`:
+  `python -m pytest tests/test_skills_consistency.py -q`  → tem que PASSAR.
+Se falhar, corrija o TESTE (não os arquivos de skill) até ficar verde.
+Rode também a suíte inteira `python -m pytest tests/ -q` e confirme que os 54 testes
+existentes continuam verdes (não pode quebrar nada).
+
+TAREFA B — manifesto:
+Crie `_skills/_index.md` com uma tabela dos 17 agentes: id | nome | papel | arquivo |
+status — lendo do frontmatter de cada `agente-<id>.md`. PT-BR, acentuação correta.
+
+REGRAS ABSOLUTAS:
+- Só crie o arquivo de teste novo e o `_index.md`. NÃO toque em código de produção
+  (.py do backend, .js, .html, .css).
+- NÃO rode git add/commit/push.
+- No fim, mostre a saída do pytest (das duas execuções).
