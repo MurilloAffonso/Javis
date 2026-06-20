@@ -2140,10 +2140,10 @@ let _selectedMissionId = null;
 // não tem checkbox pra editar, então não aceita drop nem é arrastável.
 // Quadro agora lê do SQLite (GET /tasks). 4 colunas; cada status mapeia numa coluna.
 const QUADRO_COLUMNS = [
-  { key:'pending',   label:'Pendente',            icon:'📥', status:['pending'] },
-  { key:'running',   label:'Em andamento',        icon:'⚙️', status:['running'] },
-  { key:'approved',  label:'Aprovado/Destravado', icon:'🔓', status:['done','gate_approved'] },
-  { key:'completed', label:'Concluído/Morto',     icon:'🪦', status:['completed','killed'] },
+  { key:'pending',   label:'Pendente',            icon:'📥', status:['pending'],               setStatus:'pending' },
+  { key:'running',   label:'Em andamento',        icon:'⚙️', status:['running','in_progress'], setStatus:'in_progress' },
+  { key:'approved',  label:'Aprovado/Destravado', icon:'🔓', status:['done','gate_approved'],  setStatus:'gate_approved' },
+  { key:'completed', label:'Concluído/Morto',     icon:'🪦', status:['completed','killed'],     setStatus:'completed' },
 ];
 let _quadroFilter = 'all';      // 'all' ou um workflow (mission slug)
 
@@ -2196,7 +2196,8 @@ async function renderQuadro() {
   board.innerHTML = QUADRO_COLUMNS.map(col => {
     const colCards = tasks.filter(t => _qColForStatus(t.status) === col.key);
     return `
-      <div class="quadro-col q-col-${col.key}" data-col="${col.key}">
+      <div class="quadro-col q-col-${col.key}" data-col="${col.key}" data-set-status="${col.setStatus}"
+           ondragover="quadroDragOver(event)" ondragleave="quadroDragLeave(event)" ondrop="quadroDrop(event)">
         <div class="qcol-head">
           <span class="qcol-title">${col.icon} ${col.label}</span>
           <span class="qcol-count">${colCards.length}</span>
@@ -2215,7 +2216,9 @@ function _quadroCard(t) {
   const encerrada = t.status === 'completed' || t.status === 'killed';
   const digest = t.has_digest ? '<span class="qcard-digest" title="tem digest">📄 digest</span>' : '';
   const journeyBtn = `<button class="qcard-jbtn" onclick="viewJourney('${ext}', '${hostId}')">Ver jornada</button>`;
-  return `<div class="qcard q-${_qColForStatus(t.status)}" title="${esc(t.title || '')}">
+  // encerradas não são arrastáveis (não dá pra reabrir pelo Quadro)
+  const drag = encerrada ? '' : `draggable="true" ondragstart="quadroDragStart(event)" ondragend="quadroDragEnd(event)"`;
+  return `<div class="qcard q-${_qColForStatus(t.status)}" title="${esc(t.title || '')}" data-ext-id="${ext}" ${drag}>
     <div class="qcard-text">${esc(t.title || '')}</div>
     <div class="qcard-foot">
       <span class="qcard-tag">${esc(t.agent || t.workflow || '—')}</span>
@@ -2226,12 +2229,12 @@ function _quadroCard(t) {
   </div>`;
 }
 
-// ─── Drag-and-drop do Quadro: arrastar grava de volta no backlog real ───
-let _quadroDrag = null; // { nodeId, missionId, fromStatus }
+// ─── Drag-and-drop do Quadro: mover card grava status no SQLite ───────────
+let _quadroDrag = null; // { extId }
 
 function quadroDragStart(ev) {
   const el = ev.currentTarget;
-  _quadroDrag = { nodeId: el.dataset.nodeId, missionId: el.dataset.missionId, fromStatus: el.dataset.status };
+  _quadroDrag = { extId: el.dataset.extId };
   el.classList.add('dragging');
   ev.dataTransfer.effectAllowed = 'move';
 }
@@ -2249,34 +2252,34 @@ function quadroDragLeave(ev) {
   ev.currentTarget.classList.remove('drag-over');
 }
 
-async function quadroDrop(ev, targetStatus) {
+async function quadroDrop(ev) {
   ev.preventDefault();
-  ev.currentTarget.classList.remove('drag-over');
+  const col = ev.currentTarget;
+  col.classList.remove('drag-over');
   const drag = _quadroDrag;
   _quadroDrag = null;
-  if (!drag) return;
-  if (targetStatus === drag.fromStatus) return;
-  if (targetStatus === 'running') {
-    showToast('"Em andamento" é calculado automaticamente — não dá pra arrastar pra essa coluna.', 'warning');
-    return;
-  }
-  const done = targetStatus === 'done';
+  if (!drag || !drag.extId) return;
+  const setStatus = col.dataset.setStatus;   // status-alvo da coluna
+  if (!setStatus) return;
   try {
-    const r = await fetch(`${API}/missions/${drag.missionId}/nodes/${drag.nodeId}/done`, {
+    const r = await fetch(`${API}/tasks/${encodeURIComponent(drag.extId)}/status`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ done }),
+      body: JSON.stringify({ status: setStatus, note: 'movido no Quadro' }),
+      signal: AbortSignal.timeout(8000),
     });
-    if (!r.ok) {
-      const data = await r.json().catch(() => ({}));
-      showToast(data.message || 'Não consegui mover essa tarefa.', 'error');
-      return;
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.ok) {
+      if (d.unchanged) { /* sem mudança */ }
+      else if (setStatus === 'completed') showToast('Entidade concluída. Digest gerado.', 'success');
+      else showToast(`Movido para "${setStatus}".`, 'success');
+      refreshStats();
+    } else {
+      showToast(d.error || 'Não consegui mover essa tarefa.', 'warning');
     }
-    const node = (_quadroNodes[drag.missionId] || []).find(n => n.id === drag.nodeId);
-    if (node) { node.status = targetStatus; node.pct = done ? 100 : 0; }
-    renderQuadro();
   } catch {
-    showToast('Backend offline — não consegui salvar.', 'error');
+    showToast('Backend offline — não consegui mover.', 'error');
   }
+  renderQuadro();
 }
 
 function renderMissionsList() {

@@ -97,6 +97,52 @@ def generate_task_digest(task_id: str) -> str:
     )
 
 
+_BOARD_STATUSES = {"pending", "in_progress", "gate_approved", "completed", "killed"}
+
+
+def change_task_status(task_id: str, status: str, note: str = "", actor: str = "murillo") -> dict:
+    """Muda o status da task (operação do Quadro). Regras:
+    - completed/killed reusam `complete_task` (não duplica morte/digest);
+    - task encerrada NÃO volta pra pending por aqui (precisaria de endpoint próprio);
+    - idempotente: mesmo status = no-op.
+    Registra evento `status_changed` no Journey Log e `task_status_changed` em action_logs."""
+    import repositories as repo
+    status = (status or "").strip()
+    if status not in _BOARD_STATUSES:
+        return {"ok": False, "error": f"status inválido: '{status}'"}
+    task = repo.tasks.get_task(task_id)
+    if not task:
+        return {"ok": False, "error": f"task '{task_id}' não encontrada"}
+    cur = task.get("status")
+
+    # bloqueia reabrir entidade encerrada
+    if cur in ("completed", "killed") and status not in ("completed", "killed"):
+        return {"ok": False, "error": "task encerrada — não dá pra reabrir por aqui", "status": cur}
+    # idempotência
+    if cur == status:
+        return {"ok": True, "status": cur, "unchanged": True}
+
+    # terminal → reusa o fluxo de morte/digest (não duplica regra)
+    if status in ("completed", "killed"):
+        return complete_task(task_id, note=note, actor=actor)
+
+    # mudança não-terminal
+    repo.tasks.set_status(task_id, status)
+    repo.task_events.add_event(
+        task_id, "status_changed", actor,
+        f"Status: {cur} → {status}" + (f" ({note})" if note else ""),
+        metadata={"from_status": cur, "to_status": status, "source": "board", "note": note},
+    )
+    try:
+        repo.logs.add(source="frontend", intent="task_status_changed", agent="",
+                      message=f"Task {task_id}: {cur} → {status}"
+                              + (f" (obs: {note[:80]})" if note else ""),
+                      status=status, approved=None)
+    except Exception:
+        pass
+    return {"ok": True, "status": status, "from": cur}
+
+
 def complete_task(task_id: str, note: str = "", actor: str = "murillo") -> dict:
     """Encerra a entidade: completed/killed + eventos + digest + log. Idempotente."""
     import repositories as repo

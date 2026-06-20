@@ -604,6 +604,21 @@ async def task_events(task_id: str):
         return JSONResponse({"error": str(e), "events": [], "total": 0}, status_code=500)
 
 
+class StatusRequest(BaseModel):
+    status: str
+    note: str = ""
+
+
+@app.post("/tasks/{task_id}/status")
+async def task_set_status(task_id: str, req: StatusRequest):
+    """Muda o status da task (operação do Quadro) via SQLite. completed/killed
+    reusam o fluxo de conclusão/digest. Sem integração externa."""
+    import task_lifecycle
+    out = await run_in_threadpool(task_lifecycle.change_task_status, task_id, req.status, req.note or "")
+    code = 200 if out.get("ok") else 409
+    return JSONResponse(out, status_code=code)
+
+
 class CompleteRequest(BaseModel):
     note: str = ""
 
