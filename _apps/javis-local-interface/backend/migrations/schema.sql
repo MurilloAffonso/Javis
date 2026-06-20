@@ -36,8 +36,10 @@ CREATE TABLE IF NOT EXISTS tasks (
     ext_id       TEXT UNIQUE,                     -- id do mission_board (node id)
     mission      TEXT,                            -- slug da missão
     title        TEXT NOT NULL,
-    status       TEXT DEFAULT 'pending',          -- pending | running | done | completed | killed
+    status       TEXT DEFAULT 'pending',          -- pending | running | done | gate_approved | completed | killed
     source       TEXT DEFAULT 'backlog',          -- backlog | chat | flow
+    agent        TEXT,                            -- agente/dono, se houver
+    project_id   TEXT,                            -- projeto (slug), se houver
     completed_at TEXT,                            -- quando foi concluída
     killed_at    TEXT,                            -- quando a entidade "morreu"
     digest_text  TEXT,                            -- resumo final (AI Digest)

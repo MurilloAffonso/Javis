@@ -48,6 +48,8 @@ def init_db() -> None:
                 "ALTER TABLE tasks ADD COLUMN completed_at TEXT",
                 "ALTER TABLE tasks ADD COLUMN killed_at TEXT",
                 "ALTER TABLE tasks ADD COLUMN digest_text TEXT",
+                "ALTER TABLE tasks ADD COLUMN agent TEXT",
+                "ALTER TABLE tasks ADD COLUMN project_id TEXT",
             ):
                 try:
                     conn.execute(col_sql)

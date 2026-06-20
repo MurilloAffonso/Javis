@@ -36,20 +36,42 @@ def seed_agents() -> None:
         pass
 
 
+# mission slug → projeto (slug). Default = javis.
+_MISSION_PROJECT = {
+    "pipeline-marketing-vem-passear-jampa": "vem-passear-jampa",
+    "conte-do-vem-passear-jampa": "vem-passear-jampa",
+    "c-rebro-jampa-seo": "vem-passear-jampa",
+}
+
+
+def _project_for(mission: str) -> str:
+    return _MISSION_PROJECT.get(mission, "javis")
+
+
 def sync_tasks() -> int:
-    """Espelha as tarefas do Quadro (mission_board) na tabela tasks. Retorna nº sincronizado."""
+    """Espelha as tarefas do Quadro (mission_board) na tabela tasks. Retorna nº sincronizado.
+
+    IMPORTANTE: NÃO rebaixa status terminais (completed/killed/gate_approved) que
+    o ciclo de vida do SQLite já definiu — só atualiza o que vem do backlog
+    (pending/done). Assim o Markdown segue como fallback sem apagar o estado real."""
     import repositories as repo
     n = 0
     try:
         import mission_board
         for m in mission_board.get_missions():
+            mid = m.get("id", "")
+            proj = _project_for(mid)
             for node in m.get("nodes", []):
+                ext = node.get("id", "")
+                existing = repo.tasks.get_task(ext)
+                # não sobrescreve status terminal já definido no SQLite
+                if existing and existing.get("status") in ("completed", "killed", "gate_approved"):
+                    status = existing["status"]
+                else:
+                    status = node.get("status", "pending")
                 repo.tasks.upsert(
-                    ext_id=node.get("id", ""),
-                    title=node.get("label", "")[:300],
-                    status=node.get("status", "pending"),
-                    mission=m.get("id", ""),
-                    source="backlog",
+                    ext_id=ext, title=node.get("label", "")[:300], status=status,
+                    mission=mid, source="backlog", project_id=proj,
                 )
                 n += 1
     except Exception:

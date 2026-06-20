@@ -1714,7 +1714,7 @@ body::before {
 }
 
 .quadro-board {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
   padding: 4px; align-items: start; overflow-x: auto;
 }
 .quadro-col {
@@ -1753,6 +1753,17 @@ body::before {
   padding: 2px 7px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 78%;
 }
 .qcard-pct { font-size: 10px; font-weight: 700; color: var(--progress); }
+.qcard.q-approved  { border-left-color: var(--violet); }
+.qcard.q-completed { border-left-color: #ef4444; }
+.qcard.q-completed .qcard-text { color: var(--text-mid); }
+.qcard-st { font-size: 9.5px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: .03em; }
+.qcard-actions { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.qcard-jbtn {
+  background: none; border: none; padding: 0; color: var(--violet);
+  font-size: 10.5px; cursor: pointer; text-decoration: underline;
+}
+.qcard-jbtn:hover { opacity: .8; }
+.qcard-digest { font-size: 9.5px; color: var(--emerald); }
 
 .quadro-empty { color: var(--text-dim); font-size: 13px; padding: 30px; text-align: center; grid-column: 1 / -1; }
 

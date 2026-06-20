@@ -558,6 +558,34 @@ async def stats():
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+@app.get("/tasks")
+async def tasks_list(status: str = "", workflow: str = "", agent: str = "", project_id: str = ""):
+    """Tasks do Quadro — SQLite é a FONTE PRINCIPAL. Markdown (mission_board) é
+    fallback: se o SQLite estiver vazio, sincroniza do backlog antes de responder.
+    Filtros opcionais: status, workflow (=mission), agent, project_id."""
+    try:
+        import repositories as repo
+        if repo.tasks.count() == 0:           # fallback: popula do Markdown
+            import db_sync
+            db_sync.sync_tasks()
+        rows = repo.tasks.for_board(status=status, workflow=workflow, agent=agent, project_id=project_id)
+        out = []
+        for r in rows:
+            digest = (r.get("digest_text") or "").strip()
+            out.append({
+                "id": r.get("id"), "ext_id": r.get("ext_id"), "title": r.get("title"),
+                "status": r.get("status"), "agent": r.get("agent_eff") or "",
+                "workflow": r.get("workflow") or r.get("mission") or "",
+                "project_id": r.get("project_id") or "",
+                "created_at": r.get("created_at"), "updated_at": r.get("updated_at"),
+                "completed_at": r.get("completed_at"), "killed_at": r.get("killed_at"),
+                "has_digest": bool(digest),
+            })
+        return JSONResponse({"tasks": out, "total": len(out), "source": "sqlite"})
+    except Exception as e:
+        return JSONResponse({"error": str(e), "tasks": [], "total": 0}, status_code=500)
+
+
 @app.get("/tasks/{task_id}/events")
 async def task_events(task_id: str):
     """Journey Log: timeline cronológica dos eventos de uma task (+ status/digest)."""

@@ -30,14 +30,42 @@ class _Messages:
 # ── tasks ─────────────────────────────────────────────────────────────────
 class _Tasks:
     def upsert(self, ext_id: str, title: str, status: str = "pending",
-               mission: str = "", source: str = "backlog") -> int:
-        """Insere ou atualiza por ext_id (id do mission_board) — mantém o Quadro espelhado."""
+               mission: str = "", source: str = "backlog",
+               agent: str | None = None, project_id: str | None = None) -> int:
+        """Insere ou atualiza por ext_id (id do mission_board) — mantém o Quadro espelhado.
+        agent/project_id só são sobrescritos se vierem (COALESCE preserva o existente)."""
         return db.execute(
-            "INSERT INTO tasks(ext_id, mission, title, status, source) VALUES(?,?,?,?,?) "
+            "INSERT INTO tasks(ext_id, mission, title, status, source, agent, project_id) "
+            "VALUES(?,?,?,?,?,?,?) "
             "ON CONFLICT(ext_id) DO UPDATE SET status=excluded.status, "
-            "title=excluded.title, mission=excluded.mission, updated_at=datetime('now')",
-            (ext_id, mission, title, status, source),
+            "title=excluded.title, mission=excluded.mission, "
+            "agent=COALESCE(excluded.agent, tasks.agent), "
+            "project_id=COALESCE(excluded.project_id, tasks.project_id), "
+            "updated_at=datetime('now')",
+            (ext_id, mission, title, status, source, agent, project_id),
         )
+
+    def for_board(self, status: str = "", workflow: str = "", agent: str = "",
+                  project_id: str = "") -> list[dict]:
+        """Tasks pro Quadro, com filtros opcionais. `workflow` filtra pela mission.
+        Deriva `agent` do Journey Log quando a coluna está vazia."""
+        sql = (
+            "SELECT t.*, t.mission AS workflow, "
+            "COALESCE(t.agent, (SELECT e.agent_id FROM task_events e "
+            "WHERE e.task_id=t.ext_id AND e.agent_id IS NOT NULL ORDER BY e.id LIMIT 1)) AS agent_eff "
+            "FROM tasks t WHERE 1=1"
+        )
+        params: list = []
+        if status:
+            sql += " AND t.status=?"; params.append(status)
+        if workflow:
+            sql += " AND t.mission=?"; params.append(workflow)
+        if agent:
+            sql += " AND COALESCE(t.agent,'')=?"; params.append(agent)
+        if project_id:
+            sql += " AND t.project_id=?"; params.append(project_id)
+        sql += " ORDER BY t.id"
+        return db.query(sql, tuple(params))
 
     def set_status(self, ext_id: str, status: str) -> int:
         return db.execute(

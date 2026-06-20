@@ -101,7 +101,7 @@ async function loadApprovals() {
 function _approvalCard(a) {
   const task = a.task_id ? `<div class="ap-task">tarefa: ${esc(a.task_id)}</div>` : '';
   const journeyBtn = a.task_id
-    ? `<button class="ap-journey-btn" onclick="viewJourney('${esc(a.task_id)}', ${a.id})">Ver jornada</button>` : '';
+    ? `<button class="ap-journey-btn" onclick="viewJourney('${esc(a.task_id)}', 'ap-journey-${a.id}')">Ver jornada</button>` : '';
   return `<div class="ap-card" id="ap-${a.id}">
     <div class="ap-subject">${esc(a.subject || '')}</div>
     <div class="ap-meta">${a.agent ? 'agente: ' + esc(a.agent) : ''}</div>
@@ -118,8 +118,9 @@ function _approvalCard(a) {
 }
 
 // Journey Log: timeline simples da task (horário · ator · evento · mensagem).
-async function viewJourney(taskId, apId) {
-  const host = document.getElementById(`ap-journey-${apId}`);
+// hostId = id do container onde a jornada é renderizada (serve aprovação E Quadro).
+async function viewJourney(taskId, hostId) {
+  const host = document.getElementById(hostId);
   if (!host) return;
   if (host.dataset.open === '1') { host.innerHTML = ''; host.dataset.open = '0'; return; } // toggle fecha
   host.innerHTML = '<span class="ap-spin">carregando jornada…</span>';
@@ -137,7 +138,7 @@ async function viewJourney(taskId, apId) {
     if (encerrada && d.digest_text) {
       footer = `<div class="jn-digest"><div class="jn-digest-h">📄 Digest da entidade</div><pre class="jn-digest-b">${esc(d.digest_text)}</pre></div>`;
     } else if (!encerrada) {
-      footer = `<button class="jn-complete-btn" onclick="completeTask('${esc(taskId)}', ${apId})">Concluir entidade</button>`;
+      footer = `<button class="jn-complete-btn" onclick="completeTask('${esc(taskId)}', '${esc(hostId)}')">Concluir entidade</button>`;
     } else {
       footer = '';
     }
@@ -149,7 +150,7 @@ async function viewJourney(taskId, apId) {
 }
 
 // Encerra a entidade-tarefa (completed/killed) e re-renderiza mostrando o digest.
-async function completeTask(taskId, apId) {
+async function completeTask(taskId, hostId) {
   try {
     const r = await fetch(`${API}/tasks/${encodeURIComponent(taskId)}/complete`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -161,9 +162,10 @@ async function completeTask(taskId, apId) {
   } catch (e) {
     showToast('Falhou ao concluir: ' + e, 'error');
   }
-  const host = document.getElementById(`ap-journey-${apId}`);
+  const host = document.getElementById(hostId);
   if (host) host.dataset.open = '0';   // força re-render (mostra o digest)
-  viewJourney(taskId, apId);
+  viewJourney(taskId, hostId);
+  if (document.getElementById('view-quadro')?.classList.contains('active')) setTimeout(renderQuadro, 600);
 }
 
 function _journeyRow(e) {
@@ -2136,85 +2138,92 @@ let _selectedMissionId = null;
 // Arrastar entre Pendente/Concluído grava de volta no checkbox real do backlog
 // (POST /missions/{id}/nodes/{id}/done). "Em andamento" é sempre calculado —
 // não tem checkbox pra editar, então não aceita drop nem é arrastável.
+// Quadro agora lê do SQLite (GET /tasks). 4 colunas; cada status mapeia numa coluna.
 const QUADRO_COLUMNS = [
-  { key:'pending', label:'Pendente',     icon:'📥' },
-  { key:'running', label:'Em andamento', icon:'⚙️' },
-  { key:'done',    label:'Concluído',    icon:'✅' },
+  { key:'pending',   label:'Pendente',            icon:'📥', status:['pending'] },
+  { key:'running',   label:'Em andamento',        icon:'⚙️', status:['running'] },
+  { key:'approved',  label:'Aprovado/Destravado', icon:'🔓', status:['done','gate_approved'] },
+  { key:'completed', label:'Concluído/Morto',     icon:'🪦', status:['completed','killed'] },
 ];
-let _quadroFilter = 'all';
-const _quadroNodes = {};   // cache: missionId -> nodes[] (o /missions não traz nodes)
+let _quadroFilter = 'all';      // 'all' ou um workflow (mission slug)
 
 function setQuadroFilter(id) {
   _quadroFilter = id;
   renderQuadro();
 }
 
-// Busca os nodes de cada missão (o endpoint /missions os omite) em paralelo,
-// com cache pra não refazer rede a cada troca de filtro.
-async function _loadQuadroNodes() {
-  await Promise.all(MISSIONS.map(async m => {
-    if (_quadroNodes[m.id]) return;
-    try {
-      const r = await fetch(`${API}/missions/${m.id}/nodes`);
-      _quadroNodes[m.id] = r.ok ? ((await r.json()).nodes || []) : [];
-    } catch { _quadroNodes[m.id] = []; }
-  }));
+function _qColForStatus(status) {
+  const s = status || 'pending';
+  const col = QUADRO_COLUMNS.find(c => c.status.includes(s));
+  return col ? col.key : 'pending';
 }
 
 async function renderQuadro() {
   const board = document.getElementById('quadro-board');
   if (!board) return;
-  if (!MISSIONS.length) {
-    board.innerHTML = '<div class="quadro-empty">Carregando missões…</div>';
-    await fetchMissions();
-  }
-  await _loadQuadroNodes();
-  // Achata todos os nodes num único pool, carregando a missão de origem em cada card.
-  const cards = [];
-  MISSIONS.forEach(m => {
-    if (_quadroFilter !== 'all' && m.id !== _quadroFilter) return;
-    (_quadroNodes[m.id] || []).forEach(n => {
-      cards.push({ ...n, missionId: m.id, missionName: m.name });
-    });
-  });
+  board.innerHTML = '<div class="quadro-empty">Carregando tarefas…</div>';
 
-  // Filtros: "Todas" + uma chip por missão.
+  // FONTE PRINCIPAL: SQLite via GET /tasks (com fallback Markdown no backend).
+  let tasks = [];
+  try {
+    const qs = _quadroFilter !== 'all' ? `?workflow=${encodeURIComponent(_quadroFilter)}` : '';
+    const r = await fetch(`${API}/tasks${qs}`, { signal: AbortSignal.timeout(6000) });
+    tasks = (await r.json()).tasks || [];
+  } catch {
+    board.innerHTML = '<div class="quadro-empty">Não consegui carregar as tarefas (backend offline?).</div>';
+    return;
+  }
+
+  // Filtros por workflow (a partir dos próprios dados — sem depender de /missions).
   const filters = document.getElementById('quadro-filters');
   if (filters) {
+    // pra montar as chips, busca a lista completa (sem filtro) uma vez
+    let allWf = [];
+    try {
+      const ra = await fetch(`${API}/tasks`, { signal: AbortSignal.timeout(6000) });
+      allWf = [...new Set(((await ra.json()).tasks || []).map(t => t.workflow).filter(Boolean))];
+    } catch { allWf = []; }
     filters.innerHTML =
       `<button class="qfilter ${_quadroFilter==='all'?'active':''}" onclick="setQuadroFilter('all')">Todas</button>` +
-      MISSIONS.map(m => `<button class="qfilter ${_quadroFilter===m.id?'active':''}" onclick="setQuadroFilter('${m.id}')" title="${esc(m.name)}">${esc(m.name.length>22?m.name.slice(0,22)+'…':m.name)}</button>`).join('');
+      allWf.map(w => `<button class="qfilter ${_quadroFilter===w?'active':''}" onclick="setQuadroFilter('${esc(w)}')" title="${esc(w)}">${esc(w.length>22?w.slice(0,22)+'…':w)}</button>`).join('');
   }
 
-  if (!cards.length) {
-    board.innerHTML = '<div class="quadro-empty">Nenhuma tarefa nas missões — o backlog do Codex está vazio ou o backend está offline.</div>';
+  if (!tasks.length) {
+    board.innerHTML = '<div class="quadro-empty">Nenhuma tarefa — o SQLite está vazio e o backlog do Codex também.</div>';
     return;
   }
 
   board.innerHTML = QUADRO_COLUMNS.map(col => {
-    const colCards = cards.filter(c => (c.status || 'pending') === col.key);
-    // "Em andamento" é calculado (treinamento/projetos externos não têm checkbox
-    // pra editar) — só pending/done vêm do backlog real e podem ser arrastados.
+    const colCards = tasks.filter(t => _qColForStatus(t.status) === col.key);
     return `
-      <div class="quadro-col q-col-${col.key}" data-col="${col.key}" ondragover="quadroDragOver(event)" ondragleave="quadroDragLeave(event)" ondrop="quadroDrop(event,'${col.key}')">
+      <div class="quadro-col q-col-${col.key}" data-col="${col.key}">
         <div class="qcol-head">
           <span class="qcol-title">${col.icon} ${col.label}</span>
           <span class="qcol-count">${colCards.length}</span>
         </div>
         <div class="qcol-cards">
-          ${colCards.map(c => `
-            <div class="qcard q-${col.key}" title="${esc(c.full_text || c.label)}" draggable="${col.key !== 'running'}" data-node-id="${c.id}" data-mission-id="${c.missionId}" data-status="${col.key}" ondragstart="quadroDragStart(event)" ondragend="quadroDragEnd(event)">
-              <div class="qcard-text">${esc(c.label)}</div>
-              <div class="qcard-foot">
-                <span class="qcard-tag">${esc(c.missionName.length>26?c.missionName.slice(0,26)+'…':c.missionName)}</span>
-                ${col.key==='running' && c.pct ? `<span class="qcard-pct">${c.pct}%</span>` : ''}
-              </div>
-            </div>
-          `).join('') || '<div class="qcol-empty">—</div>'}
+          ${colCards.map(_quadroCard).join('') || '<div class="qcol-empty">—</div>'}
         </div>
       </div>
     `;
   }).join('');
+}
+
+function _quadroCard(t) {
+  const ext = esc(t.ext_id || '');
+  const hostId = `qj-${(t.ext_id || '').replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+  const encerrada = t.status === 'completed' || t.status === 'killed';
+  const digest = t.has_digest ? '<span class="qcard-digest" title="tem digest">📄 digest</span>' : '';
+  const journeyBtn = `<button class="qcard-jbtn" onclick="viewJourney('${ext}', '${hostId}')">Ver jornada</button>`;
+  return `<div class="qcard q-${_qColForStatus(t.status)}" title="${esc(t.title || '')}">
+    <div class="qcard-text">${esc(t.title || '')}</div>
+    <div class="qcard-foot">
+      <span class="qcard-tag">${esc(t.agent || t.workflow || '—')}</span>
+      <span class="qcard-st">${esc(t.status || '')}</span>
+    </div>
+    <div class="qcard-actions">${journeyBtn}${digest}</div>
+    <div class="ap-journey" id="${hostId}" data-open="0"></div>
+  </div>`;
 }
 
 // ─── Drag-and-drop do Quadro: arrastar grava de volta no backlog real ───
