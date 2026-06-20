@@ -53,6 +53,38 @@ Depois (mais trabalho, mais valor): **Google Calendar/Gmail** para virar um assi
 
 ---
 
+## D) ElevenLabs — aprofundado a pedido de Murillo (16/06, madrugada)
+
+Murillo pediu pra olhar a org `github.com/elevenlabs` direto e ver se dá pra
+plugar no orquestrador (Codex/Claude), não só no TTS do app. Mapeei os
+repositórios reais da org (`gh api orgs/elevenlabs/repos`) e achei 3 encaixes
+concretos, cada um resolvendo uma parte diferente do pedido:
+
+| Repo | O que resolve | Encaixe no Javis |
+|------|----------------|-------------------|
+| **[elevenlabs-mcp](https://github.com/elevenlabs/elevenlabs-mcp)** (1.4k⭐) | MCP server oficial — TTS, clonagem de voz, STT, soundscapes | Conecta DIRETO em mim (Claude Code) e no Codex como ferramenta MCP. Eu/Codex passamos a poder gerar voz de verdade, clonar, transcrever — sem precisar do backend do Javis no meio. `uvx elevenlabs-mcp` + `ELEVENLABS_API_KEY` no config do client MCP. |
+| **[plugins (elevenlabs-stt)](https://github.com/elevenlabs/claude-plugins)** | Plugin oficial de Claude Code — STT por hotkey (Ctrl+Shift+Space) | Murillo fala DIRETO comigo (Claude Code) sem teclar — `/plugin marketplace add elevenlabs/claude-plugins` + `/plugin install elevenlabs-stt`. |
+| **[packages — ElevenAgents SDK](https://github.com/elevenlabs/packages)** | `@elevenlabs/client`/`react` — Conversational AI real-time (WebRTC), function-calling nativo (client tools), baixa latência | É o caminho pra "captar e raciocinar através da fala em tempo real" que Murillo descreveu — um agente de voz configurado no painel do ElevenLabs que chama as MESMAS tools do Javis (`agent.py`) como "client tools". Maior esforço: precisa criar o Agent no dashboard ElevenLabs (agentId) e migrar o front de Whisper+TTS-OpenAI pra esse SDK. |
+
+**O que já preparei no código (sem key, então tudo inerte até Murillo plugar):**
+- `.env`: bloco `ELEVENLABS_API_KEY=` comentado, pronto pra receber a key.
+- `backend/voice_elevenlabs.py` (NOVO): adaptador `text_to_speech`,
+  `speech_to_text`, `list_voices` — mesmo padrão de degradação elegante do
+  `integrations.py` (sem key → `None`/`[]`, sem quebrar nada).
+- `integrations.available()` agora reporta `elevenlabs: bool` (aparece no
+  `/painel` quando a key existir).
+
+**O que falta SER DECISÃO do Murillo (não posso fazer sozinho):**
+1. Criar a conta ElevenLabs + pegar a key grátis (10k créditos/mês) →
+   colar em `.env`.
+2. Decidir se quer só upgrade de voz (fácil, já preparado) ou o redesenho
+   completo pra Conversational AI em tempo real com tool-calling (precisa
+   criar um Agent no dashboard deles, é mais trabalho, mas é o que bate
+   exatamente com "raciocinando através da fala em tempo real").
+3. Se quiser eu/Codex usando ElevenLabs como ferramenta MCP (gerar/clonar voz
+   direto nas nossas sessões), aí é configurar o `elevenlabs-mcp` no
+   `claude_desktop_config.json` (ou no MCP do Codex) com a mesma key.
+
 ## Como decidir tecnicamente
 
 `backend/integrations.py` já tem `available()` que detecta quais keys existem no `.env`. Conforme você for plugando, cada ação tenta a API e cai no fallback se não houver key — então dá pra crescer aos poucos sem quebrar nada.
