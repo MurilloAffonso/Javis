@@ -59,6 +59,12 @@ _SSE_PADDING = ":" + (" " * 2048) + "\n\n"
 async def _start_integrations():
     """Liga serviços de segundo plano: Telegram e checador de lembretes."""
     try:
+        import db_sync
+        res = db_sync.bootstrap()
+        print(f"  SQLite: persistência pronta {res} [ok]")
+    except Exception as e:
+        print(f"  SQLite: bootstrap falhou ({e})")
+    try:
         import telegram_bridge
         if telegram_bridge.start_background():
             print("  Telegram: conectado [ok]")
@@ -440,6 +446,7 @@ async def chat(req: ChatRequest):
     _save(entry)
     history_store.append("user", text)
     history_store.append("assistant", out["text"])
+    _persist_messages(text, out)  # dual-write SQLite (não quebra se falhar)
     return JSONResponse(entry)
 
 
@@ -531,6 +538,24 @@ async def status():
         "brain": {"engine": "claude", "status": "online" if brain_ok else "offline"},
         "ts": _ts(),
     })
+
+
+@app.get("/stats")
+async def stats():
+    """Contadores REAIS pra UI (vêm do SQLite, não de texto fixo)."""
+    try:
+        import repositories as repo
+        return JSONResponse({
+            "messages":         repo.messages.count(),
+            "agents":           repo.agents.count(),
+            "tasks_total":      repo.tasks.count(),
+            "tasks_pending":    repo.tasks.count("pending"),
+            "tasks_done":       repo.tasks.count("done"),
+            "approvals_pending": repo.approvals.count_pending(),
+            "projects":         repo.projects.count(),
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 @app.get("/agents")
@@ -891,6 +916,7 @@ async def chat_stream(req: ChatRequest):
             _save(entry)
             history_store.append("user", text)
             history_store.append("assistant", out["text"])
+            _persist_messages(text, out)  # dual-write SQLite
             yield f"data: {_j.dumps({'type':'done','brain':out['brain'],'intent':out['intent'],'ms':entry['ms']})}\n\n"
         except Exception as e:
             yield f"data: {_j.dumps({'type':'done','text':f'⚠️ Erro interno: {e}','brain':brain0,'intent':intent0,'ms':0})}\n\n"
@@ -1280,6 +1306,17 @@ def _brain(text: str, history: list[dict], use_conclave: bool = False) -> dict:
         txt = f"Estou sem cérebro disponível, senhor: {e}"
     return {"text": txt, "intent": intent, "brain": "main", "status": "llm",
             "tools": [], "route": route, "orch": None}
+
+
+def _persist_messages(user_text: str, out: dict) -> None:
+    """Dual-write das mensagens no SQLite. Nunca quebra o chat se falhar."""
+    try:
+        import repositories as repo
+        repo.messages.add("user", user_text, source="chat")
+        repo.messages.add("assistant", out.get("text", ""), brain=out.get("brain", ""),
+                          intent=out.get("intent", ""), source="chat")
+    except Exception:
+        pass
 
 
 def _entry_from_brain(text: str, out: dict, start: datetime) -> dict:

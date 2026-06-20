@@ -440,6 +440,17 @@ def _fluxo_pauta_vp() -> str:
     except Exception as e:
         _log(f"gerar_pauta_vp: quadro não atualizou: {e}")
 
+    # persiste no SQLite: task espelhada + APROVAÇÃO pendente (Gate 1)
+    try:
+        import repositories as repo
+        repo.tasks.set_status("pipeline-marketing-vem-passear-jampa-t0", "done")
+        repo.approvals.add(
+            subject="Aprovar a pauta da semana da Vem Passear (Gate 1) antes de ir pro Design",
+            kind="gate", agent="nova", detail="_projetos/cerebro-jampa/posts/pauta-semana.md",
+        )
+    except Exception as e:
+        _log(f"gerar_pauta_vp: persistência SQLite falhou: {e}")
+
     # log do fluxo
     try:
         import logger

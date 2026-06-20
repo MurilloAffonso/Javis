@@ -48,3 +48,15 @@ def log(
 
     with log_file.open("a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+    # Dual-write SQLite (consultável). Nunca quebra o log JSONL se falhar.
+    try:
+        import repositories as repo
+        repo.logs.add(
+            source=source, intent=route.get("intent") or "",
+            message=action_result.get("message") or "",
+            status=action_result.get("status") or "",
+            agent=_extra.get("agente", ""), approved=approved, latency_ms=duration_ms,
+        )
+    except Exception:
+        pass

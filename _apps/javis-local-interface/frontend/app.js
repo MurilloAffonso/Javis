@@ -58,11 +58,25 @@ document.querySelectorAll(".ag-card[data-id]").forEach(card => {
 
 // ─── Init ────────────────────────────────────────────────
 checkStatus();
+refreshStats();
 setInterval(checkStatus, 30000);
+setInterval(refreshStats, 30000);
 setInterval(_tickSession, 1000);
 setInterval(pollReminders, 15000);
 loadChatHistory().then(loadBriefing);
 loadEngine();
+
+// Contadores REAIS do topo (vêm do SQLite via /stats, não mais fixos).
+async function refreshStats() {
+  try {
+    const r = await fetch(`${API}/stats`, { signal: AbortSignal.timeout(4000) });
+    const s = await r.json();
+    const msgs = document.getElementById('stat-count');
+    const ags  = document.getElementById('stat-agents');
+    if (msgs && typeof s.messages === 'number') msgs.textContent = s.messages;
+    if (ags  && typeof s.agents   === 'number') ags.textContent  = s.agents;
+  } catch { /* mantém o valor atual se /stats falhar */ }
+}
 
 // Motor de execução (Claude assinatura x Codex assinatura): botão manual,
 // pra trocar quando a cota de um acabar (server.py: GET/POST /brain/active).

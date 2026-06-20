@@ -57,6 +57,11 @@ _memoria/perfil.json
 _memoria/lembretes.json
 _memoria/decisao-*.md
 
+# Banco SQLite — estado de runtime, regenerável por db_sync.bootstrap()
+_apps/**/_data/javis.db
+_apps/**/_data/javis.db-wal
+_apps/**/_data/javis.db-shm
+
 # Artefatos de teste / screenshots descartáveis
 *.png
 *.jpeg
