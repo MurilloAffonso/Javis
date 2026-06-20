@@ -24,6 +24,17 @@ def _log(msg: str) -> None:
     import sys
     print(f"[agent] {msg}", file=sys.stderr, flush=True)
 
+
+def _journey(task_id: str, event_type: str, actor: str = "system", message: str = "",
+             agent_id: str | None = None, metadata: dict | None = None) -> None:
+    """Registra um evento no Journey Log da task. Nunca quebra o fluxo se falhar."""
+    try:
+        import repositories as repo
+        repo.task_events.add_event(task_id, event_type, actor, message,
+                                   agent_id=agent_id, metadata=metadata)
+    except Exception:
+        pass
+
 SYSTEM_AGENT = """Você é Jamba, assistente pessoal de Murillo Affonso.
 
 REGRAS ABSOLUTAS — NUNCA VIOLAR:
@@ -405,6 +416,13 @@ def _fluxo_pauta_vp() -> str:
     from pathlib import Path
     inicio = time.time()
     cj = Path(__file__).resolve().parents[3] / "_projetos" / "cerebro-jampa"
+    pauta_task = "pipeline-marketing-vem-passear-jampa-t0"  # âncora da jornada
+
+    # Journey Log: nascimento da task + intenção detectada
+    _journey(pauta_task, "task_created", "system",
+             "Pedido recebido: montar a pauta da semana da Vem Passear")
+    _journey(pauta_task, "intent_detected", "system",
+             "Intenção: gerar_pauta_vp (fluxo de conteúdo VP)")
 
     pedido = (
         "Monte a PAUTA DA SEMANA com EXATAMENTE 3 posts pro Instagram da Vem Passear, "
@@ -413,6 +431,8 @@ def _fluxo_pauta_vp() -> str:
         "material visual necessário, CTA e hashtags. No fim, escreva 'Status: pauta "
         "proposta — aguardando aprovação do Murillo (Gate 1)'."
     )
+    _journey(pauta_task, "agent_called", "agent", "Nova acionada para montar a pauta",
+             agent_id="nova")
     try:
         import vp_squad
         r = vp_squad.run("nova", pedido)
@@ -428,6 +448,9 @@ def _fluxo_pauta_vp() -> str:
                   "Próximo: Gate 1 (aprovação do Murillo).\n\n")
         (cj / "posts").mkdir(parents=True, exist_ok=True)
         (cj / "posts" / "pauta-semana.md").write_text(header + r["result"], encoding="utf-8")
+        _journey(pauta_task, "file_generated", "agent",
+                 "Arquivo pauta-semana.md gerado", agent_id="nova",
+                 metadata={"arquivo": "_projetos/cerebro-jampa/posts/pauta-semana.md"})
     except Exception as e:
         return f"A Nova montou a pauta mas não consegui salvar, senhor: {e}"
 
@@ -443,12 +466,14 @@ def _fluxo_pauta_vp() -> str:
     # persiste no SQLite: task espelhada + APROVAÇÃO pendente (Gate 1)
     try:
         import repositories as repo
-        repo.tasks.set_status("pipeline-marketing-vem-passear-jampa-t0", "done")
+        repo.tasks.set_status(pauta_task, "done")
         repo.approvals.add(
             subject="Aprovar a pauta da semana da Vem Passear (Gate 1) antes de ir pro Design",
             kind="gate", agent="nova", detail="_projetos/cerebro-jampa/posts/pauta-semana.md",
-            task_id="pipeline-marketing-vem-passear-jampa-t1",
+            task_id=pauta_task,  # âncora da jornada (o card "Ver jornada" mostra a timeline da pauta)
         )
+        _journey(pauta_task, "approval_requested", "system",
+                 "Gate 1 solicitada — aguardando aprovação do Murillo", agent_id="nova")
     except Exception as e:
         _log(f"gerar_pauta_vp: persistência SQLite falhou: {e}")
 

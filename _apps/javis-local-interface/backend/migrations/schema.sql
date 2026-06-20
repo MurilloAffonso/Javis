@@ -85,7 +85,21 @@ CREATE TABLE IF NOT EXISTS memories (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
+-- Journey Log: cada tarefa vira uma entidade com timeline de eventos
+-- (nascimento → eventos → checkpoints → aprovação → avanço → conclusão).
+CREATE TABLE IF NOT EXISTS task_events (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id       TEXT NOT NULL,                  -- ext_id da task (ou slug do fluxo)
+    event_type    TEXT NOT NULL,                  -- task_created | agent_called | ...
+    actor         TEXT,                           -- 'system' | 'murillo' | 'agent'
+    agent_id      TEXT,                           -- agente envolvido, se houver
+    message       TEXT,
+    metadata_json TEXT,                           -- JSON livre (contexto extra)
+    created_at    TEXT DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
 CREATE INDEX IF NOT EXISTS idx_tasks_status     ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_approvals_status ON approvals(status);
 CREATE INDEX IF NOT EXISTS idx_logs_created     ON action_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_task_events_task ON task_events(task_id, id);

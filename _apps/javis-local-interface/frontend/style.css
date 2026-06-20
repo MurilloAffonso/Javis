@@ -1891,5 +1891,28 @@ body::before {
 .ap-warn { color: #f59e0b; }
 .ap-resolved { font-size: 11.5px; font-weight: 600; color: var(--text-mid); padding: 4px 2px; }
 .ap-effect { font-size: 10.5px; color: var(--emerald); padding: 0 2px 2px; }
+
+/* Journey Log: botão discreto + timeline simples no card de aprovação */
+.ap-journey-btn {
+  align-self: flex-start; background: none; border: none; padding: 0;
+  color: var(--violet); font-size: 10.5px; cursor: pointer; text-decoration: underline;
+}
+.ap-journey-btn:hover { opacity: .8; }
+.ap-journey:not(:empty) {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 5px;
+  padding: 6px; margin: 2px 0;
+}
+.jn-list { display: flex; flex-direction: column; gap: 4px; }
+.jn-row {
+  display: grid; grid-template-columns: 34px auto; gap: 2px 6px;
+  font-size: 10px; line-height: 1.25; padding-bottom: 3px;
+  border-bottom: 1px solid var(--border);
+}
+.jn-row:last-child { border-bottom: none; padding-bottom: 0; }
+.jn-time { color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.jn-type { color: var(--violet); font-weight: 600; }
+.jn-actor { grid-column: 1 / -1; color: var(--text-dim); font-size: 9.5px; }
+.jn-msg { grid-column: 1 / -1; color: var(--text-mid); }
+.jn-empty { font-size: 10.5px; color: var(--text-dim); }
 .ap-done-ok { border-color: rgba(34,197,94,.5); }
 .ap-done-no { border-color: rgba(239,68,68,.5); }

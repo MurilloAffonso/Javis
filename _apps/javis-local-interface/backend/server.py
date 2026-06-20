@@ -558,6 +558,17 @@ async def stats():
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+@app.get("/tasks/{task_id}/events")
+async def task_events(task_id: str):
+    """Journey Log: timeline cronológica dos eventos de uma task."""
+    try:
+        import repositories as repo
+        evs = repo.task_events.list_by_task(task_id)
+        return JSONResponse({"task_id": task_id, "events": evs, "total": len(evs)})
+    except Exception as e:
+        return JSONResponse({"error": str(e), "events": [], "total": 0}, status_code=500)
+
+
 @app.get("/approvals/pending")
 async def approvals_pending():
     """Aprovações pendentes (Gate humano) — do SQLite."""

@@ -100,16 +100,50 @@ async function loadApprovals() {
 
 function _approvalCard(a) {
   const task = a.task_id ? `<div class="ap-task">tarefa: ${esc(a.task_id)}</div>` : '';
+  const journeyBtn = a.task_id
+    ? `<button class="ap-journey-btn" onclick="viewJourney('${esc(a.task_id)}', ${a.id})">Ver jornada</button>` : '';
   return `<div class="ap-card" id="ap-${a.id}">
     <div class="ap-subject">${esc(a.subject || '')}</div>
     <div class="ap-meta">${a.agent ? 'agente: ' + esc(a.agent) : ''}</div>
     ${task}
+    ${journeyBtn}
+    <div class="ap-journey" id="ap-journey-${a.id}" data-open="0"></div>
     <input class="ap-note" id="ap-note-${a.id}" placeholder="observação (opcional)…" />
     <div class="ap-actions">
       <button class="ap-btn ap-approve" onclick="decideApproval(${a.id}, 'approved')">Aprovar</button>
       <button class="ap-btn ap-reject"  onclick="decideApproval(${a.id}, 'rejected')">Rejeitar</button>
     </div>
     <div class="ap-feedback" id="ap-fb-${a.id}"></div>
+  </div>`;
+}
+
+// Journey Log: timeline simples da task (horário · ator · evento · mensagem).
+async function viewJourney(taskId, apId) {
+  const host = document.getElementById(`ap-journey-${apId}`);
+  if (!host) return;
+  if (host.dataset.open === '1') { host.innerHTML = ''; host.dataset.open = '0'; return; } // toggle fecha
+  host.innerHTML = '<span class="ap-spin">carregando jornada…</span>';
+  try {
+    const r = await fetch(`${API}/tasks/${encodeURIComponent(taskId)}/events`, { signal: AbortSignal.timeout(5000) });
+    const d = await r.json();
+    const evs = d.events || [];
+    host.innerHTML = evs.length
+      ? '<div class="jn-list">' + evs.map(_journeyRow).join('') + '</div>'
+      : '<div class="jn-empty">Sem eventos registrados nesta tarefa ainda.</div>';
+    host.dataset.open = '1';
+  } catch (e) {
+    host.innerHTML = `<span class="ap-warn">Não consegui carregar a jornada: ${esc(String(e))}</span>`;
+  }
+}
+
+function _journeyRow(e) {
+  const hora = (e.created_at || '').slice(11, 16);  // HH:MM
+  const ator = esc(e.actor || '') + (e.agent_id ? '·' + esc(e.agent_id) : '');
+  return `<div class="jn-row">
+    <span class="jn-time">${esc(hora)}</span>
+    <span class="jn-type">${esc(e.event_type || '')}</span>
+    <span class="jn-actor">${ator}</span>
+    <span class="jn-msg">${esc(e.message || '')}</span>
   </div>`;
 }
 

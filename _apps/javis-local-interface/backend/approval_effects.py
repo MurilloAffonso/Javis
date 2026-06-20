@@ -14,9 +14,20 @@ NÃO chama Nova, NÃO gera criativo, NÃO toca integração externa.
 from __future__ import annotations
 
 _MISSION      = "pipeline-marketing-vem-passear-jampa"
+_PAUTA_TASK   = _MISSION + "-t0"   # âncora da jornada (a pauta)
 _GATE_TASK    = _MISSION + "-t1"   # [Gate 1 — aprovação Murillo]
 _DESIGN_TASK  = _MISSION + "-t2"   # [Design] Produzir os criativos da pauta aprovada
 _DESIGN_TITLE = "[Design] Produzir os criativos da pauta aprovada"
+
+
+def _journey(event_type: str, actor: str, message: str, agent_id=None, metadata=None) -> None:
+    """Evento no Journey Log da pauta (t0). Nunca quebra o efeito se falhar."""
+    try:
+        import repositories as repo
+        repo.task_events.add_event(_PAUTA_TASK, event_type, actor, message,
+                                   agent_id=agent_id, metadata=metadata)
+    except Exception:
+        pass
 
 
 def is_gate1_pauta_vp(approval: dict) -> bool:
@@ -78,6 +89,13 @@ def _advance(approval: dict) -> dict:
          f"'{_DESIGN_TITLE}' ({_DESIGN_TASK}) no workflow '{_MISSION}'",
          agent="estudio")
 
+    # Journey Log: aprovação → avanço → desbloqueio do Design
+    _journey("approval_approved", "murillo", f"Gate 1 aprovada (approval {aid})")
+    _journey("workflow_advanced", "system", "Workflow avançou: gate concluída")
+    _journey("design_task_unlocked", "system",
+             "Task de Design liberada para produção", agent_id="estudio",
+             metadata={"design_task": _DESIGN_TASK})
+
     return {"advanced": True, "design_task": _DESIGN_TASK, "design_title": _DESIGN_TITLE,
             "message": "Gate 1 aprovada. Produção de criativos destravada."}
 
@@ -87,6 +105,10 @@ def _reject(approval: dict) -> dict:
     _log("workflow_reject",
          f"Gate 1 rejeitada (approval {aid}) → pauta aguardando ajuste; "
          f"NÃO foi criada task de Design.", agent="nova", status="rejected")
+    # Journey Log: rejeição → ajuste necessário
+    _journey("approval_rejected", "murillo", f"Gate 1 rejeitada (approval {aid})")
+    _journey("adjustment_required", "system",
+             "Pauta aguardando ajuste da Nova antes de novo Gate", agent_id="nova")
     # sinal de ajuste, sem apagar nada
     try:
         import repositories as repo

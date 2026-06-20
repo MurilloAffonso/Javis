@@ -8,6 +8,7 @@ Tudo tolerante a falha: se o banco der erro, o chamador (dual-write) não quebra
 os arquivos JSON/Markdown seguem como fonte viva.
 """
 from __future__ import annotations
+import json as _json
 import db
 
 
@@ -166,6 +167,33 @@ class _Memories:
         return db.count("memories")
 
 
+# ── task_events (Journey Log) ─────────────────────────────────────────────
+class _TaskEvents:
+    def add_event(self, task_id: str, event_type: str, actor: str = "system",
+                  message: str = "", agent_id: str | None = None,
+                  metadata: dict | None = None) -> int:
+        meta = _json.dumps(metadata, ensure_ascii=False) if metadata else None
+        return db.execute(
+            "INSERT INTO task_events(task_id, event_type, actor, agent_id, message, metadata_json) "
+            "VALUES(?,?,?,?,?,?)",
+            (task_id, event_type, actor, agent_id, message, meta),
+        )
+
+    def list_by_task(self, task_id: str) -> list[dict]:
+        """Timeline em ordem cronológica. metadata_json vira dict em 'metadata'."""
+        rows = db.query("SELECT * FROM task_events WHERE task_id=? ORDER BY id", (task_id,))
+        for r in rows:
+            raw = r.get("metadata_json")
+            try:
+                r["metadata"] = _json.loads(raw) if raw else {}
+            except Exception:
+                r["metadata"] = {}
+        return rows
+
+    def count_by_task(self, task_id: str) -> int:
+        return db.count("task_events", "task_id=?", (task_id,))
+
+
 # instâncias prontas pra uso
 messages  = _Messages()
 tasks     = _Tasks()
@@ -175,3 +203,4 @@ agents    = _Agents()
 projects  = _Projects()
 workflows = _Workflows()
 memories  = _Memories()
+task_events = _TaskEvents()
