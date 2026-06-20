@@ -26,7 +26,6 @@ Documento de referência rápida para os módulos Python de produção do backen
 ## Voz
 
 - `voice_bridge.py` — classifica e executa transcrições de voz, usando o cérebro do servidor para intents seguros conforme a fase indicada no arquivo.
-- `voice_elevenlabs.py` — adaptador opcional da ElevenLabs para TTS, STT e voice cloning, com fallback quando não há chave configurada.
 
 ## Integrações e ações
 
@@ -44,7 +43,6 @@ Documento de referência rápida para os módulos Python de produção do backen
 - `mission_board.py` — monta o quadro real de orquestramento a partir do backlog do Codex e do log de execução, sem dados inventados.
 - `project_registry.py` — registra projetos externos por ponteiros somente leitura, sem absorver nem alterar esses projetos.
 - `trend_scout.py` — coleta matéria-prima de estudo por área, buscando vídeos de tendência e repositórios relevantes para `_treinamento/`.
-- `codex_orchestrator.py` — lê o backlog em `_data/codex_backlog.md` e executa a próxima tarefa pendente via Codex CLI.
 - `code_agent.py` — dispara tarefas de programação para o Codex CLI em segundo plano e notifica quando termina.
 - `skill_forge.py` — pipeline Nero que transforma transcrição de especialista em rascunho de `SKILL.md`, com Score de Fidelidade e aprovação humana.
 - `jampa_squad.py` — runtime de agentes nomeados do Jampa Jarvis, carregando skills do vault CEREBRO.JAMPA em modo somente leitura.
@@ -59,4 +57,3 @@ Documento de referência rápida para os módulos Python de produção do backen
 - `logger.py` — grava eventos em JSONL com rotação diária em `logs/actions-YYYY-MM-DD.jsonl`.
 - `command_router.py` — classifica intenções por palavras-chave, sem LLM.
 - `reminders.py` — gerencia lembretes e timers em JSON, com fila de vencidos para interface e envio opcional pelo Telegram.
-- `main.py` — CLI v0 da Javis Local Interface, implementada apenas com biblioteca padrão.

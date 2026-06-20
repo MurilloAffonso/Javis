@@ -170,6 +170,28 @@ body {
   cursor: pointer; outline: none; transition: border-color 0.2s;
 }
 .model-sel:focus { border-color: var(--cyan); }
+
+.engine-toggle {
+  display: flex; gap: 6px; margin-bottom: 8px;
+}
+.engine-btn {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  color: var(--text-dim);
+  border-radius: var(--radius);
+  padding: 7px 0;
+  font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: all 0.2s;
+}
+.engine-btn:hover { border-color: rgba(0,229,255,0.25); }
+.engine-btn.active {
+  color: var(--cyan); border-color: var(--cyan);
+  background: rgba(0,229,255,0.06); box-shadow: 0 0 12px rgba(0,229,255,0.08);
+}
+.engine-desc {
+  font-size: 10.5px; color: var(--text-dim); line-height: 1.4;
+}
 .model-sel option { background: var(--surface); }
 
 .sys-rows { display: flex; flex-direction: column; gap: 5px; }
@@ -427,6 +449,23 @@ body {
 .og-qualidade  { background: rgba(34,197,94,.14);   border-color: rgba(34,197,94,.5);   color: #4ade80; }
 .og-conclave   { background: rgba(239,68,68,.14);   border-color: rgba(239,68,68,.5);   color: #f87171; }
 .og-meta       { background: rgba(245,158,11,.14);  border-color: rgba(245,158,11,.5);  color: #fbbf24; }
+
+/* fluxo dentro de cada fase: setas = handover real, pilha tracejada = paralelo */
+.org-flow {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin-top: 14px; position: relative;
+}
+.org-flow::before {
+  content: ''; position: absolute; top: -14px; left: 50%; width: 0; height: 14px;
+  border-left: 2px solid rgba(124,58,237,.30);
+}
+.of-stage { display: flex; flex-direction: column; gap: 6px; }
+.of-stage.of-parallel { position: relative; padding-left: 8px; }
+.of-stage.of-parallel::before {
+  content: ''; position: absolute; left: 0; top: 8px; bottom: 8px;
+  border-left: 2px dashed rgba(124,58,237,.28);
+}
+.of-arrow { color: var(--violet); font-weight: 700; font-size: 13px; opacity: .75; flex-shrink: 0; }
 
 /* faixa "meta" no topo do organograma (cards soltos, sem conector) */
 .org-meta-band {
@@ -1659,3 +1698,156 @@ body::before {
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
+
+/* ─── Quadro: board estilo Plane sobre as missões reais ─────────────── */
+.quadro-filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.qfilter {
+  font-size: 11px; font-weight: 600; color: var(--text-mid);
+  background: var(--surface2); border: 1px solid var(--border2);
+  padding: 4px 10px; border-radius: 999px; cursor: pointer;
+  transition: all 0.15s; white-space: nowrap;
+}
+.qfilter:hover { color: var(--text); border-color: var(--violet); }
+.qfilter.active {
+  color: #fff; background: var(--violet-dim);
+  border-color: var(--violet); box-shadow: 0 0 0 1px var(--violet-glow) inset;
+}
+
+.quadro-board {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+  padding: 4px; align-items: start; overflow-x: auto;
+}
+.quadro-col {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); display: flex; flex-direction: column;
+  min-height: 120px;
+}
+.qcol-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
+}
+.qcol-title { font-size: 12px; font-weight: 700; color: var(--text); letter-spacing: 0.02em; }
+.qcol-count {
+  font-size: 11px; font-weight: 700; color: var(--text-dim);
+  background: var(--surface2); border-radius: 999px; padding: 1px 8px; min-width: 22px; text-align: center;
+}
+.qcol-cards { display: flex; flex-direction: column; gap: 8px; padding: 10px; }
+.qcol-empty { color: var(--text-dim); font-size: 12px; text-align: center; padding: 8px 0; }
+
+.qcard {
+  background: var(--surface2); border: 1px solid var(--border2);
+  border-left: 3px solid var(--text-dim);
+  border-radius: 6px; padding: 9px 11px; cursor: default;
+  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+}
+.qcard:hover { transform: translateY(-1px); box-shadow: var(--shadow); border-color: var(--border2); }
+.qcard.q-pending { border-left-color: var(--text-dim); }
+.qcard.q-running { border-left-color: var(--progress); }
+.qcard.q-done    { border-left-color: var(--emerald); }
+.qcard.q-done .qcard-text { color: var(--text-mid); text-decoration: line-through; text-decoration-color: var(--border2); }
+.qcard-text { font-size: 12.5px; line-height: 1.35; color: var(--text); margin-bottom: 7px; }
+.qcard-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.qcard-tag {
+  font-size: 10px; font-weight: 600; color: var(--text-mid);
+  background: var(--bg); border: 1px solid var(--border);
+  padding: 2px 7px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 78%;
+}
+.qcard-pct { font-size: 10px; font-weight: 700; color: var(--progress); }
+
+.quadro-empty { color: var(--text-dim); font-size: 13px; padding: 30px; text-align: center; grid-column: 1 / -1; }
+
+.qcard[draggable="true"] { cursor: grab; }
+.qcard.dragging { opacity: 0.4; cursor: grabbing; }
+.quadro-col.drag-over { background: var(--violet-dim); border-color: var(--violet); }
+
+@media (max-width: 880px) { .quadro-board { grid-template-columns: 1fr; } }
+
+/* ── Fluxo Vem Passear: pipeline em raias (estilo Monday) ─────────────── */
+.fvp-legend { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.fvp-leg-item { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-mid); }
+.fvp-board { padding: 4px 2px 12px; }
+.fvp-lanes { display: flex; align-items: stretch; gap: 0; overflow-x: auto; padding-bottom: 6px; }
+.fvp-arrow { align-self: center; color: var(--violet); font-weight: 700; font-size: 14px; opacity: .7; padding: 0 4px; flex-shrink: 0; }
+
+.fvp-lane {
+  flex: 0 0 188px; min-width: 188px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-top: 3px solid var(--lane, var(--violet));
+  border-radius: var(--radius); display: flex; flex-direction: column;
+}
+.fvp-lane-head { padding: 9px 11px 7px; border-bottom: 1px solid var(--border); }
+.fvp-lane-name { display: block; font-size: 12.5px; font-weight: 700; color: var(--text); }
+.fvp-lane-owner { display: block; font-size: 10.5px; color: var(--lane, var(--text-dim)); font-weight: 600; margin-top: 2px; }
+.fvp-cards { display: flex; flex-direction: column; gap: 6px; padding: 9px; flex: 1; }
+.fvp-card {
+  background: var(--surface2); border: 1px solid var(--border2);
+  border-left: 3px solid var(--lane, var(--text-dim));
+  border-radius: 5px; padding: 6px 9px; font-size: 11.5px; line-height: 1.3; color: var(--text);
+}
+.fvp-gate-row {
+  display: flex; align-items: center; gap: 7px; margin: 0 9px 9px;
+  padding: 6px 8px; border-radius: 5px; border: 1px dashed var(--border2);
+}
+.fvp-gate-g { background: rgba(245,158,11,.10); border-color: rgba(245,158,11,.45); }
+.fvp-gate-c { background: rgba(124,58,237,.08); border-color: rgba(124,58,237,.40); }
+.fvp-gate {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 4px; flex-shrink: 0;
+  font-size: 11px; font-weight: 800; color: #fff;
+}
+.fvp-g { background: #f59e0b; }
+.fvp-c { background: var(--violet); }
+.fvp-gate-txt { font-size: 10.5px; color: var(--text-mid); line-height: 1.25; }
+
+.fvp-loop {
+  margin-top: 14px; padding: 10px 14px; border-radius: var(--radius);
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid var(--emerald);
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+}
+.fvp-loop-label { font-size: 12.5px; font-weight: 700; color: var(--emerald); }
+.fvp-loop-owner { font-size: 11px; font-weight: 600; color: var(--text-mid); }
+.fvp-loop-txt { font-size: 11px; color: var(--text-dim); }
+
+/* ── Time Vem Passear: cards dos 5 agentes com contrato ──────────────────── */
+.tvp-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 14px; padding: 4px;
+}
+.tvp-loading { color: var(--text-dim); font-size: 13px; padding: 24px; }
+.tvp-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 10px;
+}
+.tvp-head { display: flex; align-items: center; gap: 10px; }
+.tvp-emoji { font-size: 24px; line-height: 1; }
+.tvp-name { font-size: 14px; font-weight: 700; color: var(--text); }
+.tvp-role { font-size: 11px; color: var(--text-mid); }
+.tvp-contract { display: flex; flex-direction: column; gap: 5px; }
+.tvp-row { display: flex; gap: 8px; font-size: 11.5px; line-height: 1.3; color: var(--text-mid); }
+.tvp-lbl {
+  flex: 0 0 52px; font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--text-dim); padding-top: 1px;
+}
+.tvp-naofaz { color: var(--text-mid); }
+.tvp-naofaz .tvp-lbl { color: #ef4444; }
+.tvp-naofaz span:last-child { border-left: 2px solid rgba(239,68,68,.4); padding-left: 7px; }
+.tvp-task {
+  width: 100%; box-sizing: border-box; resize: vertical;
+  background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px;
+  padding: 7px 9px; font-size: 12px; color: var(--text); font-family: inherit;
+}
+.tvp-task:focus { outline: none; border-color: var(--violet); }
+.tvp-run {
+  align-self: flex-start; background: var(--violet); color: #fff; border: none;
+  border-radius: 6px; padding: 7px 14px; font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: opacity .12s;
+}
+.tvp-run:hover { opacity: .88; }
+.tvp-result:not(:empty) {
+  margin-top: 2px; padding: 9px 11px; background: var(--surface2);
+  border: 1px solid var(--border2); border-radius: 6px; font-size: 12.5px; line-height: 1.45; color: var(--text);
+}
+.tvp-spin { color: var(--violet); font-size: 12px; }
+.tvp-warn { color: #f59e0b; font-size: 12px; }
+.tvp-out { white-space: normal; }

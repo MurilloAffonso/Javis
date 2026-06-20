@@ -9,10 +9,7 @@ Estes agentes operam sobre os outros agentes, dando ao Javis "vida própria".
 from __future__ import annotations
 import json
 import re
-import requests
 from .specialized import AGENT_REGISTRY, AgentMeta, BaseAgent, DEFAULT_MODEL, TIMEOUT
-
-OLLAMA_URL = "http://localhost:11434/api/chat"
 
 
 # ── AIOS Master ───────────────────────────────────────────
@@ -61,22 +58,11 @@ class AIOSMaster:
     def plan(self, task: str, context: str = "") -> dict:
         prompt = f"{context}\n\nTarefa: {task}" if context else task
         try:
-            resp = requests.post(
-                OLLAMA_URL,
-                json={
-                    "model": self.model,
-                    "messages": [
-                        {"role": "system", "content": SYSTEM_AIOS},
-                        {"role": "user",   "content": prompt},
-                    ],
-                    "stream": False,
-                    "options": {"temperature": 0.1},
-                },
-                timeout=TIMEOUT,
-            )
-            resp.raise_for_status()
-            content = resp.json()["message"]["content"].strip()
-            content = re.sub(r"```(?:json)?|```", "", content).strip()
+            import claude_brain
+            if not claude_brain.available():
+                raise RuntimeError("Claude (assinatura) indisponível")
+            content = claude_brain.answer(prompt, system=SYSTEM_AIOS, timeout=TIMEOUT)
+            content = re.sub(r"```(?:json)?|```", "", (content or "").strip()).strip()
             return json.loads(content)
         except Exception:
             return {

@@ -10,11 +10,11 @@ Modo multi-rodada (rounds > 1):
 Inspirado em multi-agent-debate (github.com/arbgjr/multi-agent-debate).
 """
 from __future__ import annotations
-import requests
 from dataclasses import dataclass
 
-OLLAMA_URL    = "http://localhost:11434/api/chat"
-DEFAULT_MODEL = "llama3.2:3b"
+# Conclave roda pelo cérebro único (Claude assinatura via llm_providers.call_openai,
+# que é alias de call_claude). 'DEFAULT_MODEL' é só rótulo herdado. Sem Ollama.
+DEFAULT_MODEL = "claude"
 TIMEOUT       = 30
 
 SYSTEM_CRITICO = """\

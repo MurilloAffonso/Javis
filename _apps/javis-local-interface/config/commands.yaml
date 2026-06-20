@@ -106,6 +106,46 @@ intents:
       - "tá tudo funcionando?"
       - "como estão os serviços"
 
+  analisar_site:
+    description: Analisa/clona/recria um site a partir da URL ou nome citado
+    risk_level: low
+    requires_approval: false
+    action: analyze_site
+    examples:
+      - "analisa o site da vem passear"
+      - "olha esse site"
+      - "analisa essa página"
+
+  clima:
+    description: Informa a previsão do tempo / temperatura
+    risk_level: low
+    requires_approval: false
+    action: weather
+    examples:
+      - "como tá o tempo hoje?"
+      - "vai chover?"
+      - "qual a temperatura?"
+
+  hora_data:
+    description: Informa a hora atual ou a data
+    risk_level: low
+    requires_approval: false
+    action: get_time
+    examples:
+      - "que horas são?"
+      - "que dia é hoje?"
+      - "me diz a hora"
+
+  trocar_motor:
+    description: Troca o motor de execução (programar) entre Claude e Codex, ou informa o ativo
+    risk_level: low
+    requires_approval: false
+    action: switch_brain
+    examples:
+      - "usa o codex"
+      - "muda pro claude"
+      - "qual motor tá ativo?"
+
   acao_perigosa:
     description: Qualquer palavra-chave destrutiva — bloqueado imediatamente
     risk_level: critical

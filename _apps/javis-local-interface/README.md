@@ -3,12 +3,14 @@
 Interface de execução local do Javis. Classifica intenções por palavra-chave e executa
 ações seguras no computador de Murillo, sem precisar de LLM para ações rotineiras.
 
-## Iniciar (CLI)
+## Iniciar (servidor + interface web)
 
 ```powershell
 cd _apps/javis-local-interface
-python backend/main.py
+python backend/server.py
 ```
+
+Abra `frontend/index.html` no navegador (ou sirva a pasta), com o backend em `http://127.0.0.1:8000`.
 
 ## Estrutura
 
@@ -18,7 +20,7 @@ javis-local-interface/
 │   ├── command_router.py  — classifica intenção (sem LLM)
 │   ├── actions.py         — executa ações locais
 │   ├── logger.py          — JSONL em logs/actions.jsonl
-│   └── main.py            — loop CLI
+│   └── server.py          — API FastAPI (servidor real, usado pela interface web)
 ├── frontend/
 │   ├── index.html         — UI estática
 │   ├── style.css

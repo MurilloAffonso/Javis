@@ -7,12 +7,12 @@ Grade completa conforme arquitetura CodandoAI:
   Meta-agentes:  AIOS Master, Squad Creator, Jarvis Soul, Rootcause (em meta.py)
 """
 from __future__ import annotations
-import requests
 from dataclasses import dataclass
 
-OLLAMA_URL    = "http://localhost:11434/api/chat"
-DEFAULT_MODEL = "llama3.2:3b"
-TIMEOUT       = 45
+# Cérebro dos agentes = Claude pela ASSINATURA (decisão 19/06, sem Ollama). A
+# persona de cada agente entra como system prompt do claude_brain.
+DEFAULT_MODEL = "claude"
+TIMEOUT       = 180
 
 
 @dataclass
@@ -36,21 +36,11 @@ class BaseAgent:
         content = f"{context}\n\nTarefa: {task}" if context else task
         sys_prompt = system or self.system_prompt
         try:
-            resp = requests.post(
-                OLLAMA_URL,
-                json={
-                    "model": self.model,
-                    "messages": [
-                        {"role": "system", "content": sys_prompt},
-                        {"role": "user",   "content": content},
-                    ],
-                    "stream": False,
-                    "options": {"temperature": 0.4},
-                },
-                timeout=TIMEOUT,
-            )
-            resp.raise_for_status()
-            return resp.json()["message"]["content"].strip()
+            import claude_brain
+            if not claude_brain.available():
+                return f"[{self.meta.name} indisponível: Claude (assinatura) fora do ar]"
+            out = claude_brain.answer(content, system=sys_prompt, timeout=TIMEOUT)
+            return out or f"[{self.meta.name} não devolveu resposta]"
         except Exception as e:
             return f"[{self.meta.name} indisponível: {e}]"
 

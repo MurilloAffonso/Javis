@@ -41,6 +41,18 @@
         <span class="sb-item-icon">🏢</span>
         <span class="sb-item-label">Sala</span>
       </button>
+      <button class="sb-item" data-view="quadro">
+        <span class="sb-item-icon">📋</span>
+        <span class="sb-item-label">Quadro</span>
+      </button>
+      <button class="sb-item" data-view="fluxovp">
+        <span class="sb-item-icon">🔀</span>
+        <span class="sb-item-label">Fluxo VP</span>
+      </button>
+      <button class="sb-item" data-view="timevp">
+        <span class="sb-item-icon">👥</span>
+        <span class="sb-item-label">Time VP</span>
+      </button>
       <button class="sb-item" data-view="projects">
         <span class="sb-item-icon">🗂️</span>
         <span class="sb-item-label">Projetos</span>
@@ -72,7 +84,7 @@
 
     <div class="sb-footer">
       <div class="sb-svc-row">
-        <div class="svc" id="svc-ollama"><div class="svc-dot"></div><span>OLLAMA</span></div>
+        <div class="svc" id="svc-claude"><div class="svc-dot"></div><span>CLAUDE</span></div>
         <div class="svc offline" id="svc-webui"><div class="svc-dot"></div><span>WEBUI</span></div>
       </div>
       <button class="sb-item sb-vp-btn" onclick="window.location.href='/vempassear'">
@@ -127,6 +139,17 @@
               <div class="bc-bar"></div>
               <div class="bc-top"><span class="bc-icon">💾</span><div><div class="bc-label">MEMÓRIA ETERNA</div><div class="bc-name">Obsidian Memory</div></div></div>
               <div class="bc-desc">Memória permanente. Cresce com cada conversa.</div>
+            </div>
+
+            <div class="left-sep"></div>
+
+            <div class="left-section">
+              <div class="left-title">MOTOR DE EXECUÇÃO</div>
+              <div class="engine-toggle" id="engine-toggle">
+                <button class="engine-btn" data-engine="claude" id="engine-btn-claude">Claude</button>
+                <button class="engine-btn" data-engine="codex" id="engine-btn-codex">Codex</button>
+              </div>
+              <div class="engine-desc" id="engine-desc">Quem programa quando você pede "programa X". Troque quando a cota de um acabar.</div>
             </div>
 
             <div class="left-sep"></div>
@@ -206,7 +229,7 @@
               <button type="button" class="mic-btn" id="mic-btn" title="Comando de voz (pt-BR)">🎤</button>
               <button type="button" class="voice-auto-btn" id="wake-btn" title='Wake word'>🎙️</button>
               <button type="button" class="voice-auto-btn" id="voice-auto-btn" title="Voz sempre ativa">👂</button>
-              <label class="tts-chk" title="Falar resposta (TTS)"><input type="checkbox" id="use-tts" checked /><span>🔊</span></label>
+              <label class="tts-chk" title="Falar resposta (TTS) — desligado por padrão: fase é texto/gravação, áudio só se você marcar"><input type="checkbox" id="use-tts" /><span>🔊</span></label>
               <label class="conclave-chk" title="Ativar Conclave"><input type="checkbox" id="use-conclave" /><span>⚔️</span></label>
             </div>
             <div class="quick-row">
@@ -297,6 +320,8 @@
             <span class="ol-item"><span class="ol-dot oc-online"></span>online</span>
             <span class="ol-item"><span class="ol-dot oc-idle"></span>idle</span>
             <span class="ol-item"><span class="ol-dot oc-offline"></span>offline</span>
+            <span class="ol-item">▶ handover obrigatório</span>
+            <span class="ol-item">┊ paralelo (sem ordem)</span>
           </div>
         </div>
         <div class="org-scroll">
@@ -411,6 +436,44 @@
           </div>
           <div class="projects-grid" id="projects-grid"></div>
         </div>
+      </div>
+
+      <div class="view" id="view-quadro">
+        <div class="view-header">
+          <div>
+            <h2 class="view-title">📋 Quadro</h2>
+            <p class="view-subtitle">Cada card é uma tarefa real das missões do Javis. Arraste seu olhar pelas colunas de status.</p>
+          </div>
+          <div class="quadro-filters" id="quadro-filters"></div>
+        </div>
+        <div class="quadro-board" id="quadro-board"></div>
+      </div>
+
+      <!-- VIEW: FLUXO VEM PASSEAR (pipeline de marketing em raias, estilo Monday) -->
+      <div class="view" id="view-fluxovp">
+        <div class="view-header">
+          <div>
+            <h2 class="view-title">🔀 Fluxo Vem Passear</h2>
+            <p class="view-subtitle">Pipeline de marketing/conteúdo em raias, do briefing à distribuição. Espelha o Fluxograma FAST adaptado à operação real (Nova · Midas · você).</p>
+          </div>
+          <div class="fvp-legend">
+            <span class="fvp-leg-item"><span class="fvp-gate fvp-g">G</span> aprovação sua</span>
+            <span class="fvp-leg-item"><span class="fvp-gate fvp-c">C</span> conferência interna</span>
+            <span class="fvp-leg-item">▶ handover · ↺ aprendizado</span>
+          </div>
+        </div>
+        <div class="fvp-board" id="fvp-board"></div>
+      </div>
+
+      <!-- VIEW: TIME VEM PASSEAR (os 5 agentes com contrato Input/Output/Não faz) -->
+      <div class="view" id="view-timevp">
+        <div class="view-header">
+          <div>
+            <h2 class="view-title">👥 Time Vem Passear</h2>
+            <p class="view-subtitle">Os 5 agentes da operação de marketing, cada um com seu contrato: o que ENTRA, o que SAI e o que ele NÃO faz. Clique em "Acionar" pra colocar um pra trabalhar.</p>
+          </div>
+        </div>
+        <div class="tvp-grid" id="tvp-grid"></div>
       </div>
 
     </div>

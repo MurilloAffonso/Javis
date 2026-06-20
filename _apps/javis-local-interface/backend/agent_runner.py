@@ -91,8 +91,8 @@ def run_agent(agent_id: str, task: str) -> dict:
     except Exception:
         rag = ""
 
-    # 3) Raciocínio em cérebro forte, com 3 níveis de fallback:
-    #    Claude (assinatura, grátis) → OpenAI gpt-4o (forte, confiável) → Ollama (local).
+    # 3) Raciocínio no cérebro ÚNICO: Claude pela assinatura (decisão 19/06,
+    #    sem OpenAI nem Ollama). Se faltar, devolve erro claro — não finge.
     brain = "claude"
     result = ""
     try:
@@ -102,27 +102,10 @@ def run_agent(agent_id: str, task: str) -> dict:
     except Exception:
         result = ""
 
-    if not result.strip():
-        brain = "openai"
-        try:
-            from llm_providers import call_openai
-            user = task if not rag else f"Contexto do projeto:\n{rag}\n\nTarefa: {task}"
-            result = call_openai(
-                [{"role": "system", "content": system}, {"role": "user", "content": user}],
-                temperature=0.3,
-            )
-        except Exception:
-            result = ""
-
-    if not result.strip():
-        brain = "ollama"
-        try:
-            from agents.specialized import AGENT_REGISTRY
-            cls = AGENT_REGISTRY.get(agent_id)
-            if cls:
-                result = cls().execute(task, context=rag, system=system)
-        except Exception as e:
-            return {"status": "error", "message": f"Falha ao executar: {e}"}
+    if not (result or "").strip():
+        return {"status": "error", "agent": agent_id, "name": name, "brain": brain,
+                "message": ("Claude (assinatura) não respondeu — pode ser cota "
+                            "esgotada ou Claude Code deslogado, senhor.")}
 
     return {
         "status":    "ok",

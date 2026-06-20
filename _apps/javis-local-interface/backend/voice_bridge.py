@@ -26,8 +26,13 @@ _PREFIX_RE = re.compile(
     r"^(?:(?:" + "|".join(re.escape(w) for w in _PREFIX_WORDS) + r")[,!?\s]+)+",
     re.IGNORECASE,
 )
-# mantém compatibilidade com código que importa WAKE_WORDS diretamente
-WAKE_WORDS = ["jamba", "jambo", "jambá", "javis", "jarvis", "javes", "diabes", "diaves", "chaves"]
+# Palavras que ABREM o portão do microfone sempre-ligado (has_wake_word).
+# Nome oficial = "Javis" (decisão Murillo 18/06). Mantém só as variações que o
+# Whisper de fato produz pra "Javis" (medido na gravação dele: "Javis" com o
+# initial_prompt, "Javes" sem). "jarvis" entra porque é o erro mais comum e
+# próximo. Os palpites antigos (jamba/diabes/chaves) saíram daqui pra não abrir
+# o portão à toa — continuam só no _PREFIX_WORDS (corte de prefixo em comando).
+WAKE_WORDS = ["javis", "javes", "jávis", "jáves", "jarvis"]
 
 # Palavras-chave que surgem em hallucinations do prompt — natural speech raramente
 # contém 5+ destas ao mesmo tempo
@@ -43,6 +48,19 @@ _HALLUCINATION_THRESHOLD = 5
 def _strip_wake_word(text: str) -> str:
     """Remove greeting/wake-word prefix from voice transcript before routing."""
     return _PREFIX_RE.sub("", text).strip()
+
+
+# Portão de ativação p/ microfone sempre-ligado (sandbox de voz / VTuber). Só os
+# nomes de ativação contam — saudações genéricas (oi/ei/hey) NÃO abrem o portão,
+# senão qualquer fala de fundo destrava a escuta.
+_WAKE_ONLY_RE = re.compile(
+    r"\b(?:" + "|".join(re.escape(w) for w in WAKE_WORDS) + r")\b", re.IGNORECASE
+)
+
+
+def has_wake_word(text: str) -> bool:
+    """True se a palavra de ativação (Jamba/Javis/...) aparece em qualquer ponto do texto."""
+    return bool(_WAKE_ONLY_RE.search(text or ""))
 
 
 def _is_hallucination(text: str) -> bool:

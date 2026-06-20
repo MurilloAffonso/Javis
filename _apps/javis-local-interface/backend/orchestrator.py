@@ -10,11 +10,11 @@ Flow:
 from __future__ import annotations
 import json
 import re
-import requests
 from dataclasses import dataclass, field
 
-OLLAMA_URL    = "http://localhost:11434/api/chat"
-DEFAULT_MODEL = "llama3.2:3b"
+# Cérebro = Claude pela assinatura (sem Ollama, decisão 19/06). 'DEFAULT_MODEL' é
+# só um rótulo herdado por params de modelo; a seleção real é no claude_brain.
+DEFAULT_MODEL = "claude"
 TIMEOUT       = 30
 
 SYSTEM_ORCHESTRATOR = """\

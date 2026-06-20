@@ -1,7 +1,9 @@
 // Javis v2 — frontend app
-// Connects to FastAPI server at localhost:8000
-
-const API = "http://localhost:8000";
+// Connects to the FastAPI server na MESMA origem da página (127.0.0.1 ou
+// localhost — o que o senhor abriu). Fixar "localhost" quebrava quando a página
+// vinha de 127.0.0.1: o localhost resolvia pra IPv6 (::1), onde o servidor não
+// escuta, e TODO fetch dava timeout (status sempre "offline").
+const API = window.location.origin;
 
 // ─── DOM refs ────────────────────────────────────────────
 const chatLog      = document.getElementById("chat-log");
@@ -14,7 +16,7 @@ const planBox      = document.getElementById("plan-box");
 const conclaveWrap = document.getElementById("conclave-wrap");
 const squadWrap    = document.getElementById("squad-wrap");
 const squadRounds  = document.getElementById("squad-rounds");
-const svcOllama    = document.getElementById("svc-ollama");
+const svcClaude    = document.getElementById("svc-claude");
 const svcWebui     = document.getElementById("svc-webui");
 const micBtn       = document.getElementById("mic-btn");
 const useTts       = document.getElementById("use-tts");
@@ -60,6 +62,46 @@ setInterval(checkStatus, 30000);
 setInterval(_tickSession, 1000);
 setInterval(pollReminders, 15000);
 loadChatHistory().then(loadBriefing);
+loadEngine();
+
+// Motor de execução (Claude assinatura x Codex assinatura): botão manual,
+// pra trocar quando a cota de um acabar (server.py: GET/POST /brain/active).
+const ENGINE_DESC = {
+  claude: 'Quem programa quando você pede "programa X": assinatura do Claude.',
+  codex:  'Quem programa quando você pede "programa X": assinatura do Codex (OpenAI).',
+};
+
+async function loadEngine() {
+  try {
+    const r = await fetch(`${API}/brain/active`);
+    if (!r.ok) return;
+    const d = await r.json();
+    _setEngineUI(d.engine);
+  } catch (e) { console.warn('Engine:', e); }
+}
+
+function _setEngineUI(engine) {
+  document.querySelectorAll('.engine-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.engine === engine);
+  });
+  const desc = document.getElementById('engine-desc');
+  if (desc) desc.textContent = ENGINE_DESC[engine] || '';
+}
+
+document.getElementById('engine-toggle')?.addEventListener('click', async e => {
+  const btn = e.target.closest('.engine-btn');
+  if (!btn) return;
+  const engine = btn.dataset.engine;
+  try {
+    const r = await fetch(`${API}/brain/active`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ engine }),
+    });
+    const d = await r.json();
+    if (r.ok) _setEngineUI(d.engine);
+  } catch (e) { console.warn('Engine switch:', e); }
+});
 
 // Saudação proativa: ao abrir, o Javis recebe o senhor sabendo o que foi feito.
 async function loadBriefing() {
@@ -518,17 +560,17 @@ function updateConclave(c) {
 
 // ─── Status check ─────────────────────────────────────────
 async function checkStatus() {
-  setSvc(svcOllama, "checking");
+  setSvc(svcClaude, "checking");
   setSvc(svcWebui,  "checking");
   try {
     const res  = await fetch(`${API}/status`, { signal: AbortSignal.timeout(4000) });
     const data = await res.json();
     const svcs = data.services || {};
 
-    setSvc(svcOllama, svcs["Ollama"]?.status     === "online" ? "online" : "offline");
+    setSvc(svcClaude, data.brain?.status         === "online" ? "online" : "offline");
     setSvc(svcWebui,  svcs["Open WebUI"]?.status === "online" ? "online" : "offline");
   } catch {
-    setSvc(svcOllama, "offline");
+    setSvc(svcClaude, "offline");
     setSvc(svcWebui,  "offline");
   }
 }
@@ -1462,7 +1504,7 @@ async function speak(text) {
    JAVIS AIOS — View Router & Multi-View Logic
 ═══════════════════════════════════════════════════════════ */
 
-const VIEW_TITLES = { chat:'Orquestrador', agents:'Agentes', mente:'Mente', workflows:'Workflows', room:'Sala dos Agentes', projects:'Projetos', train:'SDR Academy', integrations:'Integrações' };
+const VIEW_TITLES = { chat:'Orquestrador', agents:'Agentes', mente:'Mente', workflows:'Workflows', room:'Sala dos Agentes', quadro:'Quadro', fluxovp:'Fluxo Vem Passear', timevp:'Time Vem Passear', projects:'Projetos', train:'SDR Academy', integrations:'Integrações' };
 
 function switchView(viewId) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -1479,19 +1521,149 @@ function switchView(viewId) {
   if (viewId === 'integrations' && !document.getElementById('integrations-grid').children.length) renderIntegrations();
   if (viewId === 'room') initAgentRoom(); else stopAgentRoom();
   if (viewId === 'projects' && !document.getElementById('projects-grid').children.length) renderProjects();
+  if (viewId === 'quadro') renderQuadro();
+  if (viewId === 'fluxovp') renderPipelineVP();
+  if (viewId === 'timevp') renderVPSquad();
   if (viewId === 'train') renderTrainAreas();
+}
+
+// ─── Time Vem Passear: os 5 agentes com contrato (do backend /vp/agents) ────
+let VP_AGENTS = [];
+
+async function renderVPSquad() {
+  const host = document.getElementById('tvp-grid');
+  if (!host) return;
+  host.innerHTML = '<div class="tvp-loading">Carregando o time…</div>';
+  try {
+    const res = await fetch(`${API}/vp/agents`, { signal: AbortSignal.timeout(5000) });
+    const data = await res.json();
+    VP_AGENTS = data.agents || [];
+  } catch {
+    host.innerHTML = '<div class="tvp-loading">Não consegui carregar o time, senhor (servidor offline?).</div>';
+    return;
+  }
+  host.innerHTML = VP_AGENTS.map(_vpCard).join('');
+}
+
+function _vpCard(a) {
+  return `<div class="tvp-card" id="tvp-${a.id}">
+    <div class="tvp-head">
+      <span class="tvp-emoji">${a.icon || '🤖'}</span>
+      <div>
+        <div class="tvp-name">${esc(a.name)}</div>
+        <div class="tvp-role">${esc(a.role || '')}</div>
+      </div>
+    </div>
+    <div class="tvp-contract">
+      <div class="tvp-row"><span class="tvp-lbl">Entra</span><span>${esc(a.input || '')}</span></div>
+      <div class="tvp-row"><span class="tvp-lbl">Sai</span><span>${esc(a.output || '')}</span></div>
+      <div class="tvp-row tvp-naofaz"><span class="tvp-lbl">Não faz</span><span>${esc(a.naofaz || '')}</span></div>
+    </div>
+    <textarea class="tvp-task" id="tvp-task-${a.id}" rows="2" placeholder="O que o senhor quer que ${esc(a.name)} faça?"></textarea>
+    <button class="tvp-run" onclick="runVPAgent('${a.id}')">Acionar ${esc(a.name)}</button>
+    <div class="tvp-result" id="tvp-result-${a.id}"></div>
+  </div>`;
+}
+
+async function runVPAgent(id) {
+  const task = (document.getElementById(`tvp-task-${id}`)?.value || '').trim();
+  const out  = document.getElementById(`tvp-result-${id}`);
+  if (!task) { if (out) out.innerHTML = '<span class="tvp-warn">Escreva a tarefa primeiro, senhor.</span>'; return; }
+  if (out) out.innerHTML = '<span class="tvp-spin">Trabalhando na assinatura… (pode levar ~40s)</span>';
+  try {
+    const res = await fetch(`${API}/vp/agents/run`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent_id: id, task }),
+      signal: AbortSignal.timeout(240000),
+    });
+    const data = await res.json();
+    if (data.status === 'ok') {
+      out.innerHTML = `<div class="tvp-out">${renderMarkdown(data.result || '')}</div>`;
+    } else {
+      out.innerHTML = `<span class="tvp-warn">${esc(data.message || 'Não rolou agora, senhor.')}</span>`;
+    }
+  } catch (e) {
+    out.innerHTML = `<span class="tvp-warn">Demorou demais ou falhou, senhor: ${esc(String(e))}</span>`;
+  }
+}
+
+// ─── Fluxo Vem Passear: pipeline de marketing em raias (estilo Monday) ──────
+// Espelha _projetos/cerebro-jampa/fluxograma-vem-passear.md. Cada raia é uma
+// função (briefing→conteúdo→copy→design→tráfego→distribuição), com gate [G]
+// (sua aprovação) ou conferência [C] quando o trabalho não pode pular adiante
+// sem aval. A faixa de baixo é o loop de aprendizado que volta pro briefing.
+const PIPELINE_VP = {
+  lanes: [
+    { id:'briefing', label:'Briefing', owner:'Você + dados', color:'#f59e0b',
+      cards:['Maré da semana', 'Agenda de saídas', 'Vagas reais', 'Fotos novas', 'Combos OK'] },
+    { id:'conteudo', label:'Conteúdo / Pauta', owner:'Nova', color:'#3b82f6',
+      cards:['10-15 pautas', 'Pilar de cada', 'Objetivo: alcance/venda', 'Formato'],
+      gate:{ t:'G', txt:'Você aprova a pauta' } },
+    { id:'copy', label:'Roteiro & Copy', owner:'Nova + Midas', color:'#06b6d4',
+      cards:['Gancho 3s', 'Roteiro por cena', 'Legenda + CTA', 'Palavra-chave WhatsApp'],
+      gate:{ t:'C', txt:'Info sensível: maré/preço/vaga conferida' } },
+    { id:'design', label:'Produção Visual', owner:'Design', color:'#ef4444',
+      cards:['Carrossel (Canva)', 'Reel (CapCut)', 'gerar_carrossel.py', 'Nome-padrão de arquivo'],
+      gate:{ t:'C', txt:'Marca / Design System' } },
+    { id:'trafego', label:'Tráfego / Conversão', owner:'Midas', color:'#8b5cf6',
+      cards:['CTA WhatsApp', 'Segmentação', 'Marcar p/ impulsionar'],
+      gate:{ t:'G', txt:'Você aprova o FINAL (checklist)' } },
+    { id:'distribuicao', label:'Distribuição', owner:'Você / Javis', color:'#22c55e',
+      cards:['Agendar (Meta Suite)', 'Reel/Story no momento real', 'Registrar publicação'] },
+  ],
+  loop: { label:'Aprendizado ↺', owner:'Midas mede · você valida',
+          txt:'retenção 3s · salvamentos · cliques no WhatsApp · reservas → vira o briefing da próxima semana' },
+};
+
+function _fvpLane(lane) {
+  const cards = lane.cards.map(c => `<div class="fvp-card">${esc(c)}</div>`).join('');
+  const gate = lane.gate
+    ? `<div class="fvp-gate-row fvp-gate-${lane.gate.t.toLowerCase()}">
+         <span class="fvp-gate fvp-${lane.gate.t.toLowerCase()}">${lane.gate.t}</span>
+         <span class="fvp-gate-txt">${esc(lane.gate.txt)}</span>
+       </div>`
+    : '';
+  return `<div class="fvp-lane" style="--lane:${lane.color}">
+    <div class="fvp-lane-head">
+      <span class="fvp-lane-name">${esc(lane.label)}</span>
+      <span class="fvp-lane-owner">${esc(lane.owner)}</span>
+    </div>
+    <div class="fvp-cards">${cards}</div>
+    ${gate}
+  </div>`;
+}
+
+function renderPipelineVP() {
+  const host = document.getElementById('fvp-board');
+  if (!host) return;
+  const lanes = PIPELINE_VP.lanes.map(_fvpLane).join('<div class="fvp-arrow">▶</div>');
+  const loop = PIPELINE_VP.loop;
+  host.innerHTML = `
+    <div class="fvp-lanes">${lanes}</div>
+    <div class="fvp-loop">
+      <span class="fvp-loop-label">${esc(loop.label)}</span>
+      <span class="fvp-loop-owner">${esc(loop.owner)}</span>
+      <span class="fvp-loop-txt">${esc(loop.txt)}</span>
+    </div>`;
 }
 
 // ─── Mente: organograma dos 17 agentes da "mente", por fase ──────────
 // AIOS Master no topo → Produto / Construção / Qualidade / Conclave,
 // com Jarvis Soul · Squad Creator · Rootcause numa faixa "meta" no topo.
+//
+// Dentro de cada fase, `flow` é uma sequência de "estágios": estágios com 1
+// agente só viram setas de handover real entre eles (PO→PM→Scrum); estágios
+// com vários agentes ficam empilhados sem seta (trabalham em paralelo, ex.:
+// UX/DevOps/Data Engineer sob o Developer, ou Crítico+Advogado debatendo
+// antes do Sintetizador) — mesma lógica do board de squads que inspirou isso
+// (handover sólido = sequência obrigatória; sem seta = alternativas/paralelo).
 const MENTE_TREE = {
   root: 'aios_master',
   groups: [
-    { id:'produto',    label:'Produto',    ids:['po', 'pm', 'scrum'] },
-    { id:'construcao', label:'Construção', ids:['architect', 'developer', 'ux_designer', 'devops', 'data_engineer'] },
-    { id:'qualidade',  label:'Qualidade',  ids:['qa', 'analyst'] },
-    { id:'conclave',   label:'Conclave',   ids:['critico', 'advogado', 'sintetizador'] },
+    { id:'produto',    label:'Produto',    flow: [['po'], ['pm'], ['scrum']] },
+    { id:'construcao', label:'Construção', flow: [['architect'], ['developer'], ['ux_designer', 'devops', 'data_engineer']] },
+    { id:'qualidade',  label:'Qualidade',  flow: [['qa', 'analyst']] },
+    { id:'conclave',   label:'Conclave',   flow: [['critico', 'advogado'], ['sintetizador']] },
   ],
   meta: ['jarvis_soul', 'squad_creator', 'rootcause'],
 };
@@ -1513,10 +1685,14 @@ function _orgCard(a, opts = {}) {
 }
 
 function _orgGroup(g) {
-  const cards = g.ids.map(id => `<li>${_orgCard(_agentById(id), { stripConclave: g.id === 'conclave' })}</li>`).join('');
+  const stages = g.flow.map(stage => {
+    const cards = stage.map(id => _orgCard(_agentById(id), { stripConclave: g.id === 'conclave' })).join('');
+    return `<div class="of-stage${stage.length > 1 ? ' of-parallel' : ''}">${cards}</div>`;
+  });
+  const flowHtml = stages.join('<div class="of-arrow" title="handover">▶</div>');
   return `<li>
     <div class="org-group og-${g.id}">${g.label}</div>
-    <ul>${cards}</ul>
+    <div class="org-flow">${flowHtml}</div>
   </li>`;
 }
 
@@ -1806,6 +1982,145 @@ async function fetchMissions() {
 }
 
 let _selectedMissionId = null;
+
+// ─── Quadro: board estilo Plane sobre as missões reais (/missions) ──────
+// Cada node de missão vira um card; colunas = status do node (pending/running/done).
+// Arrastar entre Pendente/Concluído grava de volta no checkbox real do backlog
+// (POST /missions/{id}/nodes/{id}/done). "Em andamento" é sempre calculado —
+// não tem checkbox pra editar, então não aceita drop nem é arrastável.
+const QUADRO_COLUMNS = [
+  { key:'pending', label:'Pendente',     icon:'📥' },
+  { key:'running', label:'Em andamento', icon:'⚙️' },
+  { key:'done',    label:'Concluído',    icon:'✅' },
+];
+let _quadroFilter = 'all';
+const _quadroNodes = {};   // cache: missionId -> nodes[] (o /missions não traz nodes)
+
+function setQuadroFilter(id) {
+  _quadroFilter = id;
+  renderQuadro();
+}
+
+// Busca os nodes de cada missão (o endpoint /missions os omite) em paralelo,
+// com cache pra não refazer rede a cada troca de filtro.
+async function _loadQuadroNodes() {
+  await Promise.all(MISSIONS.map(async m => {
+    if (_quadroNodes[m.id]) return;
+    try {
+      const r = await fetch(`${API}/missions/${m.id}/nodes`);
+      _quadroNodes[m.id] = r.ok ? ((await r.json()).nodes || []) : [];
+    } catch { _quadroNodes[m.id] = []; }
+  }));
+}
+
+async function renderQuadro() {
+  const board = document.getElementById('quadro-board');
+  if (!board) return;
+  if (!MISSIONS.length) {
+    board.innerHTML = '<div class="quadro-empty">Carregando missões…</div>';
+    await fetchMissions();
+  }
+  await _loadQuadroNodes();
+  // Achata todos os nodes num único pool, carregando a missão de origem em cada card.
+  const cards = [];
+  MISSIONS.forEach(m => {
+    if (_quadroFilter !== 'all' && m.id !== _quadroFilter) return;
+    (_quadroNodes[m.id] || []).forEach(n => {
+      cards.push({ ...n, missionId: m.id, missionName: m.name });
+    });
+  });
+
+  // Filtros: "Todas" + uma chip por missão.
+  const filters = document.getElementById('quadro-filters');
+  if (filters) {
+    filters.innerHTML =
+      `<button class="qfilter ${_quadroFilter==='all'?'active':''}" onclick="setQuadroFilter('all')">Todas</button>` +
+      MISSIONS.map(m => `<button class="qfilter ${_quadroFilter===m.id?'active':''}" onclick="setQuadroFilter('${m.id}')" title="${esc(m.name)}">${esc(m.name.length>22?m.name.slice(0,22)+'…':m.name)}</button>`).join('');
+  }
+
+  if (!cards.length) {
+    board.innerHTML = '<div class="quadro-empty">Nenhuma tarefa nas missões — o backlog do Codex está vazio ou o backend está offline.</div>';
+    return;
+  }
+
+  board.innerHTML = QUADRO_COLUMNS.map(col => {
+    const colCards = cards.filter(c => (c.status || 'pending') === col.key);
+    // "Em andamento" é calculado (treinamento/projetos externos não têm checkbox
+    // pra editar) — só pending/done vêm do backlog real e podem ser arrastados.
+    return `
+      <div class="quadro-col q-col-${col.key}" data-col="${col.key}" ondragover="quadroDragOver(event)" ondragleave="quadroDragLeave(event)" ondrop="quadroDrop(event,'${col.key}')">
+        <div class="qcol-head">
+          <span class="qcol-title">${col.icon} ${col.label}</span>
+          <span class="qcol-count">${colCards.length}</span>
+        </div>
+        <div class="qcol-cards">
+          ${colCards.map(c => `
+            <div class="qcard q-${col.key}" title="${esc(c.full_text || c.label)}" draggable="${col.key !== 'running'}" data-node-id="${c.id}" data-mission-id="${c.missionId}" data-status="${col.key}" ondragstart="quadroDragStart(event)" ondragend="quadroDragEnd(event)">
+              <div class="qcard-text">${esc(c.label)}</div>
+              <div class="qcard-foot">
+                <span class="qcard-tag">${esc(c.missionName.length>26?c.missionName.slice(0,26)+'…':c.missionName)}</span>
+                ${col.key==='running' && c.pct ? `<span class="qcard-pct">${c.pct}%</span>` : ''}
+              </div>
+            </div>
+          `).join('') || '<div class="qcol-empty">—</div>'}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ─── Drag-and-drop do Quadro: arrastar grava de volta no backlog real ───
+let _quadroDrag = null; // { nodeId, missionId, fromStatus }
+
+function quadroDragStart(ev) {
+  const el = ev.currentTarget;
+  _quadroDrag = { nodeId: el.dataset.nodeId, missionId: el.dataset.missionId, fromStatus: el.dataset.status };
+  el.classList.add('dragging');
+  ev.dataTransfer.effectAllowed = 'move';
+}
+
+function quadroDragEnd(ev) {
+  ev.currentTarget.classList.remove('dragging');
+}
+
+function quadroDragOver(ev) {
+  ev.preventDefault();
+  ev.currentTarget.classList.add('drag-over');
+}
+
+function quadroDragLeave(ev) {
+  ev.currentTarget.classList.remove('drag-over');
+}
+
+async function quadroDrop(ev, targetStatus) {
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('drag-over');
+  const drag = _quadroDrag;
+  _quadroDrag = null;
+  if (!drag) return;
+  if (targetStatus === drag.fromStatus) return;
+  if (targetStatus === 'running') {
+    showToast('"Em andamento" é calculado automaticamente — não dá pra arrastar pra essa coluna.', 'warning');
+    return;
+  }
+  const done = targetStatus === 'done';
+  try {
+    const r = await fetch(`${API}/missions/${drag.missionId}/nodes/${drag.nodeId}/done`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ done }),
+    });
+    if (!r.ok) {
+      const data = await r.json().catch(() => ({}));
+      showToast(data.message || 'Não consegui mover essa tarefa.', 'error');
+      return;
+    }
+    const node = (_quadroNodes[drag.missionId] || []).find(n => n.id === drag.nodeId);
+    if (node) { node.status = targetStatus; node.pct = done ? 100 : 0; }
+    renderQuadro();
+  } catch {
+    showToast('Backend offline — não consegui salvar.', 'error');
+  }
+}
 
 function renderMissionsList() {
   const list = document.getElementById('missions-list');

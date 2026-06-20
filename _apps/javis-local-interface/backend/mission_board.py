@@ -183,3 +183,37 @@ def get_mission_nodes(mission_id: str) -> list[dict]:
         if m["id"] == mission_id:
             return m["nodes"]
     return []
+
+
+_NODE_ID_RE = re.compile(r"^(.+)-t(\d+)$")
+
+
+def set_task_done(mission_id: str, node_id: str, done: bool) -> bool:
+    """Marca/desmarca o checkbox de uma tarefa real no backlog do Codex.
+
+    Só funciona para missoes derivadas do backlog (cada node tem indice
+    sequencial dentro da secao). Missoes sinteticas (treinamento, projetos
+    externos) sao calculadas a partir de outro estado e nao tem checkbox pra
+    editar — chamar aqui pra elas sempre devolve False.
+    """
+    m = _NODE_ID_RE.match(node_id)
+    if not m or not BACKLOG.exists():
+        return False
+    task_idx = int(m.group(2))
+    lines = BACKLOG.read_text(encoding="utf-8").splitlines()
+    current_slug = None
+    task_counter = -1
+    for i, raw in enumerate(lines):
+        sm = _SECTION_RE.match(raw)
+        if sm:
+            current_slug = _slug(sm.group(1).strip())
+            task_counter = -1
+            continue
+        if _TASK_RE.match(raw) and current_slug is not None:
+            task_counter += 1
+            if current_slug == mission_id and task_counter == task_idx:
+                mark = "x" if done else " "
+                lines[i] = re.sub(r"^(\s*-\s*\[)( |x)(\])", rf"\g<1>{mark}\g<3>", raw, count=1)
+                BACKLOG.write_text("\n".join(lines) + "\n", encoding="utf-8")
+                return True
+    return False

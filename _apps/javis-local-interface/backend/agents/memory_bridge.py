@@ -10,7 +10,6 @@ from datetime import datetime
 
 MEMORIA_DIR      = Path(__file__).resolve().parents[4] / "_memoria"
 HISTORY_FILE     = Path(__file__).resolve().parents[2] / "logs" / "chat_history.jsonl"
-EMBEDDINGS_FILE  = MEMORIA_DIR / "embeddings.jsonl"
 
 
 class MemoryBridge:
@@ -48,13 +47,7 @@ class MemoryBridge:
     # ── Leitura ───────────────────────────────────────────────
 
     def recall(self, query: str, limit: int = 3) -> str:
-        """Busca na memória: semântica (embeddings) quando disponível, palavras-chave como fallback."""
-        # Tenta busca semântica primeiro
-        semantic = self.semantic_search(query, limit=limit)
-        if semantic:
-            return "\n\n---\n\n".join(f"[semântico]:\n{r['text']}" for r in semantic)
-
-        # Fallback: palavras-chave
+        """Busca na memória por palavras-chave. Busca semântica real fica a cargo de knowledge.py."""
         if not MEMORIA_DIR.exists():
             return ""
         words = [w.lower() for w in query.split() if len(w) > 3]
@@ -70,56 +63,6 @@ class MemoryBridge:
 
         hits.sort(key=lambda x: x[0], reverse=True)
         return "\n\n---\n\n".join(f"[{name}]:\n{snippet}" for _, name, snippet in hits[:limit])
-
-    def save_with_embedding(self, text: str, metadata: dict | None = None) -> None:
-        """Salva texto com vetor semântico para busca posterior."""
-        import sys
-        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-        try:
-            from llm_providers import embed
-            vec = embed(text)
-            if vec is None:
-                return
-            MEMORIA_DIR.mkdir(exist_ok=True)
-            entry = {
-                "ts":   datetime.now().isoformat(),
-                "text": text[:800],
-                "vec":  vec,
-                **(metadata or {}),
-            }
-            with open(EMBEDDINGS_FILE, "a", encoding="utf-8") as f:
-                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        except Exception:
-            pass
-
-    def semantic_search(self, query: str, limit: int = 3) -> list[dict]:
-        """Busca por similaridade de cosseno entre embeddings."""
-        import sys, math
-        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-        try:
-            from llm_providers import embed
-            q_vec = embed(query)
-            if q_vec is None or not EMBEDDINGS_FILE.exists():
-                return []
-
-            def cosine(a: list, b: list) -> float:
-                dot = sum(x * y for x, y in zip(a, b))
-                na  = math.sqrt(sum(x * x for x in a))
-                nb  = math.sqrt(sum(x * x for x in b))
-                return dot / (na * nb) if na and nb else 0.0
-
-            scored = []
-            for line in EMBEDDINGS_FILE.read_text(encoding="utf-8").splitlines():
-                try:
-                    e = json.loads(line)
-                    scored.append((cosine(q_vec, e["vec"]), e))
-                except Exception:
-                    pass
-
-            scored.sort(key=lambda x: x[0], reverse=True)
-            return [e for _, e in scored[:limit] if _ > 0.6]
-        except Exception:
-            return []
 
     def recent_decisions(self, n: int = 5) -> str:
         """Retorna as N decisões mais recentes."""

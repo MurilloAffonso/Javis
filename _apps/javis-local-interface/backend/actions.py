@@ -80,6 +80,7 @@ def execute(intent: str, user_text: str = "") -> dict:
         "analisar_site":    _analyze_site,
         "clima":            _weather,
         "hora_data":        _hora_data,
+        "trocar_motor":     _switch_brain,
         "acao_perigosa":    _blocked,
         "conversa":         _to_llm,
         "desconhecido":     _to_llm,
@@ -92,6 +93,38 @@ def execute(intent: str, user_text: str = "") -> dict:
 
 
 # --- handlers individuais ---
+
+def _switch_brain(text: str) -> dict:
+    """Troca o motor de EXECUÇÃO (programar) entre Claude e Codex por voz/texto.
+
+    Sem nome de motor na fala → só informa qual está ativo. Roda no fast-path
+    (sem LLM), resposta instantânea.
+    """
+    import brain_switch
+    low = (text or "").lower()
+    quer_codex  = "codex" in low
+    quer_claude = "claude" in low
+
+    if quer_codex and not quer_claude:
+        alvo = "codex"
+    elif quer_claude and not quer_codex:
+        alvo = "claude"
+    else:
+        # nenhum (ou ambos) citado → só reporta o ativo
+        ativo = brain_switch.get_active()
+        nome = "Codex" if ativo == "codex" else "Claude"
+        return {"status": "ok", "message": f"O motor de execução ativo é o {nome}, senhor."}
+
+    atual = brain_switch.get_active()
+    nome_alvo = "Codex" if alvo == "codex" else "Claude"
+    if atual == alvo:
+        return {"status": "ok", "message": f"O motor já está no {nome_alvo}, senhor."}
+    try:
+        brain_switch.set_active(alvo)
+    except Exception as exc:
+        return {"status": "error", "message": f"Não consegui trocar o motor, senhor: {exc}"}
+    return {"status": "ok", "message": f"Pronto, senhor. As tarefas de programação agora vão pro {nome_alvo}."}
+
 
 def _browser_target(text: str) -> tuple[str, str]:
     """Decide PRA ONDE abrir o navegador a partir do que o senhor falou.
@@ -228,8 +261,7 @@ def _register_idea(text: str) -> dict:
 
 def _system_status(_: str) -> dict:
     import socket
-    services = {"Open WebUI (3000)": 3000, "Ollama (11434)": 11434,
-                "Voz sandbox (12393)": 12393}
+    services = {"Open WebUI (3000)": 3000, "Voz sandbox (12393)": 12393}
     results = []
     for name, port in services.items():
         try:

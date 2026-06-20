@@ -5,9 +5,14 @@ roda comandos), este módulo usa o Claude Code headless apenas para PENSAR:
 decisões estratégicas, análises a fundo, conselhos. Roda pela ASSINATURA do
 Murillo (Opus 4.8 por padrão), sem gastar crédito da API Anthropic.
 
-Arquitetura "dois níveis":
-  Voz/papo/ações rápidas → OpenAI gpt-4o (rápido, instantâneo)
+Arquitetura "dois níveis" (decisão Murillo 18/06: só Claude por assinatura,
+sem API paga da OpenAI/Anthropic):
+  Voz/papo/ações rápidas → Claude Haiku pela assinatura (`_VOICE_MODEL`)
   Raciocínio pesado      → Claude Opus 4.8 pela assinatura  ← ESTE módulo
+
+`llm_providers.py` (camada compartilhada por Conclave, squads, analyzers etc.)
+chama este módulo como cérebro ÚNICO. Sem Ollama (decisão 19/06): se a
+assinatura faltar/zerar, o sistema diz isso na cara, não cai em fallback local.
 
 É SÍNCRONO: o cérebro principal precisa da resposta para falar. Bounded por
 timeout para não travar a voz se o subprocesso demorar demais.
@@ -30,6 +35,10 @@ JAVIS_ROOT = Path(__file__).resolve().parents[3]
 _MODEL    = os.environ.get("JAVIS_CLAUDE_BRAIN_MODEL", "claude-opus-4-8")
 # Se o modelo escolhido não estiver disponível na assinatura, cai no sonnet.
 _FALLBACK = os.environ.get("JAVIS_CLAUDE_BRAIN_FALLBACK", "sonnet")
+# Voz = prioridade velocidade/leveza (decisão Murillo 18/06): Haiku é o modelo
+# mais rápido e mais barato em cota da assinatura. Opus fica só pro raciocínio
+# pesado (texto/conclave), que não tem pressa de resposta falada.
+_VOICE_MODEL = os.environ.get("JAVIS_CLAUDE_VOICE_MODEL", "claude-haiku-4-5-20251001")
 # Raciocínio é mais rápido que execução; teto generoso mas não infinito.
 _TIMEOUT  = int(os.environ.get("JAVIS_CLAUDE_BRAIN_TIMEOUT", "120"))
 
@@ -41,7 +50,10 @@ _SYSTEM = (
     "Pense com profundidade e devolva uma resposta DIRETA e CONCISA em português "
     "do Brasil. A resposta será LIDA EM VOZ ALTA: no máximo 4-5 frases, sem "
     "markdown, sem listas longas. Trate-o por 'senhor'. Não use ferramentas nem "
-    "edite arquivos — apenas raciocine e responda."
+    "edite arquivos — apenas raciocine e responda. "
+    "NUNCA afirme que executou, iniciou, criou ou terminou uma tarefa: você só "
+    "pensa e responde, não age. Se algo precisa ser FEITO, diga que vai pedir a "
+    "ação ou o que falta — não finja que já está pronto."
 )
 
 
@@ -56,15 +68,20 @@ def _env() -> dict:
     return env
 
 
-def answer(question: str, context: str = "", system: str | None = None, timeout: int | None = None) -> str:
+def answer(question: str, context: str = "", system: str | None = None, timeout: int | None = None,
+           model: str | None = None, add_dirs: list[str] | None = None) -> str:
     """Raciocina sobre a pergunta com o Claude (assinatura) e retorna o texto.
 
     Retorna "" se o Claude Code não estiver disponível, para o chamador cair no
     fallback (ex.: conclave OpenAI).
 
-    `system`  — sobrescreve o system prompt (por padrão usa o de voz, curto).
-                Os agentes (ex.: Architect) passam a própria persona+skill aqui.
-    `timeout` — sobrescreve o teto de tempo (agentes de design podem precisar mais).
+    `system`   — sobrescreve o system prompt (por padrão usa o de voz, curto).
+                 Os agentes (ex.: Architect) passam a própria persona+skill aqui.
+    `timeout`  — sobrescreve o teto de tempo (agentes de design podem precisar mais).
+    `model`    — sobrescreve o modelo (ex.: voz usa Haiku, mais rápido/leve).
+    `add_dirs` — pastas extras que o Claude pode LER (ex.: Downloads p/ analisar
+                 um arquivo fora do projeto). Read continua liberado; Bash/Edit/
+                 Write seguem bloqueados — então é leitura segura, não escrita.
     """
     question = (question or "").strip()
     if not question:
@@ -74,7 +91,7 @@ def answer(question: str, context: str = "", system: str | None = None, timeout:
     prompt = question if not context.strip() else f"Contexto: {context.strip()}\n\nPergunta: {question}"
     cmd = [
         _CLAUDE_BIN, "-p", prompt,
-        "--model", _MODEL,
+        "--model", model or _MODEL,
         "--fallback-model", _FALLBACK,
         "--output-format", "text",
         "--permission-mode", "default",
@@ -82,6 +99,8 @@ def answer(question: str, context: str = "", system: str | None = None, timeout:
         "--disallowedTools", "Bash", "Edit", "Write",
         "--append-system-prompt", system or _SYSTEM,
     ]
+    for d in (add_dirs or []):
+        cmd += ["--add-dir", d]
     try:
         proc = subprocess.run(
             cmd, cwd=str(JAVIS_ROOT), env=_env(),
@@ -101,12 +120,15 @@ def answer(question: str, context: str = "", system: str | None = None, timeout:
         return ""
 
 
-def answer_stream(question: str, context: str = ""):
-    """Igual a answer(), mas GERA o texto em pedaços conforme o Opus produz —
+def answer_stream(question: str, context: str = "", model: str | None = None, system: str | None = None):
+    """Igual a answer(), mas GERA o texto em pedaços conforme o modelo produz —
     para a voz começar a falar frase a frase em vez de esperar o bloco todo.
 
     Yields str (deltas de texto). Não emite nada se o Claude Code estiver
     indisponível — o chamador deve checar e cair no fallback.
+
+    `model`  — sobrescreve o modelo padrão (voz usa Haiku via `_VOICE_MODEL`).
+    `system` — sobrescreve o system prompt (outros cérebros passam o próprio).
     """
     question = (question or "").strip()
     if not question or not available():
@@ -114,20 +136,21 @@ def answer_stream(question: str, context: str = ""):
     prompt = question if not context.strip() else f"Contexto: {context.strip()}\n\nPergunta: {question}"
     cmd = [
         _CLAUDE_BIN, "-p", prompt,
-        "--model", _MODEL,
+        "--model", model or _MODEL,
         "--fallback-model", _FALLBACK,
         "--output-format", "stream-json",
         "--include-partial-messages",
         "--verbose",
         "--permission-mode", "default",
         "--disallowedTools", "Bash", "Edit", "Write",
-        "--append-system-prompt", _SYSTEM,
+        "--append-system-prompt", system or _SYSTEM,
     ]
     try:
         proc = subprocess.Popen(
             cmd, cwd=str(JAVIS_ROOT), env=_env(),
             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL, text=True, bufsize=1,
+            stderr=subprocess.DEVNULL, text=True,
+            encoding="utf-8", errors="replace", bufsize=1,
         )
     except Exception:
         return

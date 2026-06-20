@@ -32,6 +32,7 @@ REGRAS ABSOLUTAS — NUNCA VIOLAR:
 3. VOZ: Respostas são lidas em voz alta — seja CONCISO. Máximo 2 frases para ações. Sem markdown.
 4. AÇÃO: Quando houver uma ferramenta disponível, USE-A. Não descreva o que faria — faça.
 5. SEM IMPROVISO: Nunca invente dados (preços, horários, endereços). Use as ferramentas.
+6. NÃO FINJA QUE FEZ: Nunca diga que "executou", "iniciou", "criou", "terminou" ou "já fez" algo se nenhuma ferramenta foi realmente chamada para isso nesta resposta. Se não há ferramenta para a tarefa, diga a verdade — o que falta, ou ofereça a ação real — em vez de afirmar que já está feito.
 
 PERFIL DE MURILLO:
 - Empreendedor, fundador da Vem Passear em Jampa (turismo em João Pessoa/PB)
@@ -86,7 +87,7 @@ TOOLS = [
     },
     {
         "name": "status_sistema",
-        "description": "Verifica o status dos serviços do sistema (Ollama, Open WebUI, etc.).",
+        "description": "Verifica o status dos serviços do sistema (Open WebUI, Voz sandbox, etc.).",
         "input_schema": {"type": "object", "properties": {}, "required": []},
     },
     {
@@ -265,6 +266,11 @@ TOOLS = [
             "required": ["questao"],
         },
     },
+    {
+        "name": "gerar_pauta_vp",
+        "description": "Aciona o FLUXO REAL de marketing da Vem Passear: chama a agente Nova pra montar a pauta de conteúdo da SEMANA (3 posts), salva em pauta-semana.md, registra no Quadro (Raia 1) e PARA no Gate 1 pedindo a aprovação do Murillo. Use quando o senhor pedir 'cria a pauta da semana', 'monta a pauta da Vem Passear', 'pauta de posts dessa semana' ou similar.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
 ]
 
 
@@ -318,12 +324,9 @@ def _exec_tool(name: str, inp: dict, history: list[dict] | None = None) -> str:
         return f"São {n.strftime('%H:%M')}, {dias[n.weekday()]}, {n.day} de {meses[n.month-1]} de {n.year}, senhor."
     if name == "programar":
         tarefa = inp.get("tarefa") or ""
-        # Execução pela ASSINATURA do Claude (Claude Code headless); Codex como reserva.
-        import claude_exec
-        if claude_exec.available():
-            return claude_exec.dispatch(tarefa)
-        import code_agent
-        return code_agent.dispatch(tarefa)
+        # Motor escolhido por Murillo (botão Claude/Codex); com fallback automático.
+        import brain_switch
+        return brain_switch.dispatch(tarefa)
     if name == "abrir_app":
         import app_launcher
         return app_launcher.open_app(inp.get("nome") or "").get("message", "Feito, senhor.")
@@ -385,8 +388,80 @@ def _exec_tool(name: str, inp: dict, history: list[dict] | None = None) -> str:
         except Exception as e:
             _log(f"consultar_especialistas falhou: {e}")
             return f"Não consegui reunir o conselho agora, senhor: {e}"
+    if name == "gerar_pauta_vp":
+        return _fluxo_pauta_vp()
     # ações sem parâmetro
     return actions.execute(name, "").get("message", "Feito, senhor.")
+
+
+def _fluxo_pauta_vp() -> str:
+    """FLUXO REAL (chat → agente → arquivo → quadro → aprovação → log).
+
+    Coração do Javis: o pedido em linguagem natural vira ação de verdade —
+    a Nova gera a pauta, salva, o Quadro registra a Raia 1, e o fluxo PARA no
+    Gate 1 (aprovação do Murillo). Tudo logado.
+    """
+    import time
+    from pathlib import Path
+    inicio = time.time()
+    cj = Path(__file__).resolve().parents[3] / "_projetos" / "cerebro-jampa"
+
+    pedido = (
+        "Monte a PAUTA DA SEMANA com EXATAMENTE 3 posts pro Instagram da Vem Passear, "
+        "respeitando a regra de no máximo 1 de venda direta. Varie os pilares. Para cada "
+        "post traga: dia e data, pilar, formato, gancho 3s, legenda no tom da marca, "
+        "material visual necessário, CTA e hashtags. No fim, escreva 'Status: pauta "
+        "proposta — aguardando aprovação do Murillo (Gate 1)'."
+    )
+    try:
+        import vp_squad
+        r = vp_squad.run("nova", pedido)
+    except Exception as e:
+        return f"Não consegui acionar a Nova agora, senhor: {e}"
+    if r.get("status") != "ok" or not r.get("result"):
+        return r.get("message", "A Nova não devolveu a pauta agora, senhor (cota/assinatura).")
+
+    # salva a pauta
+    try:
+        header = ("# Pauta da Semana — Vem Passear Jampa\n\n> Gerada pela Nova via chat do "
+                  "Javis, " + time.strftime("%Y-%m-%d %H:%M") + ".\n> Raia 1 do Pipeline. "
+                  "Próximo: Gate 1 (aprovação do Murillo).\n\n")
+        (cj / "posts").mkdir(parents=True, exist_ok=True)
+        (cj / "posts" / "pauta-semana.md").write_text(header + r["result"], encoding="utf-8")
+    except Exception as e:
+        return f"A Nova montou a pauta mas não consegui salvar, senhor: {e}"
+
+    # registra no Quadro (Raia 1 concluída; Gate 1 fica pendente pro Murillo)
+    quadro_ok = False
+    try:
+        import mission_board
+        mid = "pipeline-marketing-vem-passear-jampa"
+        quadro_ok = mission_board.set_task_done(mid, mid + "-t0", True)
+    except Exception as e:
+        _log(f"gerar_pauta_vp: quadro não atualizou: {e}")
+
+    # log do fluxo
+    try:
+        import logger
+        logger.log(
+            "frontend", "cria a pauta da semana da Vem Passear",
+            {"intent": "gerar_pauta_vp", "confidence": "high", "risk_level": "low",
+             "requires_approval": True},
+            {"status": "ok", "message": "Nova gerou a pauta; aguardando Gate 1"},
+            approved=None, duration_ms=int((time.time() - inicio) * 1000),
+            extra={"agente": "nova", "arquivo": "_projetos/cerebro-jampa/posts/pauta-semana.md",
+                   "quadro_atualizado": quadro_ok, "gate": "1 (aprovacao Murillo) pendente"},
+        )
+    except Exception as e:
+        _log(f"gerar_pauta_vp: log falhou: {e}")
+
+    return (
+        "Pronto, senhor. A Nova montou a pauta da semana (3 posts) e salvei em "
+        "pauta-semana.md. Registrei no Quadro — Raia 1 concluída"
+        + (" ✓" if quadro_ok else "") +
+        ". O fluxo PAROU no Gate 1: preciso da sua aprovação. Confira a pauta e me diga "
+        "se aprovo pra produção ou ajusto algo — nada vai pro Design sem o seu OK."
+    )
 
 
 def _rotina_matinal() -> str:
@@ -554,26 +629,112 @@ def _respond_openai(user_text: str, history: list[dict], max_rounds: int) -> dic
     return {"text": "Executei o que era possível, senhor.", "tools": used}
 
 
+def _tool_catalog() -> str:
+    """Lista compacta das ferramentas pro prompt do Claude pela assinatura."""
+    lines = []
+    for t in TOOLS:
+        params = ", ".join(t["input_schema"].get("properties", {}).keys())
+        lines.append(f"- {t['name']}({params}): {t['description']}")
+    return "\n".join(lines)
+
+
+def _parse_tool_json(text: str) -> dict | None:
+    """Extrai {"tool": ..., "args": {...}} de uma resposta em texto puro."""
+    text = (text or "").strip()
+    if text.startswith("```"):
+        text = text.strip("`")
+        if text.lower().startswith("json"):
+            text = text[4:]
+        text = text.strip()
+    if not text.startswith("{"):
+        return None
+    try:
+        obj = json.loads(text)
+    except Exception:
+        return None
+    return obj if isinstance(obj, dict) and "tool" in obj else None
+
+
+def _respond_claude_subscription(user_text: str, history: list[dict], max_rounds: int) -> dict | None:
+    """Tool-use via Claude Code headless (ASSINATURA, sem chave de API).
+
+    O CLI não expõe function-calling nativo pra ferramentas arbitrárias do
+    Jamba, então a decisão de ferramenta vem como JSON em texto puro
+    (instruído no system prompt) e é parseada/executada aqui — mesmo
+    `_exec_tool` usado pelos outros provedores. Retorna None se o Claude
+    Code não estiver disponível, pro chamador cair no fallback.
+    """
+    import claude_brain
+    if not claude_brain.available():
+        return None
+    system = _system() + (
+        "\n\nFerramentas disponíveis:\n" + _tool_catalog() +
+        "\n\nPara usar uma ferramenta, responda SOMENTE com um JSON puro (sem "
+        "texto antes/depois, sem markdown) neste formato exato:\n"
+        '{"tool": "nome_da_ferramenta", "args": {"param": "valor"}}\n'
+        "Se nenhuma ferramenta for necessária, responda normalmente em texto.\n\n"
+        "REGRA DURA DE FERRAMENTA — não viole:\n"
+        "- Se o senhor citar um ARQUIVO (caminho, .pdf, .docx, 'em Downloads', "
+        "'na pasta X') → USE `analisar_arquivo`. NUNCA descreva o conteúdo de "
+        "memória ou suposição: você NÃO viu o arquivo até a ferramenta rodar.\n"
+        "- Se citar um SITE/URL pra ler/analisar → USE `ler_pagina` ou "
+        "`analisar_site`.\n"
+        "- Se pedir pra CRIAR/ALTERAR/EXECUTAR algo no projeto (código, arquivo, "
+        "rodar comando) → USE `programar`. Não diga que vai pedir pra outra parte: "
+        "`programar` JÁ é o pedido pro executor.\n"
+        "- Se perguntar sobre as NOTAS/ANOTAÇÕES dele → USE `buscar_conhecimento`.\n"
+        "- Na dúvida entre usar a ferramenta ou responder de cabeça sobre algo "
+        "concreto e verificável: USE a ferramenta. Responder de memória sobre o "
+        "que está num arquivo/site é FINGIR que fez — proibido."
+    )
+    base_ctx = _history_context(history)
+    transcript = ""
+    used: list[str] = []
+    for _ in range(max_rounds):
+        ctx = f"{base_ctx}\n\n{transcript}".strip() if transcript else base_ctx
+        out = claude_brain.answer(user_text, context=ctx, system=system, model=CLAUDE_MODEL)
+        if not out:
+            return None
+        call = _parse_tool_json(out)
+        if not call:
+            return {"text": out.strip(), "tools": used}
+        name = call.get("tool", "")
+        used.append(name)
+        result = _exec_tool(name, call.get("args") or {}, history)
+        transcript += f"\n[ferramenta {name} executada → resultado: {result}]"
+    return {"text": "Executei o que era possível, senhor.", "tools": used}
+
+
 def respond(user_text: str, history: list[dict] | None = None, max_rounds: int = 5) -> dict | None:
-    """Loop de tool-use. Cascata: OpenAI → Claude → OpenRouter.
+    """Loop de tool-use. Cascata: Claude (assinatura) → OpenAI → Claude API → OpenRouter.
+    Decisão Murillo 18/06: a assinatura é o cérebro principal; o resto é fallback
+    pra quando o Claude Code não estiver disponível, não rota padrão.
     Retorna {text, tools} ou None se nenhum provedor disponível."""
     history = history or []
 
-    # 1) OpenAI — primário (rápido, estável)
+    # 1) Claude pela assinatura — primário (sem custo de API)
+    try:
+        out = _respond_claude_subscription(user_text, history, max_rounds)
+        if out is not None:
+            return out
+    except Exception as e:
+        _log(f"Claude (assinatura) falhou, tentando próximo: {e}")
+
+    # 2) OpenAI — só se a assinatura estiver indisponível
     if os.environ.get("OPENAI_API_KEY", "").strip():
         try:
             return _respond_openai(user_text, history, max_rounds)
         except Exception as e:
             _log(f"OpenAI (tool-use) falhou, tentando próximo: {e}")
 
-    # 2) Claude (Anthropic) — se tiver crédito
+    # 3) Claude (Anthropic API) — se tiver crédito
     if os.environ.get("ANTHROPIC_API_KEY", "").strip():
         try:
             return _respond_claude(user_text, history, max_rounds)
         except Exception as e:
             _log(f"Claude (tool-use) falhou, tentando próximo: {e}")
 
-    # 3) OpenRouter — requer cartão cadastrado em openrouter.ai
+    # 4) OpenRouter — requer cartão cadastrado em openrouter.ai
     if os.environ.get("OPENROUTER_API_KEY", "").strip():
         try:
             return _respond_openrouter(user_text, history, max_rounds)
@@ -585,7 +746,19 @@ def respond(user_text: str, history: list[dict] | None = None, max_rounds: int =
 
 
 def stream_text(user_text: str, history: list[dict]):
-    """Stream raw text tokens via OpenAI (sem tool-use). Retorna generator ou None se indisponível."""
+    """Stream raw text (sem tool-use). Claude pela assinatura, com fallback OpenAI.
+    Retorna generator ou None se nenhum provedor disponível."""
+    import claude_brain
+    if claude_brain.available():
+        ctx = _history_context(history)
+        gen = claude_brain.answer_stream(user_text, context=ctx, system=_system())
+        first = next(gen, None)
+        if first is not None:
+            def _iter_claude():
+                yield first
+                yield from gen
+            return _iter_claude()
+
     if not os.environ.get("OPENAI_API_KEY", "").strip():
         return None
     try:

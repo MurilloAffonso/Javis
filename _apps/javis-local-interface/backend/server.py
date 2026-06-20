@@ -127,7 +127,6 @@ async def reminders_list():
 
 SERVICES = {
     "Open WebUI":  3000,
-    "Ollama":      11434,
     "Voz sandbox": 12393,
 }
 
@@ -135,7 +134,7 @@ SERVICES = {
 class ChatRequest(BaseModel):
     message: str
     use_conclave: bool = False
-    model: str = "llama3.2:3b"
+    model: str = "claude"
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -448,7 +447,7 @@ class DebateRequest(BaseModel):
     task:    str
     agents:  list[str] = ["architect", "developer", "analyst"]
     rounds:  int = 2
-    model:   str = "llama3.2:3b"
+    model:   str = "claude"
 
 
 @app.post("/debate")
@@ -488,16 +487,50 @@ async def briefing_endpoint():
         return JSONResponse({"saudacao": "Bom dia, senhor.", "estado": "", "erro": str(e)})
 
 
+@app.get("/brain/active")
+async def brain_active_get():
+    import brain_switch
+    return JSONResponse({"engine": brain_switch.get_active()})
+
+
+class BrainActiveRequest(BaseModel):
+    engine: str
+
+
+@app.post("/brain/active")
+async def brain_active_set(req: BrainActiveRequest):
+    import brain_switch
+    try:
+        engine = brain_switch.set_active(req.engine)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    return JSONResponse({"engine": engine})
+
+
 @app.get("/status")
 async def status():
     services = {}
     for name, port in SERVICES.items():
         try:
-            with socket.create_connection(("localhost", port), timeout=1):
+            # 127.0.0.1 (não "localhost"): localhost resolve pra IPv6 ::1 e fica
+            # esperando o timeout inteiro quando a porta está offline, deixando o
+            # /status lento e estourando o timeout do cliente. Em 127.0.0.1 a
+            # porta offline RECUSA na hora (sem espera).
+            with socket.create_connection(("127.0.0.1", port), timeout=0.5):
                 services[name] = {"status": "online", "port": port}
         except OSError:
             services[name] = {"status": "offline", "port": port}
-    return JSONResponse({"services": services, "ts": _ts()})
+    # Cérebro = Claude pela assinatura (não é porta; é o CLI logado).
+    try:
+        import claude_brain
+        brain_ok = claude_brain.available()
+    except Exception:
+        brain_ok = False
+    return JSONResponse({
+        "services": services,
+        "brain": {"engine": "claude", "status": "online" if brain_ok else "offline"},
+        "ts": _ts(),
+    })
 
 
 @app.get("/agents")
@@ -530,9 +563,30 @@ async def agents_run(req: AgentRunRequest):
     return JSONResponse(out)
 
 
+@app.get("/vp/agents")
+async def vp_agents_list():
+    """Squad de marketing da Vem Passear — os 5 agentes com contrato (Input/Output/Não faz)."""
+    import vp_squad
+    return JSONResponse({"agents": vp_squad.list_agents(), "total": len(vp_squad.AGENTS)})
+
+
+class VPRunRequest(BaseModel):
+    agent_id: str
+    task: str
+    context: str = ""
+
+
+@app.post("/vp/agents/run")
+async def vp_agents_run(req: VPRunRequest):
+    """Executa um agente do squad da Vem Passear (contrato como system prompt, na assinatura)."""
+    import vp_squad
+    out = await run_in_threadpool(vp_squad.run, req.agent_id, req.task, req.context)
+    return JSONResponse(out)
+
+
 class VoiceRequest(BaseModel):
     transcript: str
-    model:       str  = "llama3.2:3b"
+    model:       str  = "claude"
     use_conclave: bool = False
     tts:         bool = True
 
@@ -665,29 +719,28 @@ async def voice_stream(req: VoiceRequest):
             else:
                 yield f"data: {json.dumps({'type':'tts_text','text':'Certo, senhor.'})}\n\n"
 
-        # RACIOCÍNIO PESADO EM STREAMING — pedidos profundos vão DIRETO ao Claude
-        # Opus 4.8 (assinatura), falando frase a frase conforme o Opus pensa.
-        # Pula o gpt-4o (sem double-LLM) e elimina o silêncio de 20-40s: o senhor
-        # ouve a resposta se formando. Só para frases claramente profundas.
-        if not req.use_conclave and _likely_council(clean):
+        # CÉREBRO PADRÃO DO CHAT = Claude pela ASSINATURA (Opus 4.8), falando frase
+        # a frase conforme pensa. Decisão do Murillo (18/06): tirar a API paga do
+        # OpenAI do caminho de conversa e usar a assinatura. Toda conversa/raciocínio
+        # vai DIRETO ao Claude em streaming; ações com ferramenta (lembrete, abrir,
+        # programar) já foram tratadas no fast-path ou caem no _brain abaixo. Se o
+        # Claude estiver indisponível ou devolver vazio, cai no _brain (fallback).
+        if not req.use_conclave and (_likely_council(clean) or intent in ("conversa", "desconhecido")):
             try:
                 import claude_brain as _cb
                 import agent as _ag
             except Exception:
                 _cb = None
             if _cb and _cb.available():
-                ctx = _ag._history_context(_get_history_messages())
-                try:
-                    import briefing as _bf
-                    estado = _bf.estado_resumido()
-                    if estado:
-                        ctx = (ctx + "\n\n" if ctx else "") + "Estado atual do projeto Javis:\n" + estado
-                except Exception:
-                    pass
+                # Voz = Haiku + contexto enxuto (decisão Murillo 18/06: velocidade e
+                # leveza em 1º lugar). Sem o estado do projeto (briefing) aqui — pesa
+                # o prompt sem ajudar o bate-papo falado; histórico cortado pra 2
+                # trocas em vez de 4.
+                ctx = _ag._history_context(_get_history_messages(), limit=2)
                 spoke = False
                 full_text = ""
                 yield f"data: {json.dumps({'type':'meta','intent':'pensar_profundo','brain':'claude'})}\n\n"
-                for sentence in _accumulate_sentences(_cb.answer_stream(clean, ctx)):
+                for sentence in _accumulate_sentences(_cb.answer_stream(clean, ctx, model=_cb._VOICE_MODEL)):
                     spoke = True
                     full_text += (" " if full_text else "") + sentence
                     if req.tts:
@@ -749,7 +802,7 @@ class RootcauseRequest(BaseModel):
     task:            str
     failed_response: str
     agents_used:     list[str] = []
-    model:           str = "llama3.2:3b"
+    model:           str = "claude"
 
 
 @app.post("/rootcause")
@@ -990,6 +1043,7 @@ FAST_PATH = {
     "abrir_vscode", "abrir_projeto", "status_sistema",
     "hora_data", "abrir_youtube", "tocar_musica",
     "listar_lembretes", "registrar_ideia", "clima",
+    "trocar_motor",
     # abrir_terminal removido: requires_approval=True no RISK_MAP
 }
 
@@ -1175,7 +1229,8 @@ def _vp_fallback(tipo: str) -> str:
 def _brain(text: str, history: list[dict], use_conclave: bool = False) -> dict:
     """Núcleo ÚNICO de decisão do Jamba (usado por /chat, /chat/stream e /voice).
 
-    Cascata: atalho local → conclave (se pedido) → agente tool-use → fallback Ollama.
+    Cascata: atalho local → conclave (se pedido) → agente tool-use → cérebro
+    principal direto. Tudo no Claude pela assinatura; sem Ollama (decisão 19/06).
     Retorna {text, intent, brain, status, tools, route, orch}.
     """
     route = command_router.route(text)
@@ -1199,12 +1254,16 @@ def _brain(text: str, history: list[dict], use_conclave: bool = False) -> dict:
             return {"text": f"O conclave falhou, senhor: {e}", "intent": intent,
                     "brain": "conclave", "status": "error", "tools": [], "route": route, "orch": None}
 
-    # 3) Cérebro AGENTE (tool-use) — entende a intenção (conversa OU ação) e
-    #    decide sozinho se chama uma ferramenta. Conversa também passa por aqui
-    #    para PRESERVAR o raciocínio: pode buscar nas notas (buscar_conhecimento),
-    #    lembrar fatos (lembrar_fato) e encadear ações, em vez de responder no
-    #    vácuo. O modelo não desperdiça tool-call em bate-papo simples ("oi").
     import agent
+
+    # 3) Cérebro AGENTE (tool-use) — caminho ÚNICO pra conversa E ação (correção
+    #    19/06). Antes, "conversa"/"desconhecido" ia direto pro claude_brain.answer
+    #    (cérebro de RACIOCÍNIO, persona "só penso, não ajo"): ele PROMETIA acionar
+    #    a execução mas nunca chamava a ferramenta — loop de "vou pedir pra parte
+    #    executora" sem nada acontecer. Agora tudo passa pelo agente, que de fato
+    #    age: chama `programar` (→ executor), `buscar_conhecimento`, `pensar_profundo`
+    #    (raciocínio fundo quando precisa), `lembrar_fato`, ou só conversa. O estado
+    #    do projeto já entra via agent._system() (injeta briefing.estado_resumido()).
     ag = agent.respond(text, history)
     if ag is not None:
         used = ag["tools"][0] if ag.get("tools") else intent
@@ -1212,7 +1271,9 @@ def _brain(text: str, history: list[dict], use_conclave: bool = False) -> dict:
                 "brain": "main", "status": "agent", "tools": ag.get("tools", []),
                 "route": route, "orch": None}
 
-    # 4) Fallback sem Claude/OpenAI → cérebro local (Ollama)
+    # 5) Último recurso — cérebro principal direto (Claude assinatura via
+    #    orchestrator._main_brain → call_claude). Sem Ollama: se faltar, a
+    #    própria call_claude devolve a mensagem clara de "sem cérebro".
     try:
         txt = orchestrator._main_brain(text, history)
     except Exception as e:
@@ -1267,10 +1328,21 @@ class OAIRequest(BaseModel):
     temperature: float | None = None
 
 
+# Microfone sempre-ligado (voz-sandbox/VTuber): sem isso, QUALQUER fala captada
+# pelo VAD virava uma resposta falada. Portão: só processa se (a) a palavra de
+# ativação apareceu nesta fala, ou (b) ainda estamos dentro da "janela de
+# conversa" depois da última vez que ela apareceu — pra não exigir "Javis" antes
+# de cada frase de um papo contínuo. Estado em memória (reinicia com o servidor).
+_WAKE_SESSION_SECONDS = 25
+_last_wake_ts: float = 0.0
+
+
 @app.post("/v1/chat/completions")
 async def openai_compat(req: OAIRequest):
     """Endpoint OpenAI-compatível para voz-sandbox e outros clientes."""
+    global _last_wake_ts
     import time, uuid
+
     # Extrai texto do último user message
     user_text = ""
     for m in reversed(req.messages):
@@ -1281,8 +1353,40 @@ async def openai_compat(req: OAIRequest):
     if not user_text:
         user_text = "olá"
 
-    # Chamada OpenAI direta sem tools — resposta de texto limpa para o avatar
+    import voice_bridge as _vb
+    now = time.monotonic()
+    woke_now = _vb.has_wake_word(user_text)
+    in_session = (now - _last_wake_ts) < _WAKE_SESSION_SECONDS
+    if not (woke_now or in_session):
+        # Fala captada mas não destinada ao Javis — fica em silêncio, não loga.
+        return JSONResponse({
+            "id": f"chatcmpl-{uuid.uuid4().hex[:12]}", "object": "chat.completion",
+            "created": int(time.time()), "model": req.model,
+            "choices": [{"index": 0, "message": {"role": "assistant", "content": ""},
+                         "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        })
+    _last_wake_ts = now
+    clean_text = _vb._strip_wake_word(user_text) or user_text
+
+    # Cérebro = Claude pela assinatura (decisão 18/06, tira a API paga do caminho
+    # de voz também). Haiku + contexto enxuto (decisão 18/06: velocidade/leveza
+    # em 1º lugar na voz). Cai pro gpt-4o-mini só se o Claude faltar.
     def _llm_direct(text: str) -> str:
+        try:
+            import claude_brain
+            if claude_brain.available():
+                ctx = ""
+                try:
+                    import agent as _agent
+                    ctx = _agent._history_context(_get_history_messages(), limit=2)
+                except Exception:
+                    pass
+                resp = claude_brain.answer(text, ctx, model=claude_brain._VOICE_MODEL)
+                if resp and resp.strip():
+                    return resp
+        except Exception:
+            pass
         import os
         from openai import OpenAI
         import agent as _agent
@@ -1298,7 +1402,7 @@ async def openai_compat(req: OAIRequest):
         )
         return r.choices[0].message.content or "Sem resposta."
 
-    reply = await run_in_threadpool(_llm_direct, user_text)
+    reply = await run_in_threadpool(_llm_direct, clean_text)
 
     history_store.append("user", user_text)
     history_store.append("assistant", reply)
@@ -1464,6 +1568,24 @@ async def get_mission_nodes(mission_id: str):
     """Tarefas (nodes) de uma missão específica, pra desenhar o canvas."""
     import mission_board
     return JSONResponse({"nodes": mission_board.get_mission_nodes(mission_id)})
+
+
+class TaskDoneRequest(BaseModel):
+    done: bool
+
+
+@app.post("/missions/{mission_id}/nodes/{node_id}/done")
+async def set_mission_task_done(mission_id: str, node_id: str, req: TaskDoneRequest):
+    """Marca/desmarca uma tarefa real no backlog (drag-and-drop do Quadro).
+    Missões sintéticas (calculadas, sem checkbox) devolvem 404."""
+    import mission_board
+    ok = mission_board.set_task_done(mission_id, node_id, req.done)
+    if not ok:
+        return JSONResponse(
+            {"ok": False, "message": "Tarefa não encontrada ou não editável (missão calculada)."},
+            status_code=404,
+        )
+    return JSONResponse({"ok": True})
 
 
 if __name__ == "__main__":

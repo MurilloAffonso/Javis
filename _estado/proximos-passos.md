@@ -63,8 +63,28 @@ Detalhe completo em `_logs/2026-06-17_orquestracao-noturna.md`. Resumo:
 
 ## Pendências em aberto (para o Javis saber e cobrar)
 
-- [ ] ElevenLabs — decidir profundidade da integração e plugar `ELEVENLABS_API_KEY`
-- [ ] Figma — apontar workspace/arquivo para o Codex montar o board
 - [ ] Resumir os ~18 vídeos do esquadrão de estudo (transcript já funciona, rodar 1-2 por vez pra não bater rate-limit do YouTube)
-- [ ] Frente 3 — afinar voz (wake word, latência, exatidão do ASR)
-- [ ] Frente 2+ — interface mais proativa além da saudação (feed do que o orquestrador fez)
+- [ ] **Frente 3 (PRIORIDADE ATUAL)** — afinar voz (wake word, latência, exatidão do ASR)
+- [ ] Frente 2+ — interface mais proativa além da saudação (feed do que o orquestrador fez, hoje é mock)
+- [ ] Fallback do Ollama no `agent_runner.py` não cobre os 6 agentes de conclave/meta (silencioso se Claude e OpenAI caírem)
+- [ ] Testar qualidade real de mais skills (só Architect e Developer foram validados via execução real até agora)
+
+## Cancelado por decisão do Murillo (17/06)
+
+- ~~ElevenLabs~~ — não vamos integrar voz por API paga agora.
+- ~~Figma~~ — não vamos manter board/projeto no Figma.
+- **Obsidian não gerencia o projeto** — é só vault de notas; gestão real do Javis é por `_estado/`/`_logs/`/`proximos-passos.md`, como já era o padrão.
+
+## ✅ Cérebro central — Claude x Codex (CONCLUÍDO 17/06)
+
+Murillo tem 2 assinaturas (Claude Code + ChatGPT/Codex) e quer trocar manualmente
+qual executa "programa X" quando uma ficar sem cota — em vez de ordem fixa.
+- `backend/brain_switch.py` (novo): estado persistido em `_estado/brain_ativo.json`,
+  `get_active()`/`set_active()`/`dispatch()` (motor escolhido, com fallback pro outro).
+- `agent.py` (intent `programar`): agora usa `brain_switch.dispatch` em vez da
+  ordem fixa Claude→Codex antiga.
+- `server.py`: `GET/POST /brain/active`.
+- `index.html`/`app.js`/`style.css`: botão "MOTOR DE EXECUÇÃO" no painel esquerdo
+  do chat (Claude/Codex), com descrição dinâmica.
+- Testado ponta a ponta no browser (Playwright): clique troca o motor, persiste
+  no backend, sobrevive a reload. `pytest tests/` → 71/71.
