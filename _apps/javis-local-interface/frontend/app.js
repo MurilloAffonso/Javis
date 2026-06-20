@@ -2172,6 +2172,26 @@ async function runStudio(extId) {
   renderQuadro();
 }
 
+// Prepara a Distribuição (modo seguro) na task liberada → gera pacote + Gate 3.
+async function runDistribution(extId) {
+  try {
+    const r = await fetch(`${API}/tasks/${encodeURIComponent(extId)}/prepare-distribution`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(20000),
+    });
+    const d = await r.json();
+    if (r.ok && d.ok) {
+      showToast('Distribuição preparada. Gate 3 aguardando aprovação.', 'success');
+      refreshStats(); loadApprovals();
+    } else {
+      showToast(d.error || 'Não consegui preparar a distribuição.', 'warning');
+    }
+  } catch (e) {
+    showToast('Falhou ao preparar a distribuição: ' + e, 'error');
+  }
+  renderQuadro();
+}
+
 function _qColForStatus(status) {
   const s = status || 'pending';
   const col = QUADRO_COLUMNS.find(c => c.status.includes(s));
@@ -2237,9 +2257,15 @@ function _quadroCard(t) {
   const digest = t.has_digest ? '<span class="qcard-digest" title="tem digest">📄 digest</span>' : '';
   const journeyBtn = `<button class="qcard-jbtn" onclick="viewJourney('${ext}', '${hostId}')">Ver jornada</button>`;
   // botão "Rodar Estúdio" só na task de Design liberada (pending/in_progress)
-  const isDesign = (t.title || '').trim().toLowerCase().startsWith('[design]');
-  const studioBtn = (isDesign && (t.status === 'pending' || t.status === 'in_progress'))
+  const titleLow = (t.title || '').trim().toLowerCase();
+  const liberada = t.status === 'pending' || t.status === 'in_progress';
+  const isDesign = titleLow.startsWith('[design]');
+  const studioBtn = (isDesign && liberada)
     ? `<button class="qcard-studio" onclick="runStudio('${ext}')">🎨 Rodar Estúdio</button>` : '';
+  // botão "Preparar Distribuição" só na task de Distribuição liberada
+  const isDist = titleLow.startsWith('[distribuição] preparar');
+  const distBtn = (isDist && liberada)
+    ? `<button class="qcard-studio" onclick="runDistribution('${ext}')">📤 Preparar Distribuição</button>` : '';
   // encerradas não são arrastáveis (não dá pra reabrir pelo Quadro)
   const drag = encerrada ? '' : `draggable="true" ondragstart="quadroDragStart(event)" ondragend="quadroDragEnd(event)"`;
   return `<div class="qcard q-${_qColForStatus(t.status)}" title="${esc(t.title || '')}" data-ext-id="${ext}" ${drag}>
@@ -2248,7 +2274,7 @@ function _quadroCard(t) {
       <span class="qcard-tag">${esc(t.agent || t.workflow || '—')}</span>
       <span class="qcard-st">${esc(t.status || '')}</span>
     </div>
-    <div class="qcard-actions">${journeyBtn}${digest}${studioBtn}</div>
+    <div class="qcard-actions">${journeyBtn}${digest}${studioBtn}${distBtn}</div>
     <div class="ap-journey" id="${hostId}" data-open="0"></div>
   </div>`;
 }

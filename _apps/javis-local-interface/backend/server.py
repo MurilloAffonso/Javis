@@ -614,6 +614,16 @@ async def task_run_studio(task_id: str):
     return JSONResponse(out, status_code=code)
 
 
+@app.post("/tasks/{task_id}/prepare-distribution")
+async def task_prepare_distribution(task_id: str):
+    """Prepara a Distribuição (modo seguro) na task liberada: gera o pacote textual,
+    registra o Journey Log e cria o Gate 3. NÃO publica, sem integração externa."""
+    import distribution
+    out = await run_in_threadpool(distribution.run_distribution, task_id)
+    code = 200 if out.get("ok") else 409
+    return JSONResponse(out, status_code=code)
+
+
 class StatusRequest(BaseModel):
     status: str
     note: str = ""

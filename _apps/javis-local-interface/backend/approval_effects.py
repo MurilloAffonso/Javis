@@ -18,13 +18,16 @@ _PAUTA_TASK   = _MISSION + "-t0"   # âncora da jornada (a pauta)
 _GATE_TASK    = _MISSION + "-t1"   # [Gate 1 — aprovação Murillo]
 _DESIGN_TASK  = _MISSION + "-t2"   # [Design] Produzir os criativos da pauta aprovada
 _DESIGN_TITLE = "[Design] Produzir os criativos da pauta aprovada"
+# Gate 2 → Distribuição (modo seguro, prepara pacote; publicação é depois do Gate 3)
+_DIST_TASK    = "vp-distribuicao-preparar"
+_DIST_TITLE   = "[Distribuição] Preparar pacote de publicação da pauta aprovada"
 
 
-def _journey(event_type: str, actor: str, message: str, agent_id=None, metadata=None) -> None:
-    """Evento no Journey Log da pauta (t0). Nunca quebra o efeito se falhar."""
+def _journey(task_id: str, event_type: str, actor: str, message: str, agent_id=None, metadata=None) -> None:
+    """Evento no Journey Log de `task_id`. Nunca quebra o efeito se falhar."""
     try:
         import repositories as repo
-        repo.task_events.add_event(_PAUTA_TASK, event_type, actor, message,
+        repo.task_events.add_event(task_id, event_type, actor, message,
                                    agent_id=agent_id, metadata=metadata)
     except Exception:
         pass
@@ -35,6 +38,13 @@ def is_gate1_pauta_vp(approval: dict) -> bool:
     subj  = (approval.get("subject") or "").lower()
     agent = (approval.get("agent") or "").lower()
     return agent == "nova" and ("pauta da semana" in subj or "gate 1" in subj)
+
+
+def is_gate2_criativos(approval: dict) -> bool:
+    """Identifica a Gate 2 dos criativos: agente estudio + assunto de criativos."""
+    subj  = (approval.get("subject") or "").lower()
+    agent = (approval.get("agent") or "").lower()
+    return agent == "estudio" and "criativos da semana" in subj
 
 
 def _log(intent: str, message: str, agent: str = "", status: str = "ok", approved=None) -> None:
@@ -48,9 +58,11 @@ def _log(intent: str, message: str, agent: str = "", status: str = "ok", approve
 
 def on_decided(approval: dict, approved: bool, note: str = "") -> dict:
     """Roda após a decisão já estar persistida. Retorna resumo pro endpoint/UI."""
-    if not is_gate1_pauta_vp(approval):
-        return {"advanced": False, "reason": "não é Gate 1 da pauta VP"}
-    return _advance(approval) if approved else _reject(approval)
+    if is_gate1_pauta_vp(approval):
+        return _advance(approval) if approved else _reject(approval)
+    if is_gate2_criativos(approval):
+        return _advance_gate2(approval) if approved else _reject_gate2(approval)
+    return {"advanced": False, "reason": "aprovação sem efeito de workflow"}
 
 
 def _advance(approval: dict) -> dict:
@@ -90,9 +102,9 @@ def _advance(approval: dict) -> dict:
          agent="estudio")
 
     # Journey Log: aprovação → avanço → desbloqueio do Design
-    _journey("approval_approved", "murillo", f"Gate 1 aprovada (approval {aid})")
-    _journey("workflow_advanced", "system", "Workflow avançou: gate concluída")
-    _journey("design_task_unlocked", "system",
+    _journey(_PAUTA_TASK, "approval_approved", "murillo", f"Gate 1 aprovada (approval {aid})")
+    _journey(_PAUTA_TASK, "workflow_advanced", "system", "Workflow avançou: gate concluída")
+    _journey(_PAUTA_TASK, "design_task_unlocked", "system",
              "Task de Design liberada para produção", agent_id="estudio",
              metadata={"design_task": _DESIGN_TASK})
 
@@ -106,8 +118,8 @@ def _reject(approval: dict) -> dict:
          f"Gate 1 rejeitada (approval {aid}) → pauta aguardando ajuste; "
          f"NÃO foi criada task de Design.", agent="nova", status="rejected")
     # Journey Log: rejeição → ajuste necessário
-    _journey("approval_rejected", "murillo", f"Gate 1 rejeitada (approval {aid})")
-    _journey("adjustment_required", "system",
+    _journey(_PAUTA_TASK, "approval_rejected", "murillo", f"Gate 1 rejeitada (approval {aid})")
+    _journey(_PAUTA_TASK, "adjustment_required", "system",
              "Pauta aguardando ajuste da Nova antes de novo Gate", agent_id="nova")
     # sinal de ajuste, sem apagar nada
     try:
@@ -119,3 +131,57 @@ def _reject(approval: dict) -> dict:
         pass
     return {"advanced": False, "rejected": True,
             "message": "Gate 1 rejeitada. Pauta aguardando ajuste."}
+
+
+# ── Gate 2 (criativos) → Distribuição ────────────────────────────────────
+def _advance_gate2(approval: dict) -> dict:
+    """Gate 2 aprovada → libera/cria a task de Distribuição (modo seguro)."""
+    import repositories as repo
+    aid = approval.get("id")
+    design_task = approval.get("task_id") or _DESIGN_TASK  # jornada do Gate 2 = task de Design
+
+    # idempotência: se a task de Distribuição já existe, não re-cria nem re-loga
+    if repo.tasks.get_task(_DIST_TASK):
+        return {"advanced": False, "already": True, "distribution_task": _DIST_TASK,
+                "message": "Gate 2 já avançou; Distribuição já liberada."}
+
+    # criativos aprovados → Design fica gate_approved
+    repo.tasks.set_status(design_task, "gate_approved")
+    # cria a task de Distribuição (só no SQLite; é a fonte principal do Quadro)
+    repo.tasks.upsert(_DIST_TASK, _DIST_TITLE, status="pending", mission=_MISSION,
+                      source=f"approval:{aid}", agent="midas", project_id="vem-passear-jampa")
+
+    _log("workflow_advance",
+         f"Gate 2 aprovada (approval {aid}) → liberada a task de Distribuição "
+         f"'{_DIST_TITLE}' ({_DIST_TASK})", agent="midas")
+    _journey(design_task, "approval_approved", "murillo", f"Gate 2 aprovada (approval {aid})")
+    _journey(design_task, "workflow_advanced", "system", "Workflow avançou: criativos aprovados")
+    _journey(design_task, "distribution_task_unlocked", "system",
+             "Task de Distribuição liberada para preparação", agent_id="midas",
+             metadata={"distribution_task": _DIST_TASK})
+
+    return {"advanced": True, "distribution_task": _DIST_TASK, "distribution_title": _DIST_TITLE,
+            "message": "Gate 2 aprovada. Distribuição destravada (sem publicar)."}
+
+
+def _reject_gate2(approval: dict) -> dict:
+    """Gate 2 rejeitada → NÃO cria Distribuição; mantém Design disponível pra ajuste."""
+    import repositories as repo
+    aid = approval.get("id")
+    design_task = approval.get("task_id") or _DESIGN_TASK
+    _log("workflow_reject",
+         f"Gate 2 rejeitada (approval {aid}) → criativos aguardando ajuste; "
+         f"NÃO foi criada Distribuição.", agent="estudio", status="rejected")
+    _journey(design_task, "approval_rejected", "murillo", f"Gate 2 rejeitada (approval {aid})")
+    _journey(design_task, "adjustment_required", "system",
+             "Criativos aguardando ajuste do Estúdio antes de novo Gate", agent_id="estudio")
+    # mantém o Design disponível pra ajuste (reabre pra rodar o Estúdio de novo)
+    try:
+        repo.tasks.set_status(design_task, "pending")
+        repo.memories.add(
+            "Criativos da semana VP reprovados no Gate 2 — aguardando ajuste do Estúdio.",
+            key="gate2_criativos_vp", kind="sinal")
+    except Exception:
+        pass
+    return {"advanced": False, "rejected": True,
+            "message": "Gate 2 rejeitada. Criativos aguardando ajuste."}
