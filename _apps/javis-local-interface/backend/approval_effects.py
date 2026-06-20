@@ -47,6 +47,13 @@ def is_gate2_criativos(approval: dict) -> bool:
     return agent == "estudio" and "criativos da semana" in subj
 
 
+def is_gate3_distribuicao(approval: dict) -> bool:
+    """Identifica a Gate 3 da distribuição: agente midas + assunto de distribuição."""
+    subj  = (approval.get("subject") or "").lower()
+    agent = (approval.get("agent") or "").lower()
+    return agent in ("midas", "distribuicao") and "distribuição antes de publicar" in subj
+
+
 def _log(intent: str, message: str, agent: str = "", status: str = "ok", approved=None) -> None:
     try:
         import repositories as repo
@@ -62,6 +69,8 @@ def on_decided(approval: dict, approved: bool, note: str = "") -> dict:
         return _advance(approval) if approved else _reject(approval)
     if is_gate2_criativos(approval):
         return _advance_gate2(approval) if approved else _reject_gate2(approval)
+    if is_gate3_distribuicao(approval):
+        return _advance_gate3(approval) if approved else _reject_gate3(approval)
     return {"advanced": False, "reason": "aprovação sem efeito de workflow"}
 
 
@@ -185,3 +194,62 @@ def _reject_gate2(approval: dict) -> dict:
         pass
     return {"advanced": False, "rejected": True,
             "message": "Gate 2 rejeitada. Criativos aguardando ajuste."}
+
+
+# ── Gate 3 (distribuição) → pacote manual + fim da campanha ───────────────
+def _advance_gate3(approval: dict) -> dict:
+    """Gate 3 aprovada → gera o pacote de publicação MANUAL e fecha a campanha
+    (conclui a task de Distribuição via lifecycle/digest). NÃO publica nada."""
+    import repositories as repo
+    import distribution, task_lifecycle
+    aid = approval.get("id")
+    dist_task = approval.get("task_id") or _DIST_TASK
+
+    # idempotência: se a task já está encerrada, não refaz
+    t = repo.tasks.get_task(dist_task)
+    if t and t.get("status") in ("completed", "killed"):
+        return {"advanced": False, "already": True,
+                "message": "Gate 3 já aprovada; campanha já concluída."}
+
+    # 1) Journey: aprovação
+    _journey(dist_task, "approval_approved", "murillo", f"Gate 3 aprovada (approval {aid})")
+    # 2) gera o pacote final de publicação MANUAL
+    arquivo = distribution.gerar_pacote_publicacao_manual_vp(dist_task)
+    _journey(dist_task, "file_generated", "agent",
+             "pacote-publicacao-semana.md gerado (publicação MANUAL)", agent_id="midas",
+             metadata={"arquivo": "_projetos/cerebro-jampa/posts/pacote-publicacao-semana.md"})
+    _journey(dist_task, "manual_publication_package_created", "system",
+             "Pacote de publicação manual pronto — nenhuma integração externa acionada",
+             agent_id="midas")
+    _log("workflow_advance",
+         f"Gate 3 aprovada (approval {aid}) → pacote manual gerado; campanha concluída.",
+         agent="midas")
+    # 3) fecha a campanha: conclui a task de Distribuição (reusa lifecycle/digest)
+    #    → entity_killed + ai_digest_created + digest via complete_task.
+    res = task_lifecycle.complete_task(dist_task, note="Campanha concluída (Gate 3)", actor="murillo")
+
+    return {"advanced": True, "completed": True, "arquivo": arquivo,
+            "digest_text": res.get("digest_text", ""),
+            "message": "Pacote manual de publicação gerado. Campanha concluída com digest."}
+
+
+def _reject_gate3(approval: dict) -> dict:
+    """Gate 3 rejeitada → NÃO gera pacote; mantém Distribuição disponível pra ajuste."""
+    import repositories as repo
+    aid = approval.get("id")
+    dist_task = approval.get("task_id") or _DIST_TASK
+    _log("workflow_reject",
+         f"Gate 3 rejeitada (approval {aid}) → distribuição aguardando ajuste; "
+         f"NÃO foi gerado pacote final.", agent="midas", status="rejected")
+    _journey(dist_task, "approval_rejected", "murillo", f"Gate 3 rejeitada (approval {aid})")
+    _journey(dist_task, "adjustment_required", "system",
+             "Distribuição aguardando ajuste do Midas antes de novo Gate", agent_id="midas")
+    try:
+        repo.tasks.set_status(dist_task, "pending")
+        repo.memories.add(
+            "Distribuição da semana VP reprovada no Gate 3 — aguardando ajuste do Midas.",
+            key="gate3_distribuicao_vp", kind="sinal")
+    except Exception:
+        pass
+    return {"advanced": False, "rejected": True,
+            "message": "Gate 3 rejeitada. Distribuição aguardando ajuste."}

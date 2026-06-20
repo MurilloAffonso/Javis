@@ -17,6 +17,7 @@ CJ = JAVIS_ROOT / "_projetos" / "cerebro-jampa"
 PAUTA = CJ / "posts" / "pauta-semana.md"
 CRIATIVOS = CJ / "posts" / "criativos-semana.md"
 DISTRIB = CJ / "posts" / "distribuicao-semana.md"
+PACOTE = CJ / "posts" / "pacote-publicacao-semana.md"
 
 _DIST_TASK = "vp-distribuicao-preparar"
 _GATE3_SUBJECT = "Aprovar distribuição antes de publicar"
@@ -100,6 +101,60 @@ def preparar_distribuicao_vp(task_id: str) -> str:
     DISTRIB.parent.mkdir(parents=True, exist_ok=True)
     DISTRIB.write_text(_template_distribuicao(posts), encoding="utf-8")
     return str(DISTRIB)
+
+
+def _template_pacote_manual(posts: list[dict]) -> str:
+    import time
+    out = [
+        "# Pacote de Publicação Manual — Vem Passear Jampa",
+        f"\n> Pacote FINAL gerado após aprovação do Gate 3, "
+        f"{time.strftime('%Y-%m-%d %H:%M')}.",
+        "\n> ⚠️ **PUBLICAÇÃO MANUAL — nenhuma integração externa foi acionada.** "
+        "O Javis NÃO publicou nada. Use este pacote pra postar à mão (ou via plugin).\n",
+        "## Resumo da campanha da semana",
+        f"- {len(posts) or 3} peças propostas pra Instagram (Feed/Stories), WhatsApp Status "
+        "e Google Meu Negócio.",
+        "- Base: `pauta-semana.md` → `criativos-semana.md` → `distribuicao-semana.md`.",
+        "- Conversão alvo: WhatsApp. Aprovações: Gate 1 (pauta), Gate 2 (criativos), Gate 3 (distribuição).",
+        "\n## Lista final de peças",
+    ]
+    dias = ["Segunda", "Quarta", "Sexta"]
+    posts = posts or [{}, {}, {}]
+    for i, p in enumerate(posts, 1):
+        dia = dias[i - 1] if i <= len(dias) else f"Dia {i}"
+        fmt = (p.get("formato") if p else "") or "[CONFIRMAR COM MURILLO]"
+        out.append(f"- **Peça {i}** ({dia}) — {fmt} — {(p.get('titulo') if p else '') or 'POST'}")
+    out.append("\n## Por peça (legenda final · CTA · canal · horário)")
+    for i, p in enumerate(posts, 1):
+        cta = (p.get("cta") if p else "") or "[CONFIRMAR COM MURILLO: CTA]"
+        out += [
+            f"\n### Peça {i}",
+            "- **Legenda final:** usar a legenda de `criativos-semana.md` (Peça {0}). "
+            "[CONFIRMAR COM MURILLO: revisão final]".format(i),
+            f"- **CTA final:** {cta}",
+            "- **Canal:** Instagram Feed + Stories + WhatsApp Status (oferta também no Google Meu Negócio).",
+            "- **Horário sugerido:** [CONFIRMAR COM MURILLO: 11h ou 18h].",
+        ]
+    out += [
+        "\n## Checklist manual antes de publicar",
+        "- [ ] Arte final exportada e conferida (marca/cores).",
+        "- [ ] Legenda colada e revisada no app.",
+        "- [ ] [CONFIRMAR COM MURILLO: maré/vaga/preço de qualquer oferta].",
+        "- [ ] CTA aponta pro WhatsApp certo.",
+        "- [ ] Horário/data conferidos.",
+        "- [ ] Publicar manualmente (Javis não publica).",
+        "\n**Campanha da semana concluída. Pacote pronto pra publicação MANUAL.**\n",
+    ]
+    return "\n".join(out)
+
+
+def gerar_pacote_publicacao_manual_vp(task_id: str) -> str:
+    """Pacote FINAL de publicação manual (lê pauta+criativos+distribuição). Sem publicar."""
+    pauta_txt = PAUTA.read_text(encoding="utf-8") if PAUTA.exists() else ""
+    posts = _posts_da_pauta(pauta_txt)
+    PACOTE.parent.mkdir(parents=True, exist_ok=True)
+    PACOTE.write_text(_template_pacote_manual(posts), encoding="utf-8")
+    return str(PACOTE)
 
 
 def _gate3_pendente(task_id: str):
