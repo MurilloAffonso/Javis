@@ -602,9 +602,20 @@ async def approvals_decide(approval_id: int, req: DecisionRequest):
     except Exception as e:
         print(f"[approvals] log falhou: {e}", flush=True)
 
+    # Efeitos do workflow (MODO SEGURO): se for a Gate 1 da pauta VP, destrava o
+    # Design. NÃO gera criativo, NÃO chama Nova, NÃO toca integração externa.
+    effect = {"advanced": False}
+    try:
+        import approval_effects
+        effect = approval_effects.on_decided(ap, approved, req.note or "")
+    except Exception as e:
+        print(f"[approvals] efeito do workflow falhou: {e}", flush=True)
+
     return JSONResponse({
         "ok": True, "id": approval_id, "status": decision,
         "approvals_pending": repo.approvals.count_pending(),
+        "advanced": effect.get("advanced", False),
+        "message": effect.get("message", ""),
     })
 
 

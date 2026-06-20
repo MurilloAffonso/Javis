@@ -160,6 +160,128 @@ def test_sem_integracao_externa() -> int:
     return failures
 
 
+_T1 = "pipeline-marketing-vem-passear-jampa-t1"
+_T2 = "pipeline-marketing-vem-passear-jampa-t2"
+_GATE1_AP = {"id": 1, "agent": "nova", "task_id": _T1,
+             "subject": "Aprovar a pauta da semana da Vem Passear (Gate 1) antes de ir pro Design"}
+
+
+def _patch_mission_board():
+    """Evita que o teste escreva no codex_backlog.md real. Retorna (modulo, original)."""
+    import mission_board
+    orig = mission_board.set_task_done
+    mission_board.set_task_done = lambda *a, **k: True
+    return mission_board, orig
+
+
+def test_aprovar_gate1_libera_design() -> int:
+    print("\n--- Aprovar Gate 1 LIBERA task de Design ---")
+    _fresh_db()
+    import repositories as repo
+    import approval_effects
+    mb, orig = _patch_mission_board()
+    failures = 0
+    try:
+        res = approval_effects.on_decided(dict(_GATE1_AP), True)
+        if not check("avançou o workflow", res.get("advanced") is True):
+            failures += 1
+        if not check("retornou design_task t2", res.get("design_task", "").endswith("-t2")):
+            failures += 1
+        design = next((t for t in repo.tasks.list() if t["ext_id"] == _T2), None)
+        if not check("task de Design existe no SQLite", design is not None):
+            failures += 1
+        if not check("task de Design pending", bool(design) and design["status"] == "pending"):
+            failures += 1
+        gate = next((t for t in repo.tasks.list() if t["ext_id"] == _T1), None)
+        if not check("gate marcada 'gate_approved'", bool(gate) and gate["status"] == "gate_approved"):
+            failures += 1
+        adv = [l for l in repo.logs.recent(10) if l["intent"] == "workflow_advance"]
+        if not check("log workflow_advance registrado", len(adv) >= 1):
+            failures += 1
+    finally:
+        mb.set_task_done = orig
+    return failures
+
+
+def test_aprovar_gate1_idempotente() -> int:
+    print("\n--- Aprovar Gate 1 duas vezes NÃO duplica Design ---")
+    _fresh_db()
+    import repositories as repo
+    import approval_effects
+    mb, orig = _patch_mission_board()
+    failures = 0
+    try:
+        approval_effects.on_decided(dict(_GATE1_AP), True)
+        n1 = len([t for t in repo.tasks.list() if t["ext_id"] == _T2])
+        adv1 = len([l for l in repo.logs.recent(30) if l["intent"] == "workflow_advance"])
+        res2 = approval_effects.on_decided(dict(_GATE1_AP), True)  # de novo
+        n2 = len([t for t in repo.tasks.list() if t["ext_id"] == _T2])
+        adv2 = len([l for l in repo.logs.recent(30) if l["intent"] == "workflow_advance"])
+        if not check(f"Design não duplicou (t2: {n1} → {n2})", n1 == 1 and n2 == 1):
+            failures += 1
+        if not check("2ª chamada detecta 'already'", res2.get("already") is True):
+            failures += 1
+        if not check(f"não re-logou workflow_advance ({adv1} → {adv2})", adv1 == adv2):
+            failures += 1
+    finally:
+        mb.set_task_done = orig
+    return failures
+
+
+def test_rejeitar_gate1_nao_cria_design() -> int:
+    print("\n--- Rejeitar Gate 1 NÃO cria task de Design ---")
+    _fresh_db()
+    import repositories as repo
+    import approval_effects
+    mb, orig = _patch_mission_board()
+    failures = 0
+    try:
+        res = approval_effects.on_decided(dict(_GATE1_AP), False)
+        if not check("não avançou o workflow", res.get("advanced") is False):
+            failures += 1
+        if not check("marcou rejected", res.get("rejected") is True):
+            failures += 1
+        design = [t for t in repo.tasks.list() if t["ext_id"] == _T2]
+        if not check("nenhuma task de Design criada", len(design) == 0):
+            failures += 1
+        rej = [l for l in repo.logs.recent(10) if l["intent"] == "workflow_reject"]
+        if not check("log workflow_reject registrado", len(rej) >= 1):
+            failures += 1
+    finally:
+        mb.set_task_done = orig
+    return failures
+
+
+def test_endpoint_gate1_destrava_e_loga() -> int:
+    print("\n--- Endpoint: aprovar Gate 1 loga approval_decide + workflow_advance ---")
+    _fresh_db()
+    import repositories as repo
+    import server
+    mb, orig = _patch_mission_board()
+    failures = 0
+    try:
+        aid = repo.approvals.add(_GATE1_AP["subject"], agent="nova", task_id=_T1)
+        req = server.DecisionRequest(decision="approved", note="pode ir pro design")
+        resp = asyncio.run(server.approvals_decide(aid, req))
+        body = json.loads(bytes(resp.body))
+        if not check("endpoint sinaliza advanced=True", body.get("advanced") is True):
+            failures += 1
+        if not check("mensagem de destrave de criativos",
+                     "destravada" in (body.get("message", "").lower())):
+            failures += 1
+        intents = [l["intent"] for l in repo.logs.recent(10)]
+        if not check("action_logs tem approval_decide", "approval_decide" in intents):
+            failures += 1
+        if not check("action_logs tem workflow_advance", "workflow_advance" in intents):
+            failures += 1
+        design = next((t for t in repo.tasks.list() if t["ext_id"] == _T2), None)
+        if not check("Design pending no SQLite", bool(design) and design["status"] == "pending"):
+            failures += 1
+    finally:
+        mb.set_task_done = orig
+    return failures
+
+
 def main() -> None:
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
     print("=" * 50)
@@ -172,6 +294,10 @@ def main() -> None:
     total += test_pending_diminui()
     total += test_endpoint_decide_e_log()
     total += test_sem_integracao_externa()
+    total += test_aprovar_gate1_libera_design()
+    total += test_aprovar_gate1_idempotente()
+    total += test_rejeitar_gate1_nao_cria_design()
+    total += test_endpoint_gate1_destrava_e_loga()
     print("\n" + "=" * 50)
     print("\033[32m✅ Todos os testes passaram.\033[0m" if total == 0
           else f"\033[31m❌ {total} teste(s) falharam.\033[0m")

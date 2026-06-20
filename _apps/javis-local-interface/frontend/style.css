@@ -1890,5 +1890,6 @@ body::before {
 .ap-spin { color: var(--violet); }
 .ap-warn { color: #f59e0b; }
 .ap-resolved { font-size: 11.5px; font-weight: 600; color: var(--text-mid); padding: 4px 2px; }
+.ap-effect { font-size: 10.5px; color: var(--emerald); padding: 0 2px 2px; }
 .ap-done-ok { border-color: rgba(34,197,94,.5); }
 .ap-done-no { border-color: rgba(239,68,68,.5); }

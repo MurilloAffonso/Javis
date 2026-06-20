@@ -128,11 +128,17 @@ async function decideApproval(id, decision) {
     if (r.ok && d.ok) {
       if (card) {
         card.classList.add(decision === 'approved' ? 'ap-done-ok' : 'ap-done-no');
-        card.innerHTML = `<div class="ap-resolved">${decision === 'approved' ? '✓ Aprovado' : '✕ Rejeitado'}${note ? ' — ' + esc(note) : ''}</div>`;
+        const extra = d.message ? `<div class="ap-effect">${esc(d.message)}</div>` : '';
+        card.innerHTML = `<div class="ap-resolved">${decision === 'approved' ? '✓ Aprovado' : '✕ Rejeitado'}${note ? ' — ' + esc(note) : ''}</div>${extra}`;
       }
       refreshStats();                      // approvals_pending / contadores
-      setTimeout(loadApprovals, 1200);     // recarrega a lista (some o resolvido)
-      showToast(decision === 'approved' ? 'Aprovado, senhor.' : 'Rejeitado, senhor.',
+      setTimeout(loadApprovals, 1800);     // recarrega a lista (some o resolvido)
+      // se o Quadro estiver aberto, reflete a nova task liberada
+      if (d.advanced && document.getElementById('view-quadro')?.classList.contains('active')) {
+        renderQuadro();
+      }
+      // feedback: usa a mensagem do workflow se houver (ex.: "Produção destravada")
+      showToast(d.message || (decision === 'approved' ? 'Aprovado, senhor.' : 'Rejeitado, senhor.'),
                 decision === 'approved' ? 'success' : 'info');
     } else {
       if (fb) fb.innerHTML = `<span class="ap-warn">${esc(d.error || 'Não rolou agora.')}</span>`;
