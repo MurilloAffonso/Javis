@@ -45,6 +45,23 @@ class _Tasks:
             (status, ext_id),
         )
 
+    def get_task(self, ext_id: str) -> dict | None:
+        return db.query_one("SELECT * FROM tasks WHERE ext_id=?", (ext_id,))
+
+    def complete_task(self, ext_id: str, actor: str = "system", note: str | None = None) -> int:
+        """Encerra a entidade: status completed + completed_at/killed_at agora."""
+        return db.execute(
+            "UPDATE tasks SET status='completed', completed_at=datetime('now'), "
+            "killed_at=datetime('now'), updated_at=datetime('now') WHERE ext_id=?",
+            (ext_id,),
+        )
+
+    def update_digest(self, ext_id: str, digest_text: str) -> int:
+        return db.execute(
+            "UPDATE tasks SET digest_text=?, updated_at=datetime('now') WHERE ext_id=?",
+            (digest_text, ext_id),
+        )
+
     def list(self, status: str = "") -> list[dict]:
         if status:
             return db.query("SELECT * FROM tasks WHERE status=? ORDER BY id", (status,))
@@ -75,6 +92,9 @@ class _Approvals:
 
     def pending(self) -> list[dict]:
         return db.query("SELECT * FROM approvals WHERE status='pending' ORDER BY id DESC")
+
+    def by_task(self, task_id: str) -> list[dict]:
+        return db.query("SELECT * FROM approvals WHERE task_id=? ORDER BY id", (task_id,))
 
     def count_pending(self) -> int:
         return db.count("approvals", "status='pending'")

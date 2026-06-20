@@ -45,6 +45,9 @@ def init_db() -> None:
             for col_sql in (
                 "ALTER TABLE approvals ADD COLUMN task_id TEXT",
                 "ALTER TABLE approvals ADD COLUMN note TEXT",
+                "ALTER TABLE tasks ADD COLUMN completed_at TEXT",
+                "ALTER TABLE tasks ADD COLUMN killed_at TEXT",
+                "ALTER TABLE tasks ADD COLUMN digest_text TEXT",
             ):
                 try:
                     conn.execute(col_sql)

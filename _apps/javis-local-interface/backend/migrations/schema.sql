@@ -32,14 +32,17 @@ CREATE TABLE IF NOT EXISTS workflows (
 );
 
 CREATE TABLE IF NOT EXISTS tasks (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    ext_id     TEXT UNIQUE,                       -- id do mission_board (node id)
-    mission    TEXT,                              -- slug da missão
-    title      TEXT NOT NULL,
-    status     TEXT DEFAULT 'pending',            -- pending | running | done
-    source     TEXT DEFAULT 'backlog',            -- backlog | chat | flow
-    created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now'))
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    ext_id       TEXT UNIQUE,                     -- id do mission_board (node id)
+    mission      TEXT,                            -- slug da missão
+    title        TEXT NOT NULL,
+    status       TEXT DEFAULT 'pending',          -- pending | running | done | completed | killed
+    source       TEXT DEFAULT 'backlog',          -- backlog | chat | flow
+    completed_at TEXT,                            -- quando foi concluída
+    killed_at    TEXT,                            -- quando a entidade "morreu"
+    digest_text  TEXT,                            -- resumo final (AI Digest)
+    created_at   TEXT DEFAULT (datetime('now')),
+    updated_at   TEXT DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS messages (

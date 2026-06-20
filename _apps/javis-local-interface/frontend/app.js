@@ -127,13 +127,43 @@ async function viewJourney(taskId, apId) {
     const r = await fetch(`${API}/tasks/${encodeURIComponent(taskId)}/events`, { signal: AbortSignal.timeout(5000) });
     const d = await r.json();
     const evs = d.events || [];
-    host.innerHTML = evs.length
+    const status = d.task_status || '—';
+    const encerrada = status === 'completed' || status === 'killed';
+    const timeline = evs.length
       ? '<div class="jn-list">' + evs.map(_journeyRow).join('') + '</div>'
       : '<div class="jn-empty">Sem eventos registrados nesta tarefa ainda.</div>';
+    const head = `<div class="jn-status">entidade: <b class="jn-st-${encerrada ? 'dead' : 'live'}">${esc(status)}</b></div>`;
+    let footer;
+    if (encerrada && d.digest_text) {
+      footer = `<div class="jn-digest"><div class="jn-digest-h">📄 Digest da entidade</div><pre class="jn-digest-b">${esc(d.digest_text)}</pre></div>`;
+    } else if (!encerrada) {
+      footer = `<button class="jn-complete-btn" onclick="completeTask('${esc(taskId)}', ${apId})">Concluir entidade</button>`;
+    } else {
+      footer = '';
+    }
+    host.innerHTML = head + timeline + footer;
     host.dataset.open = '1';
   } catch (e) {
     host.innerHTML = `<span class="ap-warn">Não consegui carregar a jornada: ${esc(String(e))}</span>`;
   }
+}
+
+// Encerra a entidade-tarefa (completed/killed) e re-renderiza mostrando o digest.
+async function completeTask(taskId, apId) {
+  try {
+    const r = await fetch(`${API}/tasks/${encodeURIComponent(taskId)}/complete`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ note: '' }), signal: AbortSignal.timeout(8000),
+    });
+    const d = await r.json();
+    if (d.ok) { showToast('Entidade concluída. Digest gerado.', 'success'); refreshStats(); }
+    else      { showToast(d.error || 'Não consegui concluir.', 'warning'); }
+  } catch (e) {
+    showToast('Falhou ao concluir: ' + e, 'error');
+  }
+  const host = document.getElementById(`ap-journey-${apId}`);
+  if (host) host.dataset.open = '0';   // força re-render (mostra o digest)
+  viewJourney(taskId, apId);
 }
 
 function _journeyRow(e) {

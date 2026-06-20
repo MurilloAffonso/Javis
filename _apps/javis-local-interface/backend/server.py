@@ -560,13 +560,50 @@ async def stats():
 
 @app.get("/tasks/{task_id}/events")
 async def task_events(task_id: str):
-    """Journey Log: timeline cronológica dos eventos de uma task."""
+    """Journey Log: timeline cronológica dos eventos de uma task (+ status/digest)."""
     try:
         import repositories as repo
         evs = repo.task_events.list_by_task(task_id)
-        return JSONResponse({"task_id": task_id, "events": evs, "total": len(evs)})
+        task = repo.tasks.get_task(task_id) or {}
+        return JSONResponse({
+            "task_id": task_id, "events": evs, "total": len(evs),
+            "task_status": task.get("status"),
+            "completed_at": task.get("completed_at"),
+            "killed_at": task.get("killed_at"),
+            "digest_text": task.get("digest_text"),
+        })
     except Exception as e:
         return JSONResponse({"error": str(e), "events": [], "total": 0}, status_code=500)
+
+
+class CompleteRequest(BaseModel):
+    note: str = ""
+
+
+@app.post("/tasks/{task_id}/complete")
+async def task_complete(task_id: str, req: CompleteRequest):
+    """Encerra a entidade-tarefa (completed/killed) + gera digest. Sem LLM, sem integração externa."""
+    import task_lifecycle
+    out = await run_in_threadpool(task_lifecycle.complete_task, task_id, req.note or "")
+    code = 200 if out.get("ok") else 409
+    return JSONResponse(out, status_code=code)
+
+
+@app.get("/tasks/{task_id}/digest")
+async def task_digest(task_id: str):
+    """Digest final da task (resumo da jornada)."""
+    try:
+        import repositories as repo
+        t = repo.tasks.get_task(task_id)
+        if not t:
+            return JSONResponse({"error": "task não encontrada"}, status_code=404)
+        return JSONResponse({
+            "task_id": task_id, "status": t.get("status"),
+            "completed_at": t.get("completed_at"), "killed_at": t.get("killed_at"),
+            "digest_text": t.get("digest_text") or "",
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 @app.get("/approvals/pending")

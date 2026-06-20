@@ -1914,5 +1914,22 @@ body::before {
 .jn-actor { grid-column: 1 / -1; color: var(--text-dim); font-size: 9.5px; }
 .jn-msg { grid-column: 1 / -1; color: var(--text-mid); }
 .jn-empty { font-size: 10.5px; color: var(--text-dim); }
+.jn-status { font-size: 10px; color: var(--text-dim); margin-bottom: 5px; }
+.jn-st-live { color: var(--progress); }
+.jn-st-dead { color: #ef4444; }
+.jn-complete-btn {
+  margin-top: 6px; background: none; border: 1px solid var(--border2);
+  color: var(--text-mid); border-radius: 5px; padding: 4px 9px;
+  font-size: 10.5px; cursor: pointer;
+}
+.jn-complete-btn:hover { border-color: #ef4444; color: #ef4444; }
+.jn-digest {
+  margin-top: 7px; border-top: 1px solid var(--border); padding-top: 6px;
+}
+.jn-digest-h { font-size: 10.5px; font-weight: 700; color: var(--emerald); margin-bottom: 4px; }
+.jn-digest-b {
+  margin: 0; white-space: pre-wrap; font-family: inherit;
+  font-size: 10px; line-height: 1.4; color: var(--text-mid);
+}
 .ap-done-ok { border-color: rgba(34,197,94,.5); }
 .ap-done-no { border-color: rgba(239,68,68,.5); }
