@@ -2152,6 +2152,26 @@ function setQuadroFilter(id) {
   renderQuadro();
 }
 
+// Roda o Estúdio (modo seguro) na task de Design → gera criativos + cria Gate 2.
+async function runStudio(extId) {
+  try {
+    const r = await fetch(`${API}/tasks/${encodeURIComponent(extId)}/run-studio`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(20000),
+    });
+    const d = await r.json();
+    if (r.ok && d.ok) {
+      showToast('Criativos gerados. Gate 2 aguardando aprovação.', 'success');
+      refreshStats(); loadApprovals();   // Gate 2 aparece no painel de aprovações
+    } else {
+      showToast(d.error || 'Não consegui rodar o Estúdio.', 'warning');
+    }
+  } catch (e) {
+    showToast('Falhou ao rodar o Estúdio: ' + e, 'error');
+  }
+  renderQuadro();
+}
+
 function _qColForStatus(status) {
   const s = status || 'pending';
   const col = QUADRO_COLUMNS.find(c => c.status.includes(s));
@@ -2216,6 +2236,10 @@ function _quadroCard(t) {
   const encerrada = t.status === 'completed' || t.status === 'killed';
   const digest = t.has_digest ? '<span class="qcard-digest" title="tem digest">📄 digest</span>' : '';
   const journeyBtn = `<button class="qcard-jbtn" onclick="viewJourney('${ext}', '${hostId}')">Ver jornada</button>`;
+  // botão "Rodar Estúdio" só na task de Design liberada (pending/in_progress)
+  const isDesign = (t.title || '').trim().toLowerCase().startsWith('[design]');
+  const studioBtn = (isDesign && (t.status === 'pending' || t.status === 'in_progress'))
+    ? `<button class="qcard-studio" onclick="runStudio('${ext}')">🎨 Rodar Estúdio</button>` : '';
   // encerradas não são arrastáveis (não dá pra reabrir pelo Quadro)
   const drag = encerrada ? '' : `draggable="true" ondragstart="quadroDragStart(event)" ondragend="quadroDragEnd(event)"`;
   return `<div class="qcard q-${_qColForStatus(t.status)}" title="${esc(t.title || '')}" data-ext-id="${ext}" ${drag}>
@@ -2224,7 +2248,7 @@ function _quadroCard(t) {
       <span class="qcard-tag">${esc(t.agent || t.workflow || '—')}</span>
       <span class="qcard-st">${esc(t.status || '')}</span>
     </div>
-    <div class="qcard-actions">${journeyBtn}${digest}</div>
+    <div class="qcard-actions">${journeyBtn}${digest}${studioBtn}</div>
     <div class="ap-journey" id="${hostId}" data-open="0"></div>
   </div>`;
 }

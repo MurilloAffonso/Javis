@@ -1764,6 +1764,11 @@ body::before {
 }
 .qcard-jbtn:hover { opacity: .8; }
 .qcard-digest { font-size: 9.5px; color: var(--emerald); }
+.qcard-studio {
+  background: var(--violet-dim); border: 1px solid var(--violet); color: var(--violet);
+  border-radius: 5px; padding: 3px 8px; font-size: 10px; font-weight: 600; cursor: pointer;
+}
+.qcard-studio:hover { background: var(--violet); color: #fff; }
 
 .quadro-empty { color: var(--text-dim); font-size: 13px; padding: 30px; text-align: center; grid-column: 1 / -1; }
 

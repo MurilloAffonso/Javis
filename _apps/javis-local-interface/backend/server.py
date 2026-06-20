@@ -604,6 +604,16 @@ async def task_events(task_id: str):
         return JSONResponse({"error": str(e), "events": [], "total": 0}, status_code=500)
 
 
+@app.post("/tasks/{task_id}/run-studio")
+async def task_run_studio(task_id: str):
+    """Roda o Estúdio (modo seguro) na task de Design: gera criativos textuais,
+    registra o Journey Log e cria o Gate 2. Sem imagem, sem publicar, sem integração."""
+    import studio
+    out = await run_in_threadpool(studio.run_studio, task_id)
+    code = 200 if out.get("ok") else 409
+    return JSONResponse(out, status_code=code)
+
+
 class StatusRequest(BaseModel):
     status: str
     note: str = ""
