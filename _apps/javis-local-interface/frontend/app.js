@@ -59,8 +59,10 @@ document.querySelectorAll(".ag-card[data-id]").forEach(card => {
 // ─── Init ────────────────────────────────────────────────
 checkStatus();
 refreshStats();
+loadApprovals();
 setInterval(checkStatus, 30000);
 setInterval(refreshStats, 30000);
+setInterval(loadApprovals, 30000);
 setInterval(_tickSession, 1000);
 setInterval(pollReminders, 15000);
 loadChatHistory().then(loadBriefing);
@@ -76,6 +78,68 @@ async function refreshStats() {
     if (msgs && typeof s.messages === 'number') msgs.textContent = s.messages;
     if (ags  && typeof s.agents   === 'number') ags.textContent  = s.agents;
   } catch { /* mantém o valor atual se /stats falhar */ }
+}
+
+// ─── Gate humano: aprovações pendentes no painel de Atividade ──────────────
+async function loadApprovals() {
+  const box  = document.getElementById('approvals-box');
+  const list = document.getElementById('approvals-list');
+  const cnt  = document.getElementById('approvals-count');
+  if (!box || !list) return;
+  let items = [];
+  try {
+    const r = await fetch(`${API}/approvals/pending`, { signal: AbortSignal.timeout(4000) });
+    const d = await r.json();
+    items = d.approvals || [];
+  } catch { return; /* mantém o que está */ }
+  if (!items.length) { box.hidden = true; list.innerHTML = ''; return; }
+  box.hidden = false;
+  if (cnt) cnt.textContent = items.length;
+  list.innerHTML = items.map(_approvalCard).join('');
+}
+
+function _approvalCard(a) {
+  const task = a.task_id ? `<div class="ap-task">tarefa: ${esc(a.task_id)}</div>` : '';
+  return `<div class="ap-card" id="ap-${a.id}">
+    <div class="ap-subject">${esc(a.subject || '')}</div>
+    <div class="ap-meta">${a.agent ? 'agente: ' + esc(a.agent) : ''}</div>
+    ${task}
+    <input class="ap-note" id="ap-note-${a.id}" placeholder="observação (opcional)…" />
+    <div class="ap-actions">
+      <button class="ap-btn ap-approve" onclick="decideApproval(${a.id}, 'approved')">Aprovar</button>
+      <button class="ap-btn ap-reject"  onclick="decideApproval(${a.id}, 'rejected')">Rejeitar</button>
+    </div>
+    <div class="ap-feedback" id="ap-fb-${a.id}"></div>
+  </div>`;
+}
+
+async function decideApproval(id, decision) {
+  const card = document.getElementById(`ap-${id}`);
+  const fb   = document.getElementById(`ap-fb-${id}`);
+  const note = (document.getElementById(`ap-note-${id}`)?.value || '').trim();
+  if (fb) fb.innerHTML = '<span class="ap-spin">registrando…</span>';
+  try {
+    const r = await fetch(`${API}/approvals/${id}/decide`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision, note }),
+      signal: AbortSignal.timeout(8000),
+    });
+    const d = await r.json();
+    if (r.ok && d.ok) {
+      if (card) {
+        card.classList.add(decision === 'approved' ? 'ap-done-ok' : 'ap-done-no');
+        card.innerHTML = `<div class="ap-resolved">${decision === 'approved' ? '✓ Aprovado' : '✕ Rejeitado'}${note ? ' — ' + esc(note) : ''}</div>`;
+      }
+      refreshStats();                      // approvals_pending / contadores
+      setTimeout(loadApprovals, 1200);     // recarrega a lista (some o resolvido)
+      showToast(decision === 'approved' ? 'Aprovado, senhor.' : 'Rejeitado, senhor.',
+                decision === 'approved' ? 'success' : 'info');
+    } else {
+      if (fb) fb.innerHTML = `<span class="ap-warn">${esc(d.error || 'Não rolou agora.')}</span>`;
+    }
+  } catch (e) {
+    if (fb) fb.innerHTML = `<span class="ap-warn">Falhou: ${esc(String(e))}</span>`;
+  }
 }
 
 // Motor de execução (Claude assinatura x Codex assinatura): botão manual,

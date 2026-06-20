@@ -447,6 +447,7 @@ def _fluxo_pauta_vp() -> str:
         repo.approvals.add(
             subject="Aprovar a pauta da semana da Vem Passear (Gate 1) antes de ir pro Design",
             kind="gate", agent="nova", detail="_projetos/cerebro-jampa/posts/pauta-semana.md",
+            task_id="pipeline-marketing-vem-passear-jampa-t1",
         )
     except Exception as e:
         _log(f"gerar_pauta_vp: persistência SQLite falhou: {e}")

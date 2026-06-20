@@ -40,6 +40,16 @@ def init_db() -> None:
         conn = get_conn()
         try:
             conn.executescript(sql)
+            # Migrações aditivas pra DBs já criados antes destas colunas existirem.
+            # ALTER ADD COLUMN é seguro; ignora se a coluna já estiver lá.
+            for col_sql in (
+                "ALTER TABLE approvals ADD COLUMN task_id TEXT",
+                "ALTER TABLE approvals ADD COLUMN note TEXT",
+            ):
+                try:
+                    conn.execute(col_sql)
+                except Exception:
+                    pass
             conn.commit()
         finally:
             conn.close()

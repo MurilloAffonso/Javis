@@ -55,16 +55,21 @@ class _Tasks:
 
 # ── approvals ─────────────────────────────────────────────────────────────
 class _Approvals:
-    def add(self, subject: str, kind: str = "gate", agent: str = "", detail: str = "") -> int:
+    def add(self, subject: str, kind: str = "gate", agent: str = "",
+            detail: str = "", task_id: str = "") -> int:
         return db.execute(
-            "INSERT INTO approvals(kind, subject, agent, status, detail) VALUES(?,?,?,'pending',?)",
-            (kind, subject, agent, detail),
+            "INSERT INTO approvals(kind, subject, agent, task_id, status, detail) "
+            "VALUES(?,?,?,?,'pending',?)",
+            (kind, subject, agent, task_id, detail),
         )
 
-    def decide(self, approval_id: int, approved: bool) -> int:
+    def get(self, approval_id: int) -> dict | None:
+        return db.query_one("SELECT * FROM approvals WHERE id=?", (approval_id,))
+
+    def decide(self, approval_id: int, approved: bool, note: str = "") -> int:
         return db.execute(
-            "UPDATE approvals SET status=?, decided_at=datetime('now') WHERE id=?",
-            ("approved" if approved else "rejected", approval_id),
+            "UPDATE approvals SET status=?, note=?, decided_at=datetime('now') WHERE id=?",
+            ("approved" if approved else "rejected", note, approval_id),
         )
 
     def pending(self) -> list[dict]:

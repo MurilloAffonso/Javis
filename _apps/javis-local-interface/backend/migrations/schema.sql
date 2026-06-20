@@ -57,8 +57,10 @@ CREATE TABLE IF NOT EXISTS approvals (
     kind       TEXT,                              -- 'gate' | 'acao' ...
     subject    TEXT NOT NULL,                     -- o que precisa aprovar
     agent      TEXT,
+    task_id    TEXT,                              -- task relacionada (ext_id), se houver
     status     TEXT DEFAULT 'pending',            -- pending | approved | rejected
     detail     TEXT,
+    note       TEXT,                              -- observação da decisão humana
     created_at TEXT DEFAULT (datetime('now')),
     decided_at TEXT
 );

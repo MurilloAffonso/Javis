@@ -558,6 +558,56 @@ async def stats():
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+@app.get("/approvals/pending")
+async def approvals_pending():
+    """Aprovações pendentes (Gate humano) — do SQLite."""
+    try:
+        import repositories as repo
+        rows = repo.approvals.pending()
+        return JSONResponse({"approvals": rows, "total": len(rows)})
+    except Exception as e:
+        return JSONResponse({"error": str(e), "approvals": [], "total": 0}, status_code=500)
+
+
+class DecisionRequest(BaseModel):
+    decision: str            # "approved" | "rejected"
+    note: str = ""
+
+
+@app.post("/approvals/{approval_id}/decide")
+async def approvals_decide(approval_id: int, req: DecisionRequest):
+    """Decide um Gate (aprovar/rejeitar). Persiste no SQLite e registra em action_logs.
+    NÃO aciona integração externa, NÃO publica, NÃO envia WhatsApp — só registra a decisão."""
+    import repositories as repo
+    decision = (req.decision or "").strip().lower()
+    if decision not in ("approved", "rejected"):
+        return JSONResponse({"error": "decision deve ser 'approved' ou 'rejected'"}, status_code=400)
+    ap = repo.approvals.get(approval_id)
+    if not ap:
+        return JSONResponse({"error": f"aprovação {approval_id} não encontrada"}, status_code=404)
+    if ap.get("status") != "pending":
+        return JSONResponse({"error": f"aprovação já decidida ({ap.get('status')})",
+                             "approval": ap}, status_code=409)
+
+    approved = decision == "approved"
+    repo.approvals.decide(approval_id, approved, note=req.note or "")
+    # registra a decisão em action_logs (sem JSONL — é decisão humana, não ação de IA)
+    try:
+        repo.logs.add(
+            source="frontend", intent="approval_decide", agent=ap.get("agent", ""),
+            message=f"Gate '{ap.get('subject', '')[:80]}' → {decision}"
+                    + (f" (obs: {req.note[:100]})" if req.note else ""),
+            status=decision, approved=approved,
+        )
+    except Exception as e:
+        print(f"[approvals] log falhou: {e}", flush=True)
+
+    return JSONResponse({
+        "ok": True, "id": approval_id, "status": decision,
+        "approvals_pending": repo.approvals.count_pending(),
+    })
+
+
 @app.get("/agents")
 async def agents_list():
     from agents.specialized import get_agents_info
