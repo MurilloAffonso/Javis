@@ -11,7 +11,12 @@ import json
 
 import actions
 
-CLAUDE_MODEL = os.environ.get("JAVIS_CLAUDE_MODEL", "claude-sonnet-4-6")
+# Decisão 21/06 — Haiku 4.5 como default do tool-use (era sonnet-4-6).
+# Sonnet/Opus continuam acessíveis via env JAVIS_CLAUDE_MODEL e via `pensar_profundo`.
+# Razão: tool-use de comando ("toca jazz", "abre site") não precisa de capacidade
+# de raciocínio pesado — só de decisão certa de qual ferramenta chamar. Haiku é
+# ~5× mais leve em cota da assinatura, mantendo a precisão de tool-use.
+CLAUDE_MODEL = os.environ.get("JAVIS_CLAUDE_MODEL", "claude-haiku-4-5-20251001")
 OPENAI_MODEL = os.environ.get("JAVIS_OPENAI_MODEL", "gpt-4o-mini")
 
 # Timeout (s) por chamada de LLM — evita que a cascata empilhe espera invisível
@@ -23,6 +28,95 @@ def _log(msg: str) -> None:
     """Log visível no console do servidor — para de engolir falhas em silêncio."""
     import sys
     print(f"[agent] {msg}", file=sys.stderr, flush=True)
+
+
+# Tool gating — pré-filtragem das tools enviadas ao LLM por turno.
+# Em vez de mandar TODAS as ~30 ferramentas em cada chamada (~1.5-2k tok), o
+# command_router (regras de palavra-chave, zero LLM) detecta a intenção e
+# selecionamos só as relevantes + um baseline conservador. Degradação segura: se
+# o gating não souber classificar ou der erro, devolve TOOLS inteiro.
+
+# Tools "sempre disponíveis" — raciocínio, RAG, memória, hora/data, fluxo VP,
+# análise de arquivo, executor Codex. Coisas que podem ser pedidas em qualquer
+# turno e cujo overhead é aceitável manter na baseline.
+_BASELINE_TOOL_NAMES = {
+    "buscar_conhecimento", "pensar_profundo", "consultar_especialistas",
+    "hora_data", "gerar_pauta_vp", "lembrar_fato", "criar_lembrete",
+    "listar_lembretes", "analisar_arquivo", "programar",
+}
+
+# Mapa intent (do command_router) → tools específicas a adicionar à baseline.
+_INTENT_TOOL_NAMES: dict[str, set[str]] = {
+    "clima":           {"clima"},
+    "analisar_site":   {"analisar_site", "ler_pagina"},
+    "tocar_musica":    {"tocar_musica", "abrir_youtube"},
+    "abrir_youtube":   {"abrir_youtube", "tocar_musica"},
+    "abrir_openwebui": {"abrir_openwebui", "abrir_site"},
+    "abrir_vscode":    {"abrir_vscode", "abrir_app"},
+    "abrir_terminal":  {"abrir_terminal", "abrir_app"},
+    "abrir_navegador": {"abrir_navegador", "abrir_site", "abrir_app", "pesquisar_google"},
+    "abrir_projeto":   {"abrir_projeto", "abrir_pasta"},
+    "abrir_javis":     {"abrir_pasta"},
+    "registrar_ideia": {"registrar_ideia", "lembrar_fato"},
+    "status_sistema":  {"status_sistema"},
+    # acao_perigosa / trocar_motor / conversa / desconhecido → só baseline.
+}
+
+
+def _gate_tools(text: str) -> list[dict]:
+    """Filtra `TOOLS` para o subconjunto relevante ao texto do turno.
+
+    Reduz ~30 → ~10-15 ferramentas. Em caso de falha do roteador ou intent
+    desconhecido, devolve `TOOLS` inteiro (nunca deixa o LLM sem ferramenta
+    por causa de bug do gating).
+    """
+    try:
+        import command_router
+        r = command_router.route(text or "")
+        intent = r.get("intent", "")
+    except Exception:
+        return TOOLS
+    specific = _INTENT_TOOL_NAMES.get(intent, set())
+    keep = _BASELINE_TOOL_NAMES | specific
+    filtered = [t for t in TOOLS if t["name"] in keep]
+    if not filtered:
+        return TOOLS
+    _log(f"gate[{intent}] {len(filtered)}/{len(TOOLS)} tools enviadas")
+    return filtered
+
+
+_USAGE_LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "_data", "token_usage.jsonl")
+
+
+def _log_usage(provider: str, model: str, input_tokens: int = 0, output_tokens: int = 0,
+               cache_read_input_tokens: int = 0, cache_creation_input_tokens: int = 0,
+               kind: str = "chat") -> None:
+    """Registra o consumo de tokens em _data/token_usage.jsonl (uma linha por chamada).
+
+    Sem isso a gente não consegue dizer "antes/depois" de nenhuma otimização —
+    `server.py` retornava `usage={prompt_tokens:0,...}` hardcoded até hoje.
+    Falha em silêncio se não conseguir escrever (telemetria nunca derruba o chat).
+    """
+    try:
+        import time as _t
+        os.makedirs(os.path.dirname(_USAGE_LOG_PATH), exist_ok=True)
+        total_input = (input_tokens or 0) + (cache_read_input_tokens or 0) + (cache_creation_input_tokens or 0)
+        rec = {
+            "ts": _t.strftime("%Y-%m-%dT%H:%M:%S"),
+            "provider": provider,
+            "model": model,
+            "kind": kind,
+            "input_tokens": input_tokens or 0,
+            "cache_read_input_tokens": cache_read_input_tokens or 0,
+            "cache_creation_input_tokens": cache_creation_input_tokens or 0,
+            "output_tokens": output_tokens or 0,
+            "total_input": total_input,
+        }
+        with open(_USAGE_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        _log(f"usage[{provider}/{model}] in={total_input} (cache_read={cache_read_input_tokens or 0}) out={output_tokens or 0}")
+    except Exception as e:
+        _log(f"_log_usage falhou (ignorado): {e}")
 
 
 def _journey(task_id: str, event_type: str, actor: str = "system", message: str = "",
@@ -49,9 +143,11 @@ PERFIL DE MURILLO:
 - Empreendedor, fundador da Vem Passear em Jampa (turismo em João Pessoa/PB)
 - Usa o Jamba para automatizar tarefas e agilizar operações
 - Prefere respostas diretas e curtas
-
-Hora atual: {hora_atual}
 """
+# Atenção: NÃO interpolar dados que mudam por turno (hora, briefing, estado) nesta
+# string. Elas estabilizam o prefixo do prompt para o **prompt caching** (Anthropic
+# `cache_control:ephemeral` na rota API e cache automático do Claude CLI na rota
+# da assinatura). Hora atual / estado do projeto agora entram via `_system_dynamic`.
 
 # Ferramentas expostas ao Claude (formato Anthropic tool-use)
 TOOLS = [
@@ -285,17 +381,57 @@ TOOLS = [
 ]
 
 
-def _history_context(history: list[dict] | None, limit: int = 4) -> str:
-    """Resume as últimas trocas para dar contexto ao cérebro de raciocínio."""
+def _compact_history(history: list[dict] | None, keep_raw: int = 2,
+                     max_old_chars: int = 600) -> list[dict]:
+    """Compacta o histórico: mantém os últimos `keep_raw` turnos crus e resume
+    todos os anteriores em UMA mensagem `[Resumo da conversa anterior: ...]`.
+
+    Em conversa longa (>10 turnos), o tamanho do histórico cai de ~3k tokens
+    crus para ~200-300 tokens. Cada turno antigo vira `Quem: primeiros 80 chars`,
+    juntados por "; ". Se o resumo passa de `max_old_chars`, ficamos com a cauda
+    (mais recente) — começo da conversa raramente importa pro tool-use.
+    """
     if not history:
-        return ""
-    linhas = []
-    for h in history[-limit:]:
+        return []
+    raw_tail = history[-keep_raw:] if keep_raw > 0 else []
+    older = history[:-keep_raw] if keep_raw > 0 else history
+    if not older:
+        return list(raw_tail)
+    bits = []
+    for h in older:
         c = (h.get("content") or "").strip()
         if not c:
             continue
         quem = "Murillo" if h.get("role") == "user" else "Jamba"
-        linhas.append(f"{quem}: {c[:400]}")
+        bits.append(f"{quem}: {c[:80]}")
+    summary = "; ".join(bits)
+    if not summary:
+        return list(raw_tail)
+    if len(summary) > max_old_chars:
+        summary = "..." + summary[-(max_old_chars - 3):]
+    summary_msg = {"role": "user",
+                   "content": f"[Resumo da conversa anterior: {summary}]"}
+    return [summary_msg] + list(raw_tail)
+
+
+def _history_context(history: list[dict] | None, keep_raw: int = 2,
+                     max_old_chars: int = 600) -> str:
+    """Versão TEXTO da compactação para as rotas que injetam histórico como
+    string (assinatura via `context=`, `stream_text`). Mantém o resumo + últimos
+    `keep_raw` turnos crus em `Quem: ...` (capado em 400 chars cada)."""
+    if not history:
+        return ""
+    compacted = _compact_history(history, keep_raw=keep_raw, max_old_chars=max_old_chars)
+    linhas = []
+    for h in compacted:
+        c = (h.get("content") or "").strip()
+        if not c:
+            continue
+        if c.startswith("[Resumo"):
+            linhas.append(c)
+        else:
+            quem = "Murillo" if h.get("role") == "user" else "Jamba"
+            linhas.append(f"{quem}: {c[:400]}")
     return "\n".join(linhas)
 
 
@@ -519,31 +655,53 @@ def _rotina_matinal() -> str:
     return "Bom dia, senhor. " + " ".join(partes)
 
 
-def _system() -> str:
-    from datetime import datetime
-    dias = ["segunda-feira","terça-feira","quarta-feira","quinta-feira","sexta-feira","sábado","domingo"]
-    meses = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"]
-    n = datetime.now()
-    hora = f"{n.strftime('%H:%M')}, {dias[n.weekday()]}, {n.day} de {meses[n.month-1]} de {n.year}"
-    base = SYSTEM_AGENT.replace("{hora_atual}", hora)
+def _system_static() -> str:
+    """Bloco FIXO do system prompt — cacheável.
+
+    Contém o que NÃO muda por turno: regras + perfil de Murillo + fatos salvos
+    do `profile`. Fica estável a ponto de a Anthropic/CLI reusar o cache deste
+    prefixo entre chamadas dentro da janela de 5 min.
+    """
+    base = SYSTEM_AGENT
     try:
         import profile
         base = base + profile.context_block()
     except Exception:
         pass
-    # Injeta o ESTADO REAL do projeto: assim o cérebro sabe "o que a gente fez"
-    # sem depender de acionar a ferramenta de conhecimento.
+    return base
+
+
+def _system_dynamic() -> str:
+    """Bloco DINÂMICO do system prompt — muda por turno (não cacheável).
+
+    Hora atual + estado-resumo do projeto. Fica DEPOIS do bloco fixo para não
+    invalidar o prefixo cacheado.
+    """
+    from datetime import datetime
+    dias = ["segunda-feira","terça-feira","quarta-feira","quinta-feira","sexta-feira","sábado","domingo"]
+    meses = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"]
+    n = datetime.now()
+    hora = f"{n.strftime('%H:%M')}, {dias[n.weekday()]}, {n.day} de {meses[n.month-1]} de {n.year}"
+    out = f"Hora atual: {hora}"
     try:
         import briefing
         estado = briefing.estado_resumido()
         if estado:
-            base += (
+            out += (
                 "\n\n## Estado atual do projeto Javis (use para responder o que foi "
                 "feito e o que está pendente; não invente nada fora disto):\n" + estado
             )
     except Exception:
         pass
-    return base
+    return out
+
+
+def _system() -> str:
+    """Compatibilidade: alguns chamadores ainda esperam o system inteiro como
+    uma string só (OpenAI, OpenRouter, stream_text). Aqui devolvemos estático +
+    dinâmico concatenados. As rotas Anthropic API/Subscription usam os blocos
+    separados via `_system_static`/`_system_dynamic` para ativar o cache."""
+    return _system_static() + "\n\n" + _system_dynamic()
 
 
 def _respond_claude(user_text: str, history: list[dict], max_rounds: int) -> dict:
@@ -551,17 +709,46 @@ def _respond_claude(user_text: str, history: list[dict], max_rounds: int) -> dic
     import anthropic
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"], timeout=LLM_TIMEOUT)
     messages: list[dict] = []
-    for h in history[-6:]:
+    for h in _compact_history(history):
         if h.get("content"):
             messages.append({"role": h.get("role", "user"), "content": h["content"]})
     messages.append({"role": "user", "content": user_text})
+
+    # Prompt caching: marca o bloco fixo (regras+perfil+fatos) e o array de tools
+    # como `cache_control: ephemeral`. Bloco dinâmico (hora+briefing) vai depois,
+    # sem cache. Resultado esperado: ~90% do input vira `cache_read_input_tokens`
+    # a partir do 2º turno dentro de 5 min.
+    system_blocks = [
+        {"type": "text", "text": _system_static(), "cache_control": {"type": "ephemeral"}},
+        {"type": "text", "text": _system_dynamic()},
+    ]
+    # Gating + cache: o subconjunto filtrado vira a lista enviada, com cache
+    # marker no último item. Se o gating devolveu TOOLS inteiro (fallback) ou um
+    # subconjunto, o marker funciona igual — só é eficaz quando dois turnos
+    # seguidos têm o mesmo intent (mesmo subconjunto).
+    gated = _gate_tools(user_text)
+    cached_tools = list(gated)
+    if cached_tools:
+        last = dict(cached_tools[-1])
+        last["cache_control"] = {"type": "ephemeral"}
+        cached_tools[-1] = last
 
     used: list[str] = []
     for _ in range(max_rounds):
         resp = client.messages.create(
             model=CLAUDE_MODEL, max_tokens=1024,
-            system=_system(), tools=TOOLS, messages=messages,
+            system=system_blocks, tools=cached_tools, messages=messages,
         )
+        try:
+            u = resp.usage
+            _log_usage("anthropic_api", CLAUDE_MODEL,
+                       input_tokens=getattr(u, "input_tokens", 0),
+                       output_tokens=getattr(u, "output_tokens", 0),
+                       cache_read_input_tokens=getattr(u, "cache_read_input_tokens", 0) or 0,
+                       cache_creation_input_tokens=getattr(u, "cache_creation_input_tokens", 0) or 0,
+                       kind="tool_use")
+        except Exception:
+            pass
         if resp.stop_reason == "tool_use":
             messages.append({"role": "assistant", "content": resp.content})
             results = []
@@ -589,10 +776,10 @@ def _respond_openrouter(user_text: str, history: list[dict], max_rounds: int) ->
     oai_tools = [
         {"type": "function", "function": {
             "name": t["name"], "description": t["description"], "parameters": t["input_schema"]}}
-        for t in TOOLS
+        for t in _gate_tools(user_text)
     ]
     messages: list[dict] = [{"role": "system", "content": _system()}]
-    for h in history[-6:]:
+    for h in _compact_history(history):
         if h.get("content"):
             messages.append({"role": h.get("role", "user"), "content": h["content"]})
     messages.append({"role": "user", "content": user_text})
@@ -631,10 +818,10 @@ def _respond_openai(user_text: str, history: list[dict], max_rounds: int) -> dic
     oai_tools = [
         {"type": "function", "function": {
             "name": t["name"], "description": t["description"], "parameters": t["input_schema"]}}
-        for t in TOOLS
+        for t in _gate_tools(user_text)
     ]
     messages: list[dict] = [{"role": "system", "content": _system()}]
-    for h in history[-6:]:
+    for h in _compact_history(history):
         if h.get("content"):
             messages.append({"role": h.get("role", "user"), "content": h["content"]})
     messages.append({"role": "user", "content": user_text})
@@ -642,6 +829,14 @@ def _respond_openai(user_text: str, history: list[dict], max_rounds: int) -> dic
     used: list[str] = []
     for _ in range(max_rounds):
         resp = client.chat.completions.create(model=OPENAI_MODEL, messages=messages, tools=oai_tools)
+        try:
+            u = resp.usage
+            _log_usage("openai", OPENAI_MODEL,
+                       input_tokens=getattr(u, "prompt_tokens", 0) or 0,
+                       output_tokens=getattr(u, "completion_tokens", 0) or 0,
+                       kind="tool_use")
+        except Exception:
+            pass
         msg = resp.choices[0].message
         if msg.tool_calls:
             messages.append({
@@ -666,10 +861,14 @@ def _respond_openai(user_text: str, history: list[dict], max_rounds: int) -> dic
     return {"text": "Executei o que era possível, senhor.", "tools": used}
 
 
-def _tool_catalog() -> str:
-    """Lista compacta das ferramentas pro prompt do Claude pela assinatura."""
+def _tool_catalog(tools_subset: list[dict] | None = None) -> str:
+    """Lista compacta das ferramentas pro prompt do Claude pela assinatura.
+
+    `tools_subset` permite o tool gating injetar só as ferramentas relevantes
+    pro turno. Default = todas as TOOLS (compatibilidade).
+    """
     lines = []
-    for t in TOOLS:
+    for t in (tools_subset if tools_subset is not None else TOOLS):
         params = ", ".join(t["input_schema"].get("properties", {}).keys())
         lines.append(f"- {t['name']}({params}): {t['description']}")
     return "\n".join(lines)
@@ -704,8 +903,13 @@ def _respond_claude_subscription(user_text: str, history: list[dict], max_rounds
     import claude_brain
     if not claude_brain.available():
         return None
-    system = _system() + (
-        "\n\nFerramentas disponíveis:\n" + _tool_catalog() +
+    # Prefixo ESTÁVEL → cache automático do Claude CLI hit. Só estático + tool
+    # catalog filtrado por intent + regras (esses três blocos não mudam entre
+    # turnos do MESMO intent). O dinâmico (hora + briefing) entra DEPOIS, via
+    # `context`, sem invalidar o prefixo.
+    gated = _gate_tools(user_text)
+    system = _system_static() + (
+        "\n\nFerramentas disponíveis:\n" + _tool_catalog(gated) +
         "\n\nPara usar uma ferramenta, responda SOMENTE com um JSON puro (sem "
         "texto antes/depois, sem markdown) neste formato exato:\n"
         '{"tool": "nome_da_ferramenta", "args": {"param": "valor"}}\n'
@@ -724,12 +928,28 @@ def _respond_claude_subscription(user_text: str, history: list[dict], max_rounds
         "concreto e verificável: USE a ferramenta. Responder de memória sobre o "
         "que está num arquivo/site é FINGIR que fez — proibido."
     )
-    base_ctx = _history_context(history)
+    # `dynamic` (hora + estado do projeto) entra no prompt — não no system —
+    # justamente para o prefixo do system permanecer estável e ativar o cache do CLI.
+    dynamic = _system_dynamic()
+    base_ctx_parts = [dynamic]
+    hist = _history_context(history)
+    if hist:
+        base_ctx_parts.append(hist)
+    base_ctx = "\n\n".join(base_ctx_parts)
     transcript = ""
     used: list[str] = []
     for _ in range(max_rounds):
         ctx = f"{base_ctx}\n\n{transcript}".strip() if transcript else base_ctx
-        out = claude_brain.answer(user_text, context=ctx, system=system, model=CLAUDE_MODEL)
+        out, usage = claude_brain.answer_with_usage(user_text, context=ctx, system=system, model=CLAUDE_MODEL)
+        try:
+            _log_usage("claude_subscription", CLAUDE_MODEL,
+                       input_tokens=int(usage.get("input_tokens") or 0),
+                       output_tokens=int(usage.get("output_tokens") or 0),
+                       cache_read_input_tokens=int(usage.get("cache_read_input_tokens") or 0),
+                       cache_creation_input_tokens=int(usage.get("cache_creation_input_tokens") or 0),
+                       kind="tool_use")
+        except Exception:
+            pass
         if not out:
             return None
         call = _parse_tool_json(out)
@@ -802,7 +1022,7 @@ def stream_text(user_text: str, history: list[dict]):
         from openai import OpenAI
         client = OpenAI(api_key=os.environ["OPENAI_API_KEY"], timeout=LLM_TIMEOUT, max_retries=1)
         messages: list[dict] = [{"role": "system", "content": _system()}]
-        for h in (history or [])[-6:]:
+        for h in _compact_history(history):
             if h.get("content"):
                 messages.append({"role": h.get("role", "user"), "content": h["content"]})
         messages.append({"role": "user", "content": user_text})

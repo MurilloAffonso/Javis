@@ -120,6 +120,54 @@ def answer(question: str, context: str = "", system: str | None = None, timeout:
         return ""
 
 
+def answer_with_usage(question: str, context: str = "", system: str | None = None, timeout: int | None = None,
+                      model: str | None = None, add_dirs: list[str] | None = None) -> tuple[str, dict]:
+    """Igual a answer(), mas devolve (texto, usage_dict) — usa --output-format json
+    para o Claude Code retornar `usage` (input/output/cache_*tokens) na resposta.
+
+    Usado para TELEMETRIA de tokens da rota da assinatura. Se algo falhar na
+    parsing, usage volta vazio ({}); o texto continua sendo retornado normalmente.
+    """
+    question = (question or "").strip()
+    if not question:
+        return ("Sobre o que devo pensar, senhor?", {})
+    if not available():
+        return ("", {})
+    prompt = question if not context.strip() else f"Contexto: {context.strip()}\n\nPergunta: {question}"
+    cmd = [
+        _CLAUDE_BIN, "-p", prompt,
+        "--model", model or _MODEL,
+        "--fallback-model", _FALLBACK,
+        "--output-format", "json",
+        "--permission-mode", "default",
+        "--disallowedTools", "Bash", "Edit", "Write",
+        "--append-system-prompt", system or _SYSTEM,
+    ]
+    for d in (add_dirs or []):
+        cmd += ["--add-dir", d]
+    try:
+        proc = subprocess.run(
+            cmd, cwd=str(JAVIS_ROOT), env=_env(),
+            stdin=subprocess.DEVNULL,
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=timeout or _TIMEOUT,
+        )
+        raw = (proc.stdout or "").strip()
+        if not raw:
+            return ("", {})
+        try:
+            obj = _json.loads(raw)
+        except Exception:
+            return (raw, {})
+        text = (obj.get("result") or "").strip()
+        usage = obj.get("usage") or {}
+        return (text, usage)
+    except subprocess.TimeoutExpired:
+        return ("Levei mais que o tempo disponível pensando nisso, senhor. Pode reformular ou simplificar?", {})
+    except Exception:
+        return ("", {})
+
+
 def answer_stream(question: str, context: str = "", model: str | None = None, system: str | None = None):
     """Igual a answer(), mas GERA o texto em pedaços conforme o modelo produz —
     para a voz começar a falar frase a frase em vez de esperar o bloco todo.
