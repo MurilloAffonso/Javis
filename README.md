@@ -344,10 +344,10 @@ A **Javis Local Interface** (`_apps/javis-local-interface/`) é uma camada de ex
     └── resultado + log → CLI / frontend
 ```
 
-**Iniciar o CLI:**
+**Iniciar o servidor (API + Quadro + CONVERSA):**
 ```powershell
-cd _apps/javis-local-interface
-python backend/main.py
+cd _apps/javis-local-interface/backend
+uvicorn server:app --reload   # abre em http://localhost:8000/
 ```
 
 **Testar roteamento de voz (dry-run):**
@@ -373,6 +373,75 @@ Integração voz→comando: `_docs/JAVIS-VOICE-TO-COMMAND-ROUTER.md`
 
 ---
 
+## Pipeline Operacional — Campanha com Gates de Aprovação
+
+O coração operacional do Javis é o **Quadro** (Kanban estilo Plane, na view
+do servidor em `http://localhost:8000/`) somado ao painel **CONVERSA**. Por ali
+roda uma campanha de marketing ponta a ponta, sempre em **modo seguro**: nada é
+publicado de verdade e nenhuma integração externa (WhatsApp/Instagram/Google Meu
+Negócio) é acionada — tudo é template/arquivo local até Murillo decidir o
+contrário.
+
+### Fluxo ponta a ponta
+
+```
+[Murillo] "cria a pauta da semana da Vem Passear"  (painel CONVERSA)
+   │
+   ▼  agente Nova → gerar_pauta_vp
+pauta-semana.md ──▶ 🚦 GATE 1 (Murillo aprova a pauta)
+                         │ aprovado → destrava Design
+                         ▼  botão "🎨 Rodar Estúdio" — agente Estúdio
+                    criativos-semana.md ──▶ 🚦 GATE 2 (aprova criativos)
+                                                │ aprovado → cria task Distribuição
+                                                ▼  botão "📤 Preparar Distribuição" — agente Midas
+                                           distribuicao-semana.md ──▶ 🚦 GATE 3 (aprova distribuição)
+                                                                          │ aprovado
+                                                                          ▼
+                                                pacote-publicacao-semana.md  (PUBLICAÇÃO MANUAL)
+                                                  → task concluída/morta + digest de IA
+```
+
+Cada gate é uma **aprovação humana explícita** — o fluxo nunca avança sozinho de
+uma etapa para a outra. Rejeitar uma gate (ex.: Gate 2) **não** cria a etapa
+seguinte: a task volta para `pending`, o sistema marca `adjustment_required` e o
+botão da etapa reaparece para refazer.
+
+### Os 4 entregáveis (gerados em ordem)
+
+| Ordem | Arquivo (`_projetos/cerebro-jampa/posts/`) | Gerado por | Conteúdo |
+|-------|--------------------------------------------|------------|----------|
+| 1 | `pauta-semana.md` | Nova (chat) | ~3 posts, pilares variados, no máx. 1 de venda |
+| 2 | `criativos-semana.md` | Estúdio | headline, legenda, CTA e briefing visual por peça |
+| 3 | `distribuicao-semana.md` | Midas | calendário, canais, horário e checklist por peça |
+| 4 | `pacote-publicacao-semana.md` | Midas | pacote final manual + aviso "nenhuma integração externa foi acionada" |
+
+Dados não confirmados (maré, vaga, preço, horário) saem sempre como
+`[CONFIRMAR COM MURILLO]` em vez de serem inventados.
+
+### Como o estado é guardado
+
+- **SQLite** é a fonte principal de tasks e aprovações; o backlog em Markdown
+  (`_data/codex_backlog.md`) recebe *dual-write* (`[x]` na gate aprovada).
+- **Journey Log** por task registra a timeline real (`agent_called` →
+  `file_generated` → `approval_requested` → `approval_approved` → … →
+  `entity_killed` → `ai_digest_created`); `action_logs` registra as decisões.
+- **Idempotência:** re-decidir uma gate já resolvida, ou re-rodar Estúdio/
+  Distribuição no mesmo `task_id`, retorna **409** — sem duplicar tasks.
+- Ao concluir, a task vai para a coluna **🪦 Concluído/Morto** com um **digest**
+  de IA (o que foi feito, quem participou, gargalos, próximo passo).
+
+### Validação
+
+Roteiro manual completo (incl. teste negativo de rejeição) em
+`_docs/TESTE_E2E_CAMPANHA_VP.md`. Baseline automática:
+
+```powershell
+cd _apps/javis-local-interface
+python -m pytest tests/ -q
+```
+
+---
+
 ## Próximos Passos
 
 - [x] LeanCTX funcionando como MCP server
@@ -383,9 +452,10 @@ Integração voz→comando: `_docs/JAVIS-VOICE-TO-COMMAND-ROUTER.md`
 - [x] Sandbox de voz validado (voz → transcrição → LLM → fala)
 - [x] Javis Local Interface v0 — CLI + Command Router + Actions + Logger + Frontend
 - [x] voice_bridge.py em modo dry-run — classifica e loga, não executa
-- [ ] Criar primeiro projeto ativo em `_projetos/`
+- [x] v1 — Servidor FastAPI (`server.py`, porta 8000) servindo Quadro + CONVERSA
+- [x] Primeiro projeto ativo plugado — Cérebro Jampa / campanha Vem Passear Jampa
+- [x] Pipeline de campanha com 3 gates de aprovação humana (Pauta → Estúdio → Distribuição), SQLite + Journey Log + digest, tudo em modo seguro
 - [ ] Resolver instalação do Headroom (incompatibilidade Python 3.14)
-- [ ] v1 — Servir frontend via FastAPI, conectar backend via HTTP
 - [ ] v2 — Murillo valida logs dry-run → liberar execução por voz (risk: low)
 - [ ] v3 — Conectar transcrição real do Open-LLM-VTuber ao voice_bridge
 
@@ -402,4 +472,4 @@ Integração voz→comando: `_docs/JAVIS-VOICE-TO-COMMAND-ROUTER.md`
 ---
 
 *Criado em: 2026-06-10*
-*Versão: 0.6.0 — Camada de ativação criada*
+*Versão: 0.7.0 — Pipeline operacional de campanha com gates de aprovação*
