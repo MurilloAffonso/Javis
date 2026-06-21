@@ -56,6 +56,7 @@ _memoria/knowledge_index.json
 _memoria/perfil.json
 _memoria/lembretes.json
 _memoria/decisao-*.md
+_apps/**/_data/chat_history.json
 
 # Banco SQLite — estado de runtime, regenerável por db_sync.bootstrap()
 _apps/**/_data/javis.db
