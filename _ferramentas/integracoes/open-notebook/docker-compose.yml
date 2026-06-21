@@ -1,0 +1,44 @@
+services:
+  # SurrealDB — banco do Open Notebook. Porta REMAPEADA de 8000 (oficial) para
+  # 8400 pra não conflitar com o servidor do Javis (`uvicorn server:app` na 8000).
+  surrealdb:
+    image: surrealdb/surrealdb:v2
+    command: start --log info --user root --pass root rocksdb:/mydata/mydatabase.db
+    user: root
+    ports:
+      - "8400:8000"   # host:container
+    volumes:
+      - ./surreal_data:/mydata
+    environment:
+      - SURREAL_EXPERIMENTAL_GRAPHQL=true
+    restart: always
+
+  # Open Notebook — alternativa local ao Google NotebookLM.
+  # UI em http://localhost:8502
+  # API em http://localhost:5055
+  # Aponta os modelos pelo painel (Settings → Models) após subir.
+  # Para usar Ollama local (zero custo): URL = http://host.docker.internal:11434
+  # Para usar OpenAI/Anthropic: cole a key no painel (já existe no .env do Javis).
+  open_notebook:
+    image: lfnovo/open_notebook:v1-latest
+    ports:
+      - "8502:8502"
+      - "5055:5055"
+    environment:
+      # IMPORTANTE — Murillo deve trocar essa chave antes de armazenar dado real.
+      # Comando pra gerar: python -c "import secrets; print(secrets.token_urlsafe(32))"
+      - OPEN_NOTEBOOK_ENCRYPTION_KEY=88qMDkPqLZX_beedNgkhCtReY3dG7mrkB4YyT6ssdeI
+      - SURREAL_URL=ws://surrealdb:8000/rpc
+      - SURREAL_USER=root
+      - SURREAL_PASSWORD=root
+      - SURREAL_NAMESPACE=open_notebook
+      - SURREAL_DATABASE=open_notebook
+      # Permite o container alcançar o Ollama do host (Windows/macOS).
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./notebook_data:/app/data
+    depends_on:
+      - surrealdb
+    restart: always
