@@ -8,6 +8,8 @@ Degrada com elegância: sem ANTHROPIC_API_KEY, retorna None e o chamador usa o f
 from __future__ import annotations
 import os
 import json
+import re
+import time
 
 import actions
 
@@ -88,9 +90,55 @@ def _gate_tools(text: str) -> list[dict]:
 _USAGE_LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "_data", "token_usage.jsonl")
 
 
+def _sanitize_telemetry_error(error: Exception | str | None) -> str | None:
+    """Remove segredos conhecidos e padrões de credencial antes de persistir erros."""
+    if error is None:
+        return None
+    text = f"{type(error).__name__}: {error}" if isinstance(error, Exception) else str(error)
+    for env_name in ("OPENROUTER_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY"):
+        secret = os.environ.get(env_name, "")
+        if secret:
+            text = text.replace(secret, "[REDACTED]")
+    text = re.sub(
+        r"(?i)\b(authorization|api[_-]?key)\s*[:=]\s*[^\s,;]+",
+        r"\1=[REDACTED]",
+        text,
+    )
+    text = re.sub(r"\b(?:sk-or-v1-|sk-)[A-Za-z0-9_-]{8,}\b", "[REDACTED]", text)
+    return text[:500] or None
+
+
+def _estimate_openrouter_cost(
+    requested_model: str,
+    input_tokens: int,
+    output_tokens: int,
+    reported_cost: object = None,
+) -> float | None:
+    """Estima USD sem tabela embutida; usa custo reportado, modelo free ou rates via env."""
+    if reported_cost is not None:
+        try:
+            return round(float(reported_cost), 8)
+        except (TypeError, ValueError):
+            pass
+    if requested_model.endswith(":free"):
+        return 0.0
+    try:
+        input_rate = os.environ.get("JAVIS_OPENROUTER_INPUT_USD_PER_MILLION", "").strip()
+        output_rate = os.environ.get("JAVIS_OPENROUTER_OUTPUT_USD_PER_MILLION", "").strip()
+        if not input_rate or not output_rate:
+            return None
+        cost = (input_tokens * float(input_rate) + output_tokens * float(output_rate)) / 1_000_000
+        return round(cost, 8)
+    except (TypeError, ValueError):
+        return None
+
+
 def _log_usage(provider: str, model: str, input_tokens: int = 0, output_tokens: int = 0,
                cache_read_input_tokens: int = 0, cache_creation_input_tokens: int = 0,
-               kind: str = "chat") -> None:
+               kind: str = "chat", requested_model: str | None = None,
+               resolved_model: str | None = None, estimated_cost_usd: float | None = None,
+               latency_ms: int | None = None, error: Exception | str | None = None,
+               fallback_used: bool = False) -> None:
     """Registra o consumo de tokens em _data/token_usage.jsonl (uma linha por chamada).
 
     Sem isso a gente não consegue dizer "antes/depois" de nenhuma otimização —
@@ -105,12 +153,18 @@ def _log_usage(provider: str, model: str, input_tokens: int = 0, output_tokens: 
             "ts": _t.strftime("%Y-%m-%dT%H:%M:%S"),
             "provider": provider,
             "model": model,
+            "requested_model": requested_model or model,
+            "resolved_model": resolved_model or model,
             "kind": kind,
             "input_tokens": input_tokens or 0,
             "cache_read_input_tokens": cache_read_input_tokens or 0,
             "cache_creation_input_tokens": cache_creation_input_tokens or 0,
             "output_tokens": output_tokens or 0,
             "total_input": total_input,
+            "estimated_cost_usd": estimated_cost_usd,
+            "latency_ms": latency_ms,
+            "error": _sanitize_telemetry_error(error),
+            "fallback_used": bool(fallback_used),
         }
         with open(_USAGE_LOG_PATH, "a", encoding="utf-8") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
@@ -764,7 +818,12 @@ def _respond_claude(user_text: str, history: list[dict], max_rounds: int) -> dic
     return {"text": "Executei o que era possível, senhor.", "tools": used}
 
 
-def _respond_openrouter(user_text: str, history: list[dict], max_rounds: int) -> dict:
+def _respond_openrouter(
+    user_text: str,
+    history: list[dict],
+    max_rounds: int,
+    fallback_used: bool = False,
+) -> dict:
     """Tool-use via OpenRouter (Llama 3.3 70B gratuito ou outros modelos)."""
     from openai import OpenAI
     model = os.environ.get("JAVIS_OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct:free")
@@ -786,7 +845,37 @@ def _respond_openrouter(user_text: str, history: list[dict], max_rounds: int) ->
 
     used: list[str] = []
     for _ in range(max_rounds):
-        resp = client.chat.completions.create(model=model, messages=messages, tools=oai_tools)
+        started = time.perf_counter()
+        try:
+            resp = client.chat.completions.create(model=model, messages=messages, tools=oai_tools)
+        except Exception as exc:
+            _log_usage(
+                "openrouter", model, kind="tool_use",
+                requested_model=model, resolved_model=model,
+                estimated_cost_usd=0.0 if model.endswith(":free") else None,
+                latency_ms=int((time.perf_counter() - started) * 1000),
+                error=exc, fallback_used=fallback_used,
+            )
+            raise
+        latency_ms = int((time.perf_counter() - started) * 1000)
+        usage = getattr(resp, "usage", None)
+        input_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
+        output_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
+        reported_cost = getattr(usage, "cost", None)
+        resolved_model = getattr(resp, "model", None) or model
+        _log_usage(
+            "openrouter", resolved_model,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            kind="tool_use",
+            requested_model=model,
+            resolved_model=resolved_model,
+            estimated_cost_usd=_estimate_openrouter_cost(
+                model, input_tokens, output_tokens, reported_cost,
+            ),
+            latency_ms=latency_ms,
+            fallback_used=fallback_used,
+        )
         msg = resp.choices[0].message
         if msg.tool_calls:
             messages.append({
@@ -994,10 +1083,14 @@ def respond(user_text: str, history: list[dict] | None = None, max_rounds: int =
     # 4) OpenRouter — requer cartão cadastrado em openrouter.ai
     if os.environ.get("OPENROUTER_API_KEY", "").strip():
         try:
-            return _respond_openrouter(user_text, history, max_rounds)
+            return _respond_openrouter(user_text, history, max_rounds, fallback_used=True)
         except Exception as e:
-            _log(f"OpenRouter (tool-use) falhou: {e}")
-            return {"text": f"Tive um problema ao executar, senhor: {e}", "tools": []}
+            safe_error = _sanitize_telemetry_error(e) or type(e).__name__
+            _log(f"OpenRouter (tool-use) falhou: {safe_error}")
+            return {
+                "text": "Tive um problema no provedor de fallback, senhor. O erro foi registrado sem credenciais.",
+                "tools": [],
+            }
 
     return None
 
