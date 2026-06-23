@@ -6,6 +6,7 @@ python-dotenv>=1.0
 requests>=2.31
 openai>=1.30
 anthropic>=0.25
+piper-tts>=1.4
 
 # dev
 pytest>=8.0

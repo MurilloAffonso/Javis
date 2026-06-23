@@ -1,60 +1,37 @@
 # Estado Atual — Javis
 
-**Atualizado:** 2026-06-12 (sessão voice-streaming-ui)
-**Responsável pela última atualização:** Claude Code — Voice/Streaming/UI upgrade + abrir_projeto fix
+**Atualizado:** 2026-06-23 (rota Gemini free + TTS local Piper na cascata)
+**Testes:** 138 passing em `_apps/javis-local-interface/` (`python -m pytest tests/ -q`)
+
+> Histórico detalhado de sessões: ver `_logs/` datados e o `git log`. Este arquivo
+> é só o **snapshot atual** — mantido curto de propósito.
 
 ---
 
-## Stack ativa
+## O que o Javis É
 
-| Ferramenta | Status | Evidência |
-|-----------|--------|-----------|
-| LeanCTX v3.7.5 | ✅ ATIVO | 1.0M tokens salvos, 79.7% compressão, $2.73 USD |
-| CodeGraph | ✅ ATIVO | 13 arquivos, 177 nós, 315 arestas indexados |
-| AgentMemory | ✅ instalado | MCP configurado, em uso |
-| Open WebUI | ✅ rodando | localhost:3000 (Docker) |
-| Ollama + llama3.2:3b | ✅ rodando | porta 11434 |
-| voz-sandbox (Open-LLM-VTuber) | ⏸ separado | porta 12393, não integrado ao Javis |
-| Headroom | ✅ instalado | v0.24.0, compilado com Rust, `headroom wrap claude` disponível |
+Assistente pessoal/operacional do Murillo (persona "Jamba", mordomo PT-BR), com
+chat + voz, orquestração de tarefas e um pipeline de campanha com aprovação humana.
+Roda local (FastAPI em `localhost:8000`), Windows.
 
----
+## O que está PRONTO e TESTADO (a base que funciona)
 
-## Módulos do Javis Local Interface
+| Bloco | Estado |
+|-------|--------|
+| **Cascata multi-cérebro** (`agent.py`) | ✅ Claude assinatura → OpenAI → Claude API → Gemini → OpenRouter, com telemetria de token e custo sanitizada |
+| **command_router** | ✅ 13 intents, fast-path por palavra-chave (sem LLM = instantâneo) |
+| **Tool-use** (`agent.py`) | ✅ ~20 ferramentas; gating + prompt caching + compactação de histórico |
+| **Pipeline de campanha** | ✅ 3 gates de aprovação humana (Pauta→Estúdio→Distribuição), SQLite + Journey Log + digest |
+| **Motor de execução** (`brain_switch.py`) | ✅ troca Claude/Codex, persistido em `brain_ativo.json` |
+| **Voz** (`voice_bridge.py`) | ✅ executando (dry_run=False), faster-whisper ASR local + wake word "Jamba" |
+| **TTS** (`/tts`, `tts_local.py`) | ✅ Piper local (pt_BR-faber-medium, grátis, sem rede) padrão; fallback OpenAI pago só se Piper faltar/falhar. Ack/streaming de voz em tempo real continua no OpenAI (latência já calibrada) |
+| **RAG** (`knowledge.py`) | ✅ indexa .md das pastas de conhecimento, tool `buscar_conhecimento` |
+| **Frontend** | ✅ Quadro Kanban (estilo Plane) + CONVERSA + painel HUD |
+| **Integrações** | ✅ Telegram ativo; YouTube/weather degradam sem key |
 
-| Módulo | Status |
-|--------|--------|
-| backend/command_router.py | ✅ 13 intents, testado |
-| backend/voice_bridge.py | ✅ dry_run=True, 5 test files passando |
-| backend/actions.py | ✅ whitelist de 9 ações seguras |
-| backend/logger.py | ✅ rotação diária JSONL |
-| frontend/app.js | ✅ 14/14 intents + NeuralBrain (cérebro neural animado) |
-| frontend/index.html | ✅ banner neural + botões 📂 projeto e 🌐 analisar site |
-| backend/site_analyzer.py | ✅ analisa URL + gera esqueleto HTML/CSS próprio |
-| tests/ | ✅ 189 checks, 0 falhas |
+## Frentes (ver `proximos-passos.md`)
 
----
-
-## Sessões recentes
-
-- 2026-06-10: Setup inicial, LeanCTX, Open WebUI, 6 modelos configurados
-- 2026-06-11: 5 fases de auditoria (gitignore, actions, logs, intents, token economy)
-- 2026-06-11: Sessão abrir-sessao/fechar-sessao — 1ª sessão com protocolo completo. Auditoria de intents: 13/13 consistentes, 189/189 testes OK.
-- 2026-06-12: Voice/Streaming/UI upgrade — Whisper ASR, AutoWhisperEngine c/ VAD calibrado, streaming SSE, TTS nova, UI HUD sci-fi. abrir_projeto adicionado.
-- 2026-06-12: Cérebro neural animado (NeuralBrain canvas) + análise de site (site_analyzer) por voz/chat. Ações locais executam no /chat/stream e /voice. Performance: removida dupla chamada Claude (_classify), run_in_threadpool evita travar event loop. Launcher javis-start.bat + atalhos Desktop/Startup.
-- 2026-06-12: Redesign JARVIS-style — renomeado para JAMBA (wake word + prompts). Novo layout: esquerda=stats/cérebros/agentes, CENTRO=orbe circular gigante (VoiceOrb canvas, reativo à voz via mic level), DIREITA=chat. Música corrigida: tocar_musica vence youtube, _play_music extrai termo e busca, ou abre stream lofi (autoplay). Wake words Jamba em voice_bridge + VoiceEngine.
-- 2026-06-12: Voz onyx (homem) tts-1-hd + trata Murillo por "senhor". Integrações: integrations.py (YouTube exato, weather), RESERVATORIOS.md (curadoria de APIs/repos por encaixe). Novas: clima (OpenWeather, intent+ação) e telegram_bridge.py (controla Jamba pelo celular via long polling, sobe no startup se TELEGRAM_BOT_TOKEN). Todas degradam sem key. Pendente: OPENWEATHER_API_KEY, TELEGRAM_BOT_TOKEN, YOUTUBE_API_KEY no .env.
-- 2026-06-12: TOOL-USE (agent.py) — Claude/OpenAI function calling com 11 ferramentas; entende intenção e encadeia ações ("abre youtube e toca jazz"). Wired em /chat/stream e /voice; FAST_PATH só p/ abridores de app inequívocos. Fallback Claude→OpenAI (chave Anthropic SEM SALDO, usando OpenAI gpt-4o-mini). WAKE WORD "Jamba" (WakeWordEngine, Web Speech) — botão 🎙️, exclusivo c/ always-on 👂. ATENÇÃO: recarregar ANTHROPIC_API_KEY com saldo quando possível.
-- 2026-06-12: BATCH inteligência — Murillo tem ASSINATURA Claude (não API); CLI claude headless testado = 16-22s, lento demais p/ cérebro → estratégia: usar Claude Code (este chat) p/ CONSTRUIR, OpenAI roda o Jamba. Construído: profile.py (memória/personalização, perfil.json injetado no prompt do agente), reminders.py (lembretes/timers, thread checador + fila /reminders/poll que a UI fala por TTS + Telegram), code_agent.py (bridge Codex 'programar' — requer npm i -g @openai/codex), rotina_matinal. Novas tools no agente: lembrar_fato, criar_lembrete, listar_lembretes, rotina_matinal, programar. Frontend: pollReminders 15s. Tudo testado OK.
-- 2026-06-12: BATCH 2 — Codex INSTALADO (0.139.0, logado via ChatGPT, code_agent.dispatch pronto, roda na assinatura ChatGPT não gasta API). app_launcher.py: abre QUALQUER app/site do Windows (mapa ~50 apps + ms-settings URIs + start genérico) — tools abrir_app, abrir_site, pesquisar_google (testados: calculadora, google OK). WhatsApp via wa.me: integrations.whatsapp_send (abre msg pronta, user confirma) — tool enviar_whatsapp. Agente agora com ~20 ferramentas. Telegram ATIVO (token no .env, travado em TELEGRAM_ALLOWED_CHAT_ID=7840324823, bot @Jarvis_VempassearJampa_bot). Auto-send WhatsApp real exigiria whatsapp-web.js/Cloud API.
-- 2026-06-12: RAG — knowledge.py: indexa .md/.txt das pastas de conhecimento (_memoria,_ideias,_projetos,_logs,_estado,_prompts,_skills,_inbox,_outbox,_ferramentas + .md da raiz; skip open-webui-data/caches; trava _MAX_FILES=800) com embeddings text-embedding-3-small (97 arquivos, 494 chunks). Busca cosine, tool buscar_conhecimento no agente. Endpoints /knowledge/reindex e /search; indexa no startup (incremental por mtime). FIX: FAST_PATH agora ignora perguntas (_looks_like_question) — "o que tá pendente no projeto?" ia abrir pasta, agora vai pro RAG. Testado: responde sobre os arquivos do Murillo corretamente. Próximos sugeridos: auto-memória + proatividade (digest matinal Telegram agendado).
-- 2026-06-12: PAINEL — Codex estava em 98-99% de uso (reseta 18/jun, 1 reset), então EU construí o painel (não gastar reset dele). 3 arquivos novos: frontend/painel.{html,css,js} (HUD sci-fi, dados reais). Endpoints novos no server: GET /profile (facts), /integrations (available), e rotas /painel /painel.css /painel.js. Acessa em localhost:8000/painel. Testado no browser: 17 agentes, 3 serviços, 3 fatos, Telegram conectado. NOTA: Codex tem outros projetos (CEREBROJAMPA, CEREBRO.CLAUDE) — manter Jamba separado.
-- 2026-06-17 (madrugada, autonomia total autorizada): sessão de orquestração Javis↔Cérebro Jampa. `backend/project_registry.py` (NOVO) lê project-manifest.json/skills do CEREBRO.JAMPA real read-only → endpoint `/projects/registry`, card "Cérebro Jampa" em Projetos agora mostra fase/skills reais. `backend/mission_board.py` (NOVO) parseia `_data/codex_backlog.md` em missões/nodes reais → `/missions` e `/missions/{id}/nodes` substituem o mock hardcoded; frontend separou fetch/render (`renderMissionsList`/`renderCanvasForMission`) pra clique não resetar estado. Polish visual feito pelo Codex CLI direto (`codex exec`, sem o orchestrator que auto-commita): grid animado + glow em Workflows/Projetos. `_treinamento/{vendas,conteudo,tecnico,estrategia}/{_entrada,_resumos}` criado (fluxo manual NotebookLM por ora), `_treinamento` adicionado ao RAG (`knowledge.py`), endpoint `/treinamento/status` + painel "Áreas de Estudo" na view Treino. Confirmado com Codex: ele TEM plugin/MCP Figma conectado (Claude Code não tem) — não criei nada no Figma por não saber qual workspace/arquivo usar. Detalhe completo em `_logs/2026-06-17_orquestracao-noturna.md`. NENHUM commit/push feito — Murillo revisa de manhã.
-- 2026-06-17 (continuação, sessão retomada via cron 2h): backlog do Codex fechado 100% (5/5 itens — roteiros de Reel, templates WhatsApp, melhoria visual `renderAgentGallery()`, SEO checklist, todos validados com grep de acentuação antes de marcar `[x]`). 3 melhorias de UX/acessibilidade feitas direto em `app.js`/`style.css` (fade-in de view, `:focus-visible` global, estado vazio na galeria) — testadas no Playwright, zero erros. Esquadrão de estudo fechado de 0% pra 100%: corrigida query do GitHub pra área "estratégia" em `trend_scout.py` (estava trazendo repos irrelevantes — DeFi, analytics de delivery indiano), re-rodado o scout, e escritos 7 resumos reais (lendo README/descrição via `gh api`) cobrindo as 4 áreas; vídeos seguem manuais via NotebookLM (sem transcript, resumir seria inventar). `/missions` confirma as 5 missões do quadro em 100%. Suíte `tests/` rodada após tudo: 54/54 passando, zero regressão. NENHUM commit/push feito.
-
----
-
-## O que está pendente (ver proximos-passos.md)
-
-- ANTHROPIC_API_KEY ausente no .env (Claude usa Ollama como fallback)
-- Headroom aguardando aprovação de Murillo
-- Fase 2 de voz (execução real) aguardando aprovação de Murillo
+Decisão 22/06: **UMA frente ativa por vez.** Fechadas: **rota Gemini free na
+cascata** (23/06) e **TTS local Piper** (23/06). Frente ativa: livre, aguardando
+escolha. Parqueado (não disputa foco): OpenRouter deep, Hermes, treinamento/redes,
+criativo.

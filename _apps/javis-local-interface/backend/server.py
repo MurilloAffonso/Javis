@@ -36,6 +36,7 @@ import command_router
 import actions
 import logger
 import history_store
+import tts_local
 from orchestrator import Orchestrator
 
 FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
@@ -1176,9 +1177,19 @@ class TTSRequest(BaseModel):
 
 @app.post("/tts")
 async def text_to_speech(req: TTSRequest):
-    """TTS via OpenAI — voz natural (nova/alloy/shimmer...)."""
+    """TTS — Piper local (grátis, padrão), fallback pra OpenAI (pago) se
+    indisponível. Pedido com voice/model explícitos pula direto pro OpenAI
+    (Piper não tem essas vozes)."""
     import os
     from fastapi.responses import Response
+
+    clean = req.text[:600]
+    provider = os.environ.get("JAVIS_TTS_PROVIDER", "piper")
+
+    if provider == "piper" and not req.voice and not req.model:
+        audio_bytes = tts_local.synthesize(clean)
+        if audio_bytes:
+            return Response(content=audio_bytes, media_type="audio/wav")
 
     api_key = os.environ.get("OPENAI_API_KEY", "")
     if not api_key:
@@ -1186,7 +1197,6 @@ async def text_to_speech(req: TTSRequest):
 
     voice = req.voice or os.environ.get("JAVIS_TTS_VOICE", "nova")
     model = req.model or os.environ.get("JAVIS_TTS_MODEL", "tts-1")
-    clean = req.text[:600]
 
     try:
         from openai import OpenAI
@@ -1241,7 +1251,7 @@ FAST_PATH = {
     "abrir_vscode", "abrir_projeto", "status_sistema",
     "hora_data", "abrir_youtube", "tocar_musica",
     "listar_lembretes", "registrar_ideia", "clima",
-    "trocar_motor",
+    "trocar_motor", "atualizar_memoria",
     # abrir_terminal removido: requires_approval=True no RISK_MAP
 }
 

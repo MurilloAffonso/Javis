@@ -89,6 +89,178 @@ def test_ordem_de_fallback(monkeypatch):
     assert ordem == ["claude_subscription", "openai", "anthropic", "openrouter"]
 
 
+def test_ordem_de_fallback_inclui_gemini_antes_do_openrouter(monkeypatch):
+    ordem = []
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-anthropic")
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy-gemini")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-openrouter")
+    monkeypatch.setattr(agent, "_respond_claude_subscription", lambda *_a, **_k: None)
+    monkeypatch.setattr(agent, "_respond_openai", lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("sem chave")))
+
+    def anthropic(*_args, **_kwargs):
+        ordem.append("anthropic")
+        raise RuntimeError("erro simulado")
+
+    def gemini(*_args, **kwargs):
+        ordem.append("gemini")
+        assert kwargs["fallback_used"] is True
+        return {"text": "gemini ok", "tools": []}
+
+    def openrouter(*_args, **_kwargs):
+        pytest.fail("OpenRouter não deveria ser alcançado")
+
+    monkeypatch.setattr(agent, "_respond_claude", anthropic)
+    monkeypatch.setattr(agent, "_respond_gemini", gemini)
+    monkeypatch.setattr(agent, "_respond_openrouter", openrouter)
+
+    assert agent.respond("teste")["text"] == "gemini ok"
+    assert ordem == ["anthropic", "gemini"]
+
+
+def test_sem_gemini_key_pula_pra_openrouter(monkeypatch):
+    ordem = []
+    monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-openrouter")
+    monkeypatch.setattr(agent, "_respond_claude_subscription", lambda *_a, **_k: None)
+    monkeypatch.setattr(agent, "_respond_openai", lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("sem chave")))
+    monkeypatch.setattr(
+        agent, "_respond_gemini",
+        lambda *_a, **_k: pytest.fail("Gemini não deveria ser chamado sem chave"),
+    )
+
+    def openrouter(*_args, **_kwargs):
+        ordem.append("openrouter")
+        return {"text": "openrouter ok", "tools": []}
+
+    monkeypatch.setattr(agent, "_respond_openrouter", openrouter)
+
+    assert agent.respond("teste")["text"] == "openrouter ok"
+    assert ordem == ["openrouter"]
+
+
+def test_erro_gemini_avanca_para_openrouter(monkeypatch):
+    ordem = []
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy-gemini")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-openrouter")
+    monkeypatch.setattr(agent, "_respond_claude_subscription", lambda *_a, **_k: None)
+    monkeypatch.setattr(agent, "_respond_openai", lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("sem chave")))
+
+    def gemini(*_args, **_kwargs):
+        ordem.append("gemini")
+        raise RuntimeError("erro offline")
+
+    def openrouter(*_args, **_kwargs):
+        ordem.append("openrouter")
+        return {"text": "openrouter ok", "tools": []}
+
+    monkeypatch.setattr(agent, "_respond_gemini", gemini)
+    monkeypatch.setattr(agent, "_respond_openrouter", openrouter)
+
+    assert agent.respond("teste")["text"] == "openrouter ok"
+    assert ordem == ["gemini", "openrouter"]
+
+
+def test_tool_use_gemini_e_telemetria_sao_offline(monkeypatch, tmp_path):
+    secret = "AIzaSy-segredo-que-nao-pode-vazar"
+    monkeypatch.setenv("GEMINI_API_KEY", secret)
+    monkeypatch.setattr(agent, "_USAGE_LOG_PATH", str(tmp_path / "usage.jsonl"))
+    monkeypatch.setattr(agent, "_system", lambda: "system offline")
+    monkeypatch.setattr(
+        agent,
+        "_gate_tools",
+        lambda _text: [{
+            "name": "hora_data",
+            "description": "hora local",
+            "input_schema": {"type": "object", "properties": {}},
+        }],
+    )
+
+    tool_call = SimpleNamespace(
+        id="call-1",
+        function=SimpleNamespace(name="hora_data", arguments="{}"),
+    )
+    responses = [
+        SimpleNamespace(
+            model="gemini-2.0-flash",
+            usage=SimpleNamespace(prompt_tokens=10, completion_tokens=2),
+            choices=[SimpleNamespace(message=SimpleNamespace(content="", tool_calls=[tool_call]))],
+        ),
+        SimpleNamespace(
+            model="gemini-2.0-flash",
+            usage=SimpleNamespace(prompt_tokens=12, completion_tokens=3),
+            choices=[SimpleNamespace(message=SimpleNamespace(content="feito", tool_calls=[]))],
+        ),
+    ]
+    requests = []
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            requests.append(kwargs)
+            return responses.pop(0)
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            assert kwargs["api_key"] == secret
+            assert kwargs["base_url"] == "https://generativelanguage.googleapis.com/v1beta/openai/"
+            self.chat = SimpleNamespace(completions=FakeCompletions())
+
+    import openai
+    monkeypatch.setattr(openai, "OpenAI", FakeOpenAI)
+
+    ferramentas = []
+    monkeypatch.setattr(
+        agent, "_exec_tool",
+        lambda name, args, _history: ferramentas.append((name, args)) or "12:00",
+    )
+
+    result = agent._respond_gemini("que horas são?", [], 3)
+
+    assert result == {"text": "feito", "tools": ["hora_data"]}
+    assert ferramentas == [("hora_data", {})]
+    assert len(requests) == 2
+    assert any(message["role"] == "tool" for message in requests[1]["messages"])
+
+    records = [
+        json.loads(line)
+        for line in (tmp_path / "usage.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert len(records) == 2
+    assert all(record["provider"] == "gemini" for record in records)
+    assert all(record["resolved_model"] == "gemini-2.0-flash" for record in records)
+    assert all(record["estimated_cost_usd"] == 0.0 for record in records)
+    assert all(record["latency_ms"] is not None for record in records)
+    assert all(record["error"] is None for record in records)
+    assert secret not in (tmp_path / "usage.jsonl").read_text(encoding="utf-8")
+
+
+def test_erro_gemini_e_sanitizado(monkeypatch, tmp_path):
+    secret = "AIzaSy-segredo-timeout-123456"
+    monkeypatch.setenv("GEMINI_API_KEY", secret)
+    monkeypatch.setattr(agent, "_USAGE_LOG_PATH", str(tmp_path / "usage.jsonl"))
+    monkeypatch.setattr(agent, "_system", lambda: "system offline")
+    monkeypatch.setattr(agent, "_gate_tools", lambda _text: [])
+
+    class FailingCompletions:
+        def create(self, **_kwargs):
+            raise TimeoutError(f"timeout api_key={secret}")
+
+    class FakeOpenAI:
+        def __init__(self, **_kwargs):
+            self.chat = SimpleNamespace(completions=FailingCompletions())
+
+    import openai
+    monkeypatch.setattr(openai, "OpenAI", FakeOpenAI)
+
+    with pytest.raises(TimeoutError):
+        agent._respond_gemini("teste", [], 1, fallback_used=True)
+
+    raw = (tmp_path / "usage.jsonl").read_text(encoding="utf-8")
+    record = json.loads(raw)
+    assert secret not in raw
+    assert "[REDACTED]" in record["error"]
+    assert record["fallback_used"] is True
+    assert record["provider"] == "gemini"
+
+
 def test_timeout_avanca_para_proximo_provedor(monkeypatch):
     ordem = []
     monkeypatch.setenv("OPENAI_API_KEY", "dummy-openai")

@@ -824,9 +824,12 @@ def _respond_openrouter(
     max_rounds: int,
     fallback_used: bool = False,
 ) -> dict:
-    """Tool-use via OpenRouter (Llama 3.3 70B gratuito ou outros modelos)."""
+    """Tool-use via OpenRouter (gpt-oss-120b gratuito ou outros modelos)."""
     from openai import OpenAI
-    model = os.environ.get("JAVIS_OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct:free")
+    # Default free trocado em 23/06: llama-3.3-70b:free estava rate-limited upstream
+    # (provedor Venice) e gpt-oss-120b:free passou no teste live (PT/tool/código).
+    # Catálogo free é volátil — ver _logs/2026-06-23_openrouter-teste-live.md.
+    model = os.environ.get("JAVIS_OPENROUTER_MODEL", "openai/gpt-oss-120b:free")
     client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=os.environ["OPENROUTER_API_KEY"],
@@ -873,6 +876,85 @@ def _respond_openrouter(
             estimated_cost_usd=_estimate_openrouter_cost(
                 model, input_tokens, output_tokens, reported_cost,
             ),
+            latency_ms=latency_ms,
+            fallback_used=fallback_used,
+        )
+        msg = resp.choices[0].message
+        if msg.tool_calls:
+            messages.append({
+                "role": "assistant",
+                "content": msg.content or "",
+                "tool_calls": [
+                    {"id": tc.id, "type": "function",
+                     "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
+                    for tc in msg.tool_calls
+                ],
+            })
+            for tc in msg.tool_calls:
+                used.append(tc.function.name)
+                try:
+                    args = json.loads(tc.function.arguments or "{}")
+                except Exception:
+                    args = {}
+                out = _exec_tool(tc.function.name, args, history)
+                messages.append({"role": "tool", "tool_call_id": tc.id, "content": out or "feito"})
+            continue
+        return {"text": (msg.content or "").strip(), "tools": used}
+    return {"text": "Executei o que era possível, senhor.", "tools": used}
+
+
+def _respond_gemini(
+    user_text: str,
+    history: list[dict],
+    max_rounds: int,
+    fallback_used: bool = False,
+) -> dict:
+    """Tool-use via Gemini (endpoint OpenAI-compatible, tier grátis 1.500 req/dia)."""
+    from openai import OpenAI
+    model = os.environ.get("JAVIS_GEMINI_MODEL", "gemini-2.5-flash")
+    client = OpenAI(
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+        api_key=os.environ["GEMINI_API_KEY"],
+        timeout=LLM_TIMEOUT,
+    )
+    oai_tools = [
+        {"type": "function", "function": {
+            "name": t["name"], "description": t["description"], "parameters": t["input_schema"]}}
+        for t in _gate_tools(user_text)
+    ]
+    messages: list[dict] = [{"role": "system", "content": _system()}]
+    for h in _compact_history(history):
+        if h.get("content"):
+            messages.append({"role": h.get("role", "user"), "content": h["content"]})
+    messages.append({"role": "user", "content": user_text})
+
+    used: list[str] = []
+    for _ in range(max_rounds):
+        started = time.perf_counter()
+        try:
+            resp = client.chat.completions.create(model=model, messages=messages, tools=oai_tools)
+        except Exception as exc:
+            _log_usage(
+                "gemini", model, kind="tool_use",
+                requested_model=model, resolved_model=model,
+                estimated_cost_usd=0.0,
+                latency_ms=int((time.perf_counter() - started) * 1000),
+                error=exc, fallback_used=fallback_used,
+            )
+            raise
+        latency_ms = int((time.perf_counter() - started) * 1000)
+        usage = getattr(resp, "usage", None)
+        input_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
+        output_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
+        resolved_model = getattr(resp, "model", None) or model
+        _log_usage(
+            "gemini", resolved_model,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            kind="tool_use",
+            requested_model=model,
+            resolved_model=resolved_model,
+            estimated_cost_usd=0.0,
             latency_ms=latency_ms,
             fallback_used=fallback_used,
         )
@@ -1052,7 +1134,7 @@ def _respond_claude_subscription(user_text: str, history: list[dict], max_rounds
 
 
 def respond(user_text: str, history: list[dict] | None = None, max_rounds: int = 5) -> dict | None:
-    """Loop de tool-use. Cascata: Claude (assinatura) → OpenAI → Claude API → OpenRouter.
+    """Loop de tool-use. Cascata: Claude (assinatura) → OpenAI → Claude API → Gemini → OpenRouter.
     Decisão Murillo 18/06: a assinatura é o cérebro principal; o resto é fallback
     pra quando o Claude Code não estiver disponível, não rota padrão.
     Retorna {text, tools} ou None se nenhum provedor disponível."""
@@ -1080,7 +1162,14 @@ def respond(user_text: str, history: list[dict] | None = None, max_rounds: int =
         except Exception as e:
             _log(f"Claude (tool-use) falhou, tentando próximo: {e}")
 
-    # 4) OpenRouter — requer cartão cadastrado em openrouter.ai
+    # 4) Gemini — grátis (1.500 req/dia), key sem cartão em aistudio.google.com
+    if os.environ.get("GEMINI_API_KEY", "").strip():
+        try:
+            return _respond_gemini(user_text, history, max_rounds, fallback_used=True)
+        except Exception as e:
+            _log(f"Gemini (tool-use) falhou, tentando próximo: {e}")
+
+    # 5) OpenRouter — requer cartão cadastrado em openrouter.ai
     if os.environ.get("OPENROUTER_API_KEY", "").strip():
         try:
             return _respond_openrouter(user_text, history, max_rounds, fallback_used=True)

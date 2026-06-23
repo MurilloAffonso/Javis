@@ -81,6 +81,7 @@ def execute(intent: str, user_text: str = "") -> dict:
         "clima":            _weather,
         "hora_data":        _hora_data,
         "trocar_motor":     _switch_brain,
+        "atualizar_memoria": _reindex_memory,
         "acao_perigosa":    _blocked,
         "conversa":         _to_llm,
         "desconhecido":     _to_llm,
@@ -271,6 +272,24 @@ def _system_status(_: str) -> dict:
             results.append(f"  ❌ {name}")
     summary = "\n".join(results)
     return {"status": "ok", "message": f"Status dos serviços:\n{summary}"}
+
+
+def _reindex_memory(_: str) -> dict:
+    """Re-indexa as notas do vault (Obsidian/projeto) na memória semântica.
+
+    Incremental: só re-embeda arquivos que mudaram. Roda no fast-path."""
+    import knowledge
+    res = knowledge.build_index(force=False)
+    if res.get("status") != "ok":
+        return {"status": "error",
+                "message": res.get("message", "Não consegui atualizar a memória, senhor.")}
+    chunks = res.get("chunks", 0)
+    feitos = res.get("arquivos_reindexados", 0)
+    if feitos:
+        msg = f"Memória atualizada, senhor: {feitos} arquivo(s) reindexado(s), {chunks} trechos no total."
+    else:
+        msg = f"Memória já estava em dia, senhor: {chunks} trechos indexados, nada mudou."
+    return {"status": "ok", "message": msg}
 
 
 def _analyze_site(text: str) -> dict:

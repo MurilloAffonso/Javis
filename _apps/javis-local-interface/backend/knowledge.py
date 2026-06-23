@@ -15,10 +15,12 @@ JAVIS_ROOT = Path(__file__).resolve().parents[3]
 INDEX_FILE = JAVIS_ROOT / "_memoria" / "knowledge_index.json"
 
 # SÓ as pastas de conhecimento do senhor entram no índice (notas, ideias, projetos…)
+# _referencias/ fica de fora de propósito: é majoritariamente doc de libs de
+# terceiros (ECC, silero-vad) que poluiria a busca semântica.
 _KNOWLEDGE_DIRS = [
     "_memoria", "_ideias", "_projetos", "_logs", "_estado",
     "_prompts", "_skills", "_inbox", "_outbox", "_ferramentas",
-    "_treinamento",
+    "_treinamento", "_docs", "_sessoes",
 ]
 # subpastas a pular mesmo dentro das de conhecimento (caches, libs, lixo)
 _SKIP_DIRS = {

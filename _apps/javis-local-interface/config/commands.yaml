@@ -146,6 +146,16 @@ intents:
       - "muda pro claude"
       - "qual motor tá ativo?"
 
+  atualizar_memoria:
+    description: Re-indexa as notas do vault (Obsidian/projeto) na memória semântica — incremental
+    risk_level: low
+    requires_approval: false
+    action: reindex_memory
+    examples:
+      - "atualiza a memória"
+      - "reindexa as notas"
+      - "sincroniza a memória"
+
   acao_perigosa:
     description: Qualquer palavra-chave destrutiva — bloqueado imediatamente
     risk_level: critical
