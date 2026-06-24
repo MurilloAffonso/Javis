@@ -1,7 +1,7 @@
 # Estado Atual — Javis
 
 **Atualizado:** 2026-06-23 (rota Gemini free + TTS local Piper na cascata)
-**Testes:** 138 passing em `_apps/javis-local-interface/` (`python -m pytest tests/ -q`)
+**Testes:** 142 passing em `_apps/javis-local-interface/` (`python -m pytest tests/ -q`)
 
 > Histórico detalhado de sessões: ver `_logs/` datados e o `git log`. Este arquivo
 > é só o **snapshot atual** — mantido curto de propósito.
@@ -18,7 +18,7 @@ Roda local (FastAPI em `localhost:8000`), Windows.
 
 | Bloco | Estado |
 |-------|--------|
-| **Cascata multi-cérebro** (`agent.py`) | ✅ Claude assinatura → OpenAI → Claude API → Gemini → OpenRouter, com telemetria de token e custo sanitizada |
+| **Cascata multi-cérebro** (`agent.py`) | ✅ Conversa leve → Gemini grátis (~2s); pesado/fallback → Claude assinatura → OpenAI → Claude API → Gemini → OpenRouter. Telemetria sanitizada. `JAVIS_CHAT_FAST_BRAIN=claude` desliga o atalho |
 | **command_router** | ✅ 13 intents, fast-path por palavra-chave (sem LLM = instantâneo) |
 | **Tool-use** (`agent.py`) | ✅ ~20 ferramentas; gating + prompt caching + compactação de histórico |
 | **Pipeline de campanha** | ✅ 3 gates de aprovação humana (Pauta→Estúdio→Distribuição), SQLite + Journey Log + digest |

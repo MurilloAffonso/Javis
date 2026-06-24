@@ -46,6 +46,12 @@ HISTORY_FILE.parent.mkdir(exist_ok=True)
 app = FastAPI(title="Javis v2", version="2.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
+# Interface "Central de Comando" (protótipo) — servida em /central, isolada do
+# frontend atual. Só monta se a pasta existir; não altera nenhuma rota existente.
+_central_dir = FRONTEND_DIR / "central"
+if _central_dir.exists():
+    app.mount("/central", StaticFiles(directory=str(_central_dir), html=True), name="central")
+
 orchestrator = Orchestrator()
 _history: list[dict] = []
 

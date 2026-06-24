@@ -1133,12 +1133,47 @@ def _respond_claude_subscription(user_text: str, history: list[dict], max_rounds
     return {"text": "Executei o que era possível, senhor.", "tools": used}
 
 
+# Gatilhos de raciocínio PESADO — quando o senhor pede análise a fundo/debate,
+# vale o cérebro forte (Claude assinatura, que pode subir pra Opus via
+# pensar_profundo) desde o início, mesmo custando os ~20s de cold-start.
+# Espelham os _DEEP_HINTS de server.py (ack falado).
+_HEAVY_HINTS = (
+    "debate", "debat", "analisa a fundo", "analise a fundo", "análise a fundo",
+    "o que voces acham", "o que vocês acham", "me ajuda a decidir",
+    "me ajude a decidir", "vale a pena", "consultar o conselho",
+    "consulta o conselho", "o que o conselho", "pensa direito",
+    "pensa nisso", "pense nisso", "analisa direito", "prós e contras",
+    "pros e contras", "pensa a fundo", "pense a fundo", "pensa profundo",
+)
+
+
+def _is_heavy_request(text: str) -> bool:
+    """True se o pedido pede raciocínio profundo/debate → cérebro forte direto."""
+    t = (text or "").lower()
+    return any(h in t for h in _HEAVY_HINTS)
+
+
 def respond(user_text: str, history: list[dict] | None = None, max_rounds: int = 5) -> dict | None:
-    """Loop de tool-use. Cascata: Claude (assinatura) → OpenAI → Claude API → Gemini → OpenRouter.
-    Decisão Murillo 18/06: a assinatura é o cérebro principal; o resto é fallback
-    pra quando o Claude Code não estiver disponível, não rota padrão.
+    """Loop de tool-use. Cascata: [Gemini rápido p/ conversa leve] → Claude
+    (assinatura) → OpenAI → Claude API → Gemini → OpenRouter.
+    Decisão Murillo 18/06: a assinatura é o cérebro principal. Ajuste 23/06: pra
+    conversa LEVE, Gemini grátis responde primeiro (~1-2s vs ~20s do cold-start do
+    Claude Code headless); pedido pesado e fallback continuam no Claude assinatura.
     Retorna {text, tools} ou None se nenhum provedor disponível."""
     history = history or []
+
+    # 0) Conversa leve → Gemini grátis primeiro (rápido). Pesado pula direto pro
+    #    Claude assinatura. Gemini ainda pode chamar ferramentas (incl.
+    #    pensar_profundo) quando a própria mensagem leve precisar. Desligar com
+    #    JAVIS_CHAT_FAST_BRAIN=claude.
+    fast_brain = os.environ.get("JAVIS_CHAT_FAST_BRAIN", "gemini").strip().lower()
+    if (fast_brain == "gemini"
+            and os.environ.get("GEMINI_API_KEY", "").strip()
+            and not _is_heavy_request(user_text)):
+        try:
+            return _respond_gemini(user_text, history, max_rounds, fallback_used=False)
+        except Exception as e:
+            _log(f"Gemini (chat rápido) falhou, caindo no Claude assinatura: {e}")
 
     # 1) Claude pela assinatura — primário (sem custo de API)
     try:

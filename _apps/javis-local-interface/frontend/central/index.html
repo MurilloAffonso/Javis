@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Javis · Central de Comando</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./css/theme.css" />
+</head>
+<body>
+  <div class="app">
+
+    <!-- RAIL LATERAL -->
+    <aside class="rail">
+      <div class="brand"><span class="orb"></span><b>Javis</b></div>
+
+      <a class="nav-i active" data-route="central" href="#/"><span class="ic">🏠</span><span>Central</span></a>
+      <a class="nav-i" data-route="projetos" href="#/vem-passear"><span class="ic">🗺️</span><span>Projetos</span></a>
+      <a class="nav-i" data-route="squads" href="#/squads"><span class="ic">🧩</span><span>Squads</span></a>
+      <a class="nav-i" data-route="metricas" href="#/metricas"><span class="ic">📊</span><span>Métricas</span></a>
+      <a class="nav-i" data-route="aprovacoes" href="#/aprovacoes"><span class="ic">✅</span><span>Aprovações</span><span class="badge">3</span></a>
+      <a class="nav-i" data-route="proximos" href="#/proximos"><span class="ic">🎯</span><span>Próximos passos</span></a>
+
+      <div class="nav-sep"></div>
+      <a class="nav-i" href="#/"><span class="ic">💬</span><span>Conversa (Jamba)</span></a>
+      <a class="nav-i" href="#/"><span class="ic">🧠</span><span>Conselho</span></a>
+      <a class="nav-i" href="#/"><span class="ic">⚙️</span><span>Integrações</span></a>
+
+      <div class="rail-foot">
+        <div class="row"><span class="dot online"></span> cérebro · <span class="dot online"></span> voz · <span class="dot online"></span> projetos</div>
+        <div class="row">motor ativo: <b style="color:var(--text)">Claude</b></div>
+      </div>
+    </aside>
+
+    <!-- ÁREA PRINCIPAL -->
+    <main class="main">
+      <div class="topbar">
+        <button class="icon-btn" id="toggle-rail" title="Recolher menu">☰</button>
+        <div class="crumb" id="crumb">Central</div>
+        <div class="spacer"></div>
+        <button class="icon-btn" title="Buscar">⌕</button>
+        <button class="icon-btn" title="Config">⚙</button>
+      </div>
+      <div id="view"></div>
+    </main>
+
+    <!-- DOCK JAMBA -->
+    <aside class="dock">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="jamba-orb"></span>
+        <div><b>Jamba</b><div class="muted" style="font-size:12px">assistente do Javis</div></div>
+      </div>
+      <div class="bubble">Bom dia, senhor. 3 aprovações esperam e a Vem Passear fechou 4 reservas ontem.</div>
+      <div class="card do-now">
+        <div class="muted" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">O que fazer agora</div>
+        <div class="li">▸ Aprovar a pauta da semana</div>
+        <div class="li">▸ Decidir verba do Areia Vermelha</div>
+        <div class="li">▸ Ver risco de remarcação (maré)</div>
+      </div>
+      <div class="ask"><input type="text" placeholder="Falar com o Jamba…" /></div>
+    </aside>
+
+  </div>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>

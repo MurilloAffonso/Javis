@@ -33,6 +33,7 @@ def zero_network_and_clean_env(monkeypatch):
         "ANTHROPIC_API_KEY",
         "OPENROUTER_API_KEY",
         "GEMINI_API_KEY",
+        "JAVIS_CHAT_FAST_BRAIN",
         "JAVIS_ALLOW_LIVE_OPENROUTER_TEST",
         "JAVIS_OPENROUTER_BENCHMARK_MAX_USD",
     ):
@@ -91,6 +92,7 @@ def test_ordem_de_fallback(monkeypatch):
 
 def test_ordem_de_fallback_inclui_gemini_antes_do_openrouter(monkeypatch):
     ordem = []
+    monkeypatch.setenv("JAVIS_CHAT_FAST_BRAIN", "claude")  # isola o caminho de FALLBACK
     monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-anthropic")
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-gemini")
     monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-openrouter")
@@ -139,6 +141,7 @@ def test_sem_gemini_key_pula_pra_openrouter(monkeypatch):
 
 def test_erro_gemini_avanca_para_openrouter(monkeypatch):
     ordem = []
+    monkeypatch.setenv("JAVIS_CHAT_FAST_BRAIN", "claude")  # isola o caminho de FALLBACK
     monkeypatch.setenv("GEMINI_API_KEY", "dummy-gemini")
     monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-openrouter")
     monkeypatch.setattr(agent, "_respond_claude_subscription", lambda *_a, **_k: None)
@@ -157,6 +160,86 @@ def test_erro_gemini_avanca_para_openrouter(monkeypatch):
 
     assert agent.respond("teste")["text"] == "openrouter ok"
     assert ordem == ["gemini", "openrouter"]
+
+
+def test_chat_leve_usa_gemini_primeiro_sem_tocar_claude_assinatura(monkeypatch):
+    """Passo 0: conversa leve com Gemini disponível responde via Gemini (rápido),
+    sem nem chamar o Claude assinatura (cold-start de ~20s)."""
+    ordem = []
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy-gemini")
+
+    def gemini(*_args, **kwargs):
+        ordem.append("gemini")
+        assert kwargs.get("fallback_used") is False  # primário, não fallback
+        return {"text": "oi rápido", "tools": []}
+
+    monkeypatch.setattr(agent, "_respond_gemini", gemini)
+    monkeypatch.setattr(
+        agent, "_respond_claude_subscription",
+        lambda *_a, **_k: pytest.fail("Claude assinatura não deveria ser chamado em chat leve"),
+    )
+
+    assert agent.respond("oi, tudo certo?")["text"] == "oi rápido"
+    assert ordem == ["gemini"]
+
+
+def test_pedido_pesado_pula_gemini_e_vai_pro_claude_assinatura(monkeypatch):
+    """Pedido de raciocínio pesado ('pensa a fundo') pula o Gemini rápido e usa o
+    cérebro forte (Claude assinatura) desde o início."""
+    ordem = []
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy-gemini")
+    monkeypatch.setattr(
+        agent, "_respond_gemini",
+        lambda *_a, **_k: pytest.fail("Gemini não deveria ser chamado em pedido pesado"),
+    )
+
+    def assinatura(*_args, **_kwargs):
+        ordem.append("claude_subscription")
+        return {"text": "pensei a fundo", "tools": []}
+
+    monkeypatch.setattr(agent, "_respond_claude_subscription", assinatura)
+
+    assert agent.respond("pensa a fundo nisso e me diz os prós e contras")["text"] == "pensei a fundo"
+    assert ordem == ["claude_subscription"]
+
+
+def test_fast_brain_claude_desliga_gemini_primeiro(monkeypatch):
+    """Com JAVIS_CHAT_FAST_BRAIN=claude, volta ao comportamento antigo: Claude
+    assinatura primeiro, mesmo em chat leve com Gemini disponível."""
+    ordem = []
+    monkeypatch.setenv("JAVIS_CHAT_FAST_BRAIN", "claude")
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy-gemini")
+    monkeypatch.setattr(
+        agent, "_respond_gemini",
+        lambda *_a, **_k: pytest.fail("Gemini não deveria vir primeiro com fast_brain=claude"),
+    )
+
+    def assinatura(*_args, **_kwargs):
+        ordem.append("claude_subscription")
+        return {"text": "claude primeiro", "tools": []}
+
+    monkeypatch.setattr(agent, "_respond_claude_subscription", assinatura)
+
+    assert agent.respond("oi")["text"] == "claude primeiro"
+    assert ordem == ["claude_subscription"]
+
+
+def test_chat_leve_sem_gemini_key_usa_claude_assinatura(monkeypatch):
+    """Sem GEMINI_API_KEY, o passo 0 não dispara — Claude assinatura segue primário."""
+    ordem = []
+    monkeypatch.setattr(
+        agent, "_respond_gemini",
+        lambda *_a, **_k: pytest.fail("Gemini não deveria ser chamado sem chave"),
+    )
+
+    def assinatura(*_args, **_kwargs):
+        ordem.append("claude_subscription")
+        return {"text": "ok", "tools": []}
+
+    monkeypatch.setattr(agent, "_respond_claude_subscription", assinatura)
+
+    assert agent.respond("oi")["text"] == "ok"
+    assert ordem == ["claude_subscription"]
 
 
 def test_tool_use_gemini_e_telemetria_sao_offline(monkeypatch, tmp_path):
