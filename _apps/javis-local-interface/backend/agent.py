@@ -315,10 +315,13 @@ TOOLS = [
     },
     {
         "name": "programar",
-        "description": "Delega uma tarefa de EXECUÇÃO ao motor de execução (Claude Code pela assinatura): escrever/alterar código, criar arquivos, rodar comandos/testes ou tarefas multi-step dentro do projeto. Use quando o senhor pedir para 'programar', 'criar', 'executar' ou 'fazer' algo no projeto. Roda em segundo plano e avisa ao terminar.",
+        "description": "Delega uma tarefa de EXECUÇÃO ao motor de execução (Claude Code pela assinatura): escrever/alterar código, criar arquivos, rodar comandos/testes, analisar projetos ou tarefas multi-step em QUALQUER pasta do computador. Use quando o senhor pedir para 'programar', 'criar', 'executar', 'analisar' ou 'fazer' algo — no projeto Javis ou em qualquer outra pasta. Roda em segundo plano e avisa ao terminar.",
         "input_schema": {
             "type": "object",
-            "properties": {"tarefa": {"type": "string", "description": "Descrição clara da tarefa a executar."}},
+            "properties": {
+                "tarefa": {"type": "string", "description": "Descrição clara da tarefa a executar."},
+                "pasta": {"type": "string", "description": "Caminho completo da pasta onde executar (ex.: C:\\Users\\noteacer\\Documents\\MeuProjeto). Se vazio, executa na pasta do Javis."},
+            },
             "required": ["tarefa"],
         },
     },
@@ -525,9 +528,10 @@ def _exec_tool(name: str, inp: dict, history: list[dict] | None = None) -> str:
         return f"São {n.strftime('%H:%M')}, {dias[n.weekday()]}, {n.day} de {meses[n.month-1]} de {n.year}, senhor."
     if name == "programar":
         tarefa = inp.get("tarefa") or ""
+        pasta = inp.get("pasta") or None
         # Motor escolhido por Murillo (botão Claude/Codex); com fallback automático.
         import brain_switch
-        return brain_switch.dispatch(tarefa)
+        return brain_switch.dispatch(tarefa, pasta=pasta)
     if name == "abrir_app":
         import app_launcher
         return app_launcher.open_app(inp.get("nome") or "").get("message", "Feito, senhor.")

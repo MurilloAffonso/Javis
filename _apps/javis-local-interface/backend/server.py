@@ -563,6 +563,27 @@ async def status():
     })
 
 
+@app.get("/exec/status")
+async def exec_status():
+    """Estado em tempo real da execução via claude_exec (programar tool)."""
+    try:
+        import claude_exec
+        s = claude_exec.get_status()
+        return JSONResponse({
+            "running": s["running"],
+            "task": s["task"],
+            "pasta": s["pasta"],
+            "started_at": s.get("started_at"),
+            "exit_code": s.get("exit_code"),
+            "lines": s["lines"][-150:],
+            "total_lines": len(s["lines"]),
+        })
+    except Exception as e:
+        return JSONResponse({"running": False, "task": "", "pasta": None,
+                             "started_at": None, "exit_code": None,
+                             "lines": [], "total_lines": 0, "error": str(e)})
+
+
 @app.get("/stats")
 async def stats():
     """Contadores REAIS pra UI (vêm do SQLite, não de texto fixo)."""
@@ -956,7 +977,7 @@ async def voice_stream(req: VoiceRequest):
                 # leveza em 1º lugar). Sem o estado do projeto (briefing) aqui — pesa
                 # o prompt sem ajudar o bate-papo falado; histórico cortado pra 2
                 # trocas em vez de 4.
-                ctx = _ag._history_context(_get_history_messages(), limit=2)
+                ctx = _ag._history_context(_get_history_messages(), keep_raw=2)
                 spoke = False
                 full_text = ""
                 yield f"data: {json.dumps({'type':'meta','intent':'pensar_profundo','brain':'claude'})}\n\n"
