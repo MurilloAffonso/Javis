@@ -39,9 +39,10 @@
     {
       "id": "vempassear",
       "nome": "Vem Passear Jampa",
-      "descricao": "Operacao de marketing, vendas e atendimento da Vem Passear Jampa.",
+      "descricao": "Projeto real do Vem Passear Jampa (repo CEREBRO.JAMPA). Marketing, vendas e atendimento.",
       "status": "ativo",
       "objetivo": "Vender passeios em Joao Pessoa via funil de marketing + vendas + pos-venda.",
+      "pointer_externo": "cerebro-jampa",
       "squads": [
         "marketing", "vendas", "atendimento", "conteudo", "trafego",
         "dados", "operacao", "produto-oferta", "pos-venda"
@@ -58,21 +59,6 @@
       "aprovacoes_pendentes": 0,
       "proximos_passos": [],
       "tipo": "interno"
-    },
-    {
-      "id": "cerebro-jampa",
-      "nome": "Cerebro Jampa",
-      "descricao": "Projeto externo maduro (site Next.js ao vivo). Javis aponta, nao absorve.",
-      "status": "externo",
-      "objetivo": "Operacao de conteudo/SEO de Joao Pessoa (repo standalone).",
-      "squads": [],
-      "agentes": [],
-      "ferramentas": ["project_registry (pointer read-only)"],
-      "metricas": {},
-      "aprovacoes_pendentes": 0,
-      "proximos_passos": [],
-      "tipo": "externo",
-      "pointer": "backend/project_registry.py :: cerebro-jampa"
     }
   ]
 }

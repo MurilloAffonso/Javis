@@ -36,12 +36,16 @@ def get_projects() -> list[dict]:
     try:
         import project_registry as pr
         for p in projs:
-            if p.get("tipo") == "externo":
-                ext = pr.get_project(p.get("id"))
+            # 'pointer_externo' liga um projeto interno ao repo externo real
+            # (ex: vempassear → CEREBRO.JAMPA); 'tipo externo' usa o próprio id.
+            ptr = p.get("pointer_externo") or (p.get("id") if p.get("tipo") == "externo" else None)
+            if ptr:
+                ext = pr.get_project(ptr)
                 if ext:
                     p["status"] = ext.get("status", p.get("status"))
                     p["_externo"] = {"fase": ext.get("fase_atual"), "skills_ativas": ext.get("skills_ativas"),
-                                     "atualizado": ext.get("fonte_da_verdade_atualizada_em")}
+                                     "atualizado": ext.get("fonte_da_verdade_atualizada_em"),
+                                     "path": ext.get("path")}
     except Exception:
         pass
     return projs
