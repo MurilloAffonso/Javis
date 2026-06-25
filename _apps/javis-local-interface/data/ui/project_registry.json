@@ -1,0 +1,78 @@
+{
+  "_meta": {
+    "descricao": "Catalogo de projetos internos do Javis (Command Center). Read-only para a UI. Cerebro Jampa e um ponteiro externo (ver backend/project_registry.py).",
+    "atualizado_em": "2026-06-24",
+    "versao": 1
+  },
+  "projects": [
+    {
+      "id": "geral",
+      "nome": "Geral",
+      "descricao": "Operacao geral do Javis, sem projeto especifico.",
+      "status": "ativo",
+      "objetivo": "Assistencia e execucao do dia a dia de Murillo.",
+      "squads": [],
+      "agentes": ["javis-core", "conclave-ai", "claude-code-exec", "knowledge-analyst"],
+      "ferramentas": ["command_router", "actions", "claude_exec", "knowledge"],
+      "metricas": {},
+      "aprovacoes_pendentes": 0,
+      "proximos_passos": [],
+      "tipo": "interno"
+    },
+    {
+      "id": "javis-dev",
+      "nome": "Javis Dev",
+      "descricao": "Desenvolvimento e evolucao do proprio Javis (backend, interface, squads).",
+      "status": "ativo",
+      "objetivo": "Construir a Central de Comando e a arquitetura de squads como grafo de agentes.",
+      "squads": [],
+      "agentes": ["javis-core", "claude-code-exec", "squad-creator"],
+      "ferramentas": ["claude_exec", "command_router", "logger"],
+      "metricas": {},
+      "aprovacoes_pendentes": 0,
+      "proximos_passos": [
+        "Fase 2: frontend Command Center",
+        "Conectar telemetria real ao logger"
+      ],
+      "tipo": "interno"
+    },
+    {
+      "id": "vempassear",
+      "nome": "Vem Passear Jampa",
+      "descricao": "Operacao de marketing, vendas e atendimento da Vem Passear Jampa.",
+      "status": "ativo",
+      "objetivo": "Vender passeios em Joao Pessoa via funil de marketing + vendas + pos-venda.",
+      "squads": [
+        "marketing", "vendas", "atendimento", "conteudo", "trafego",
+        "dados", "operacao", "produto-oferta", "pos-venda"
+      ],
+      "agentes": [
+        "vp-sales-agent", "vp-marketing-agent", "copywriter",
+        "media-buyer", "data-analyst", "atendimento-ia"
+      ],
+      "ferramentas": ["vp_squad", "vp_store", "knowledge", "file_analyzer"],
+      "metricas": {
+        "fonte": "data/projects/vempassear.json",
+        "observacao": "Dashboards detalhados no manifesto do projeto."
+      },
+      "aprovacoes_pendentes": 0,
+      "proximos_passos": [],
+      "tipo": "interno"
+    },
+    {
+      "id": "cerebro-jampa",
+      "nome": "Cerebro Jampa",
+      "descricao": "Projeto externo maduro (site Next.js ao vivo). Javis aponta, nao absorve.",
+      "status": "externo",
+      "objetivo": "Operacao de conteudo/SEO de Joao Pessoa (repo standalone).",
+      "squads": [],
+      "agentes": [],
+      "ferramentas": ["project_registry (pointer read-only)"],
+      "metricas": {},
+      "aprovacoes_pendentes": 0,
+      "proximos_passos": [],
+      "tipo": "externo",
+      "pointer": "backend/project_registry.py :: cerebro-jampa"
+    }
+  ]
+}

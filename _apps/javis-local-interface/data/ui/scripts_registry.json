@@ -1,0 +1,317 @@
+{
+  "_meta": {
+    "descricao": "Catalogo dos scripts Python do backend (ingerido por docstring). Read-only.",
+    "gerado_em": "2026-06-25",
+    "total": 44
+  },
+  "scripts": [
+    {
+      "id": "_test_guard",
+      "arquivo": "_test_guard.py",
+      "proposito": "Testa o guard de comandos destrutivos sem disparar o hook do shell.",
+      "funcoes": 1,
+      "classes": 0
+    },
+    {
+      "id": "actions",
+      "arquivo": "actions.py",
+      "proposito": "Actions — executa ações locais da whitelist. Sem shell arbitrário.",
+      "funcoes": 19,
+      "classes": 0
+    },
+    {
+      "id": "agent",
+      "arquivo": "agent.py",
+      "proposito": "Agent — cérebro com tool-use (function calling) do Jamba.",
+      "funcoes": 24,
+      "classes": 0
+    },
+    {
+      "id": "agent_runner",
+      "arquivo": "agent_runner.py",
+      "proposito": "agent_runner.py — executa UM agente com skill + RAG + cérebro forte.",
+      "funcoes": 4,
+      "classes": 0
+    },
+    {
+      "id": "app_launcher",
+      "arquivo": "app_launcher.py",
+      "proposito": "App Launcher — abre o máximo de coisas no PC do senhor por nome.",
+      "funcoes": 6,
+      "classes": 0
+    },
+    {
+      "id": "approval_effects",
+      "arquivo": "approval_effects.py",
+      "proposito": "approval_effects.py — efeitos de decisões de aprovação (MODO SEGURO).",
+      "funcoes": 12,
+      "classes": 0
+    },
+    {
+      "id": "brain_switch",
+      "arquivo": "brain_switch.py",
+      "proposito": "brain_switch.py — qual assinatura executa as tarefas de programação: Claude ou Codex.",
+      "funcoes": 3,
+      "classes": 0
+    },
+    {
+      "id": "briefing",
+      "arquivo": "briefing.py",
+      "proposito": "briefing.py — ponte de ESTADO do projeto para o cérebro do Javis.",
+      "funcoes": 8,
+      "classes": 0
+    },
+    {
+      "id": "browser",
+      "arquivo": "browser.py",
+      "proposito": "",
+      "funcoes": 5,
+      "classes": 0
+    },
+    {
+      "id": "claude_brain",
+      "arquivo": "claude_brain.py",
+      "proposito": "claude_brain.py — cérebro de RACIOCÍNIO do Jamba via ASSINATURA do Claude.",
+      "funcoes": 5,
+      "classes": 0
+    },
+    {
+      "id": "claude_exec",
+      "arquivo": "claude_exec.py",
+      "proposito": "Claude Exec — motor de EXECUÇÃO do Jamba via ASSINATURA do Claude (Claude Code).",
+      "funcoes": 5,
+      "classes": 0
+    },
+    {
+      "id": "code_agent",
+      "arquivo": "code_agent.py",
+      "proposito": "Code Agent — dispara tarefas de programação pro Codex CLI dentro do projeto.",
+      "funcoes": 3,
+      "classes": 0
+    },
+    {
+      "id": "command_router",
+      "arquivo": "command_router.py",
+      "proposito": "Command Router — classifica intenção por palavras-chave, sem LLM.",
+      "funcoes": 4,
+      "classes": 0
+    },
+    {
+      "id": "conclave",
+      "arquivo": "conclave.py",
+      "proposito": "Conclave — sistema de debate autônomo de 3 agentes.",
+      "funcoes": 0,
+      "classes": 1
+    },
+    {
+      "id": "db",
+      "arquivo": "db.py",
+      "proposito": "db.py — camada de persistência SQLite do Javis (ADITIVA).",
+      "funcoes": 6,
+      "classes": 0
+    },
+    {
+      "id": "db_sync",
+      "arquivo": "db_sync.py",
+      "proposito": "db_sync.py — espelha os dados vivos (Markdown/JSON/rosters) no SQLite.",
+      "funcoes": 6,
+      "classes": 0
+    },
+    {
+      "id": "distribution",
+      "arquivo": "distribution.py",
+      "proposito": "distribution.py — preparação de Distribuição em MODO SEGURO.",
+      "funcoes": 8,
+      "classes": 0
+    },
+    {
+      "id": "file_analyzer",
+      "arquivo": "file_analyzer.py",
+      "proposito": "file_analyzer.py — converte e analisa arquivos com markitdown + LLM.",
+      "funcoes": 4,
+      "classes": 0
+    },
+    {
+      "id": "history_store",
+      "arquivo": "history_store.py",
+      "proposito": "",
+      "funcoes": 3,
+      "classes": 0
+    },
+    {
+      "id": "integrations",
+      "arquivo": "integrations.py",
+      "proposito": "Integrations — conectores de APIs externas (YouTube, Google, etc.).",
+      "funcoes": 8,
+      "classes": 0
+    },
+    {
+      "id": "jampa_squad",
+      "arquivo": "jampa_squad.py",
+      "proposito": "jampa_squad.py — runtime de agentes nomeados (o \"Jampa Jarvis\").",
+      "funcoes": 10,
+      "classes": 0
+    },
+    {
+      "id": "knowledge",
+      "arquivo": "knowledge.py",
+      "proposito": "Knowledge — RAG sobre os arquivos do senhor (Obsidian + projeto).",
+      "funcoes": 10,
+      "classes": 0
+    },
+    {
+      "id": "llm_providers",
+      "arquivo": "llm_providers.py",
+      "proposito": "LLM Providers — Claude pela ASSINATURA (claude_brain), cérebro ÚNICO.",
+      "funcoes": 4,
+      "classes": 0
+    },
+    {
+      "id": "logger",
+      "arquivo": "logger.py",
+      "proposito": "Logger — grava eventos JSONL com rotação diária em logs/actions-YYYY-MM-DD.jsonl.",
+      "funcoes": 1,
+      "classes": 0
+    },
+    {
+      "id": "mission_board",
+      "arquivo": "mission_board.py",
+      "proposito": "mission_board.py — Quadro de orquestramento real, derivado do backlog do",
+      "funcoes": 8,
+      "classes": 0
+    },
+    {
+      "id": "orchestrator",
+      "arquivo": "orchestrator.py",
+      "proposito": "Orchestrator — roteamento por LLM com multi-brain e squad autônomo.",
+      "funcoes": 0,
+      "classes": 2
+    },
+    {
+      "id": "profile",
+      "arquivo": "profile.py",
+      "proposito": "Profile — memória de personalização do Jamba.",
+      "funcoes": 6,
+      "classes": 0
+    },
+    {
+      "id": "project_registry",
+      "arquivo": "project_registry.py",
+      "proposito": "project_registry.py — Javis como orquestrador mestre de projetos externos.",
+      "funcoes": 3,
+      "classes": 0
+    },
+    {
+      "id": "reminders",
+      "arquivo": "reminders.py",
+      "proposito": "Reminders — lembretes e timers do Jamba.",
+      "funcoes": 9,
+      "classes": 0
+    },
+    {
+      "id": "repositories",
+      "arquivo": "repositories.py",
+      "proposito": "repositories.py — acesso aos dados do SQLite, um repositório por entidade.",
+      "funcoes": 0,
+      "classes": 9
+    },
+    {
+      "id": "server",
+      "arquivo": "server.py",
+      "proposito": "Javis v2 — FastAPI server.",
+      "funcoes": 103,
+      "classes": 24
+    },
+    {
+      "id": "site_analyzer",
+      "arquivo": "site_analyzer.py",
+      "proposito": "Site Analyzer — busca uma URL, extrai a estrutura e gera código similar.",
+      "funcoes": 6,
+      "classes": 0
+    },
+    {
+      "id": "skill_forge",
+      "arquivo": "skill_forge.py",
+      "proposito": "skill_forge.py — pipeline \"Nero\": transcrição de expert → SKILL.md (rascunho).",
+      "funcoes": 2,
+      "classes": 0
+    },
+    {
+      "id": "social_reader",
+      "arquivo": "social_reader.py",
+      "proposito": "social_reader.py — lê redes sociais e fóruns sem API paga.",
+      "funcoes": 3,
+      "classes": 0
+    },
+    {
+      "id": "studio",
+      "arquivo": "studio.py",
+      "proposito": "studio.py — agente Estúdio em MODO SEGURO.",
+      "funcoes": 6,
+      "classes": 0
+    },
+    {
+      "id": "task_lifecycle",
+      "arquivo": "task_lifecycle.py",
+      "proposito": "task_lifecycle.py — conclusão/morte da entidade-tarefa + AI Digest.",
+      "funcoes": 5,
+      "classes": 0
+    },
+    {
+      "id": "telegram_bridge",
+      "arquivo": "telegram_bridge.py",
+      "proposito": "Telegram Bridge — controlar o Jamba pelo celular via long polling.",
+      "funcoes": 5,
+      "classes": 0
+    },
+    {
+      "id": "telemetry_adapter",
+      "arquivo": "telemetry_adapter.py",
+      "proposito": "telemetry_adapter.py — telemetria READ-ONLY a partir do log de eventos.",
+      "funcoes": 7,
+      "classes": 0
+    },
+    {
+      "id": "trend_scout",
+      "arquivo": "trend_scout.py",
+      "proposito": "trend_scout.py — esquadrões de estudo: cada área busca vídeo de tendência",
+      "funcoes": 8,
+      "classes": 0
+    },
+    {
+      "id": "tts_local",
+      "arquivo": "tts_local.py",
+      "proposito": "TTS local via Piper — grátis, sem rede, sem chave de API.",
+      "funcoes": 4,
+      "classes": 0
+    },
+    {
+      "id": "ui_state",
+      "arquivo": "ui_state.py",
+      "proposito": "ui_state.py — adaptador READ-ONLY de estado para a interface (Chainlit + Command Center).",
+      "funcoes": 14,
+      "classes": 0
+    },
+    {
+      "id": "voice_bridge",
+      "arquivo": "voice_bridge.py",
+      "proposito": "Voice Bridge — classifica e executa transcrições de voz.",
+      "funcoes": 5,
+      "classes": 0
+    },
+    {
+      "id": "vp_squad",
+      "arquivo": "vp_squad.py",
+      "proposito": "vp_squad.py — Squad de marketing da Vem Passear (5 agentes com CONTRATO).",
+      "funcoes": 4,
+      "classes": 0
+    },
+    {
+      "id": "vp_store",
+      "arquivo": "vp_store.py",
+      "proposito": "",
+      "funcoes": 18,
+      "classes": 0
+    }
+  ]
+}

@@ -1,0 +1,106 @@
+{
+  "_meta": {
+    "descricao": "Manifesto do projeto Vem Passear Jampa para o Command Center. Dashboards comecam com estrutura + placeholders; dados reais virao de _data/vp_*.json e do backend na Fase 2.",
+    "atualizado_em": "2026-06-24",
+    "versao": 1
+  },
+  "id": "vempassear",
+  "nome": "Vem Passear Jampa",
+  "descricao": "Operacao de passeios turisticos em Joao Pessoa.",
+  "status": "ativo",
+  "objetivo": "Vender passeios via funil de marketing + vendas + pos-venda, com atendimento rapido.",
+  "fontes_de_dados": {
+    "clientes": "_data/vp_clientes.json",
+    "passeios": "_data/vp_passeios.json",
+    "conteudos": "_data/vp_conteudos.json",
+    "pauta": "_data/vp_pauta.json"
+  },
+  "squads": [
+    "marketing", "vendas", "atendimento", "conteudo", "trafego",
+    "dados", "operacao", "produto-oferta", "pos-venda"
+  ],
+  "aprovacoes_pendentes": [],
+  "proximos_passos": [],
+  "dashboards": {
+    "funil_vendas": {
+      "titulo": "Funil de Vendas",
+      "etapas": ["visitante", "lead", "qualificado", "proposta", "reserva", "passeio realizado"],
+      "valores": {},
+      "fonte": "_data/vp_clientes.json",
+      "status": "estrutura"
+    },
+    "leads": {
+      "titulo": "Leads",
+      "total": null,
+      "por_status": {},
+      "fonte": "_data/vp_clientes.json",
+      "status": "estrutura"
+    },
+    "reservas": {
+      "titulo": "Reservas",
+      "total": null,
+      "fonte": "_data/vp_clientes.json",
+      "status": "estrutura"
+    },
+    "passeios_vendidos": {
+      "titulo": "Passeios Vendidos",
+      "total": null,
+      "por_passeio": {},
+      "fonte": "_data/vp_passeios.json",
+      "status": "estrutura"
+    },
+    "origem_do_lead": {
+      "titulo": "Origem do Lead",
+      "por_canal": {},
+      "fonte": "_data/vp_clientes.json",
+      "status": "estrutura"
+    },
+    "campanhas": {
+      "titulo": "Campanhas",
+      "ativas": [],
+      "status": "sem dados"
+    },
+    "criativos": {
+      "titulo": "Criativos",
+      "total": null,
+      "fonte": "_data/vp_conteudos.json",
+      "status": "estrutura"
+    },
+    "avaliacoes_google": {
+      "titulo": "Avaliacoes Google",
+      "nota_media": null,
+      "total": null,
+      "status": "sem dados"
+    },
+    "pos_venda": {
+      "titulo": "Pos-venda",
+      "nps": null,
+      "recompra": null,
+      "status": "sem dados"
+    },
+    "receita": {
+      "titulo": "Receita",
+      "total": null,
+      "moeda": "BRL",
+      "status": "sem dados"
+    },
+    "roas": {
+      "titulo": "ROAS",
+      "valor": null,
+      "status": "sem dados",
+      "observacao": "Requer dados de investimento em midia + receita atribuida."
+    },
+    "cac": {
+      "titulo": "CAC",
+      "valor": null,
+      "status": "sem dados",
+      "observacao": "Requer custo de aquisicao + numero de clientes."
+    },
+    "conversao_por_etapa": {
+      "titulo": "Conversao por Etapa",
+      "taxas": {},
+      "fonte": "_data/vp_clientes.json",
+      "status": "estrutura"
+    }
+  }
+}

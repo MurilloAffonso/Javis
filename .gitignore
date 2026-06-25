@@ -70,3 +70,15 @@ _apps/**/_data/javis.db-shm
 *.jpeg
 *.jpg
 _git_*_tmp.txt
+
+# --- Javis Command Center (overnight) ---
+.venv_chainlit/
+_apps/**/.venv_chainlit/
+_apps/**/.files/
+_apps/**/.chainlit/
+.chainlit/
+_apps/**/chainlit.md
+_apps/**/telas_extraidas_video/
+*.bak
+app_ui.py.py
+_apps/**/public/avatars/*.wav

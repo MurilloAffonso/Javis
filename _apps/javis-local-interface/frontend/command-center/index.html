@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JAVIS Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- ============ COLUNA ESQUERDA ============ -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">J</div>
+        <div>
+          <div class="name">JAVIS</div>
+          <div class="sub">Core Platform</div>
+        </div>
+      </div>
+
+      <input id="sb-search" class="sb-search" placeholder="Buscar agents, squads..." />
+
+      <nav id="nav-menu" style="margin-bottom:18px"></nav>
+
+      <div class="side-section">
+        <div class="side-title">Squads</div>
+        <div id="nav-squads"></div>
+      </div>
+
+      <div class="side-section">
+        <div class="side-title">Orchestrators</div>
+        <div id="nav-orchestrators"></div>
+      </div>
+
+      <div class="side-section">
+        <div class="side-title">Masters</div>
+        <div id="nav-masters"></div>
+      </div>
+
+      <div class="side-section">
+        <div class="side-title">Specialists</div>
+        <div id="nav-specialists"></div>
+      </div>
+
+      <div class="sb-footer">v1.0.0 · JAVIS Core</div>
+    </aside>
+
+    <!-- ============ CANVAS CENTRAL ============ -->
+    <main class="canvas">
+      <header class="topbar">
+        <div class="canvas-title" id="canvas-title" style="font-size:15px"></div>
+        <input class="tb-search" id="tb-search" placeholder="Buscar agents, squads..." />
+        <div class="master-pill">⚡ JAVIS Master</div>
+        <div class="tb-icons">
+          <span class="ti-btn" title="Notificações">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span class="tb-badge">2</span>
+          </span>
+          <span class="ti-btn" title="Tema">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          </span>
+          <div class="tb-avatar">MA</div>
+        </div>
+      </header>
+      <section class="canvas-body" id="canvas-body">
+        <div class="empty-state">Carregando...</div>
+      </section>
+    </main>
+
+    <!-- ============ PAINEL DIREITO ============ -->
+    <aside class="rightpanel">
+      <div style="font-size:17px;font-weight:700;margin-bottom:14px">Atividade</div>
+      <div class="rp-tabs" id="rp-tabs"></div>
+      <div id="rp-body"></div>
+    </aside>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -89,7 +89,7 @@ def list_agents() -> list[dict]:
     return [
         {"id": aid, "name": a["name"], "icon": a["icon"], "role": a["role"],
          "group": a["group"], "input": a["input"], "output": a["output"],
-         "naofaz": a["naofaz"]}
+         "faz": a.get("faz", ""), "naofaz": a["naofaz"], "tools": a.get("tools", "")}
         for aid, a in AGENTS.items()
     ]
 

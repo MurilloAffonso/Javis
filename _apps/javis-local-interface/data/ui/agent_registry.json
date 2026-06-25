@@ -1,0 +1,155 @@
+{
+  "_meta": {
+    "descricao": "Cards de agentes para o Command Center. Os agentes 'reais' tambem existem no backend (/agents, /vp/agents); este arquivo e a camada de apresentacao (tipo/squad/tags/status).",
+    "atualizado_em": "2026-06-24",
+    "versao": 1,
+    "tipos": ["orquestrador", "especialista", "executor", "analista", "criador"],
+    "status_possiveis": ["ativo", "aguardando", "executando", "erro"]
+  },
+  "agents": [
+    {
+      "id": "javis-core",
+      "nome": "Javis Core Orchestrator",
+      "tipo": "orquestrador",
+      "squad": null,
+      "projeto": "geral",
+      "descricao": "Nucleo de decisao (_brain): roteia intencao, escolhe ferramenta e encadeia acoes.",
+      "ferramentas": ["command_router", "actions", "claude_exec", "knowledge"],
+      "status": "ativo",
+      "tags": ["Master"],
+      "backend": "_brain()"
+    },
+    {
+      "id": "conclave-ai",
+      "nome": "Conclave AI",
+      "tipo": "orquestrador",
+      "squad": null,
+      "projeto": "geral",
+      "descricao": "Debate de 3 agentes (Critico, Advogado, Sintetizador) para decisoes dificeis.",
+      "ferramentas": ["conclave", "orchestrator"],
+      "status": "aguardando",
+      "tags": ["Master", "Research"],
+      "backend": "conclave.py"
+    },
+    {
+      "id": "claude-code-exec",
+      "nome": "Claude Code Executor",
+      "tipo": "executor",
+      "squad": null,
+      "projeto": "javis-dev",
+      "descricao": "Executa tarefas multi-step via Claude Code headless (assinatura), com whitelist.",
+      "ferramentas": ["claude_exec"],
+      "status": "aguardando",
+      "tags": ["Executor"],
+      "backend": "claude_exec.py"
+    },
+    {
+      "id": "knowledge-analyst",
+      "nome": "Knowledge Analyst",
+      "tipo": "analista",
+      "squad": null,
+      "projeto": "geral",
+      "descricao": "RAG sobre Obsidian e arquivos do projeto: busca semantica e contexto.",
+      "ferramentas": ["knowledge"],
+      "status": "ativo",
+      "tags": ["Research", "Dados"],
+      "backend": "knowledge.py"
+    },
+    {
+      "id": "research-analyst",
+      "nome": "Research Analyst",
+      "tipo": "analista",
+      "squad": "dados",
+      "projeto": "vempassear",
+      "descricao": "Pesquisa de mercado, tendencias e concorrencia.",
+      "ferramentas": ["browser", "social_reader", "trend_scout"],
+      "status": "aguardando",
+      "tags": ["Research"],
+      "backend": null
+    },
+    {
+      "id": "copywriter",
+      "nome": "Copywriter",
+      "tipo": "criador",
+      "squad": "conteudo",
+      "projeto": "vempassear",
+      "descricao": "Escreve posts, legendas e roteiros no tom da marca.",
+      "ferramentas": ["knowledge", "file_analyzer"],
+      "status": "aguardando",
+      "tags": ["Marketing", "Conteudo"],
+      "backend": null
+    },
+    {
+      "id": "media-buyer",
+      "nome": "Media Buyer",
+      "tipo": "especialista",
+      "squad": "trafego",
+      "projeto": "vempassear",
+      "descricao": "Gere midia paga (Meta/Google) e otimiza investimento.",
+      "ferramentas": ["integrations"],
+      "status": "aguardando",
+      "tags": ["Marketing", "Dados"],
+      "backend": null
+    },
+    {
+      "id": "data-analyst",
+      "nome": "Data Analyst",
+      "tipo": "analista",
+      "squad": "dados",
+      "projeto": "vempassear",
+      "descricao": "Transforma planilhas e exports em dashboards e insights.",
+      "ferramentas": ["file_analyzer", "knowledge"],
+      "status": "aguardando",
+      "tags": ["Dados"],
+      "backend": null
+    },
+    {
+      "id": "atendimento-ia",
+      "nome": "Atendimento IA",
+      "tipo": "especialista",
+      "squad": "atendimento",
+      "projeto": "vempassear",
+      "descricao": "Responde clientes com rapidez e tom humano; encaminha quando precisa.",
+      "ferramentas": ["knowledge", "vp_store"],
+      "status": "aguardando",
+      "tags": ["Vendas", "Atendimento"],
+      "backend": null
+    },
+    {
+      "id": "vp-sales-agent",
+      "nome": "Vem Passear Sales Agent",
+      "tipo": "especialista",
+      "squad": "vendas",
+      "projeto": "vempassear",
+      "descricao": "Converte leads em reservas; follow-up e proposta.",
+      "ferramentas": ["vp_squad", "vp_store"],
+      "status": "ativo",
+      "tags": ["Vendas"],
+      "backend": "vp_squad.py"
+    },
+    {
+      "id": "vp-marketing-agent",
+      "nome": "Vem Passear Marketing Agent",
+      "tipo": "especialista",
+      "squad": "marketing",
+      "projeto": "vempassear",
+      "descricao": "Planeja pauta e campanhas para atrair demanda qualificada.",
+      "ferramentas": ["vp_squad", "knowledge"],
+      "status": "ativo",
+      "tags": ["Marketing"],
+      "backend": "vp_squad.py"
+    },
+    {
+      "id": "squad-creator",
+      "nome": "Squad Creator",
+      "tipo": "orquestrador",
+      "squad": null,
+      "projeto": "javis-dev",
+      "descricao": "Meta-agente que desenha novos squads (missao/agentes/contratos).",
+      "ferramentas": ["agents.meta", "skill_forge"],
+      "status": "aguardando",
+      "tags": ["Master"],
+      "backend": "agents/meta.py"
+    }
+  ]
+}

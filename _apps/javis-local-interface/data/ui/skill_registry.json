@@ -1,0 +1,368 @@
+{
+  "_meta": {
+    "descricao": "Catalogo gerado de _skills/ + skills_forjadas (ui_state.get_skills). Fallback estatico; backend serve a versao viva em /ui/skills.",
+    "gerado_em": "2026-06-24"
+  },
+  "skills": [
+    {
+      "id": "abrir-projeto",
+      "nome": "abrir-projeto",
+      "descricao": "Abrir a pasta de um projeto específico do Javis no Explorer ou no VS Code, com base no nome mencionado por Murillo.",
+      "categoria": "Processo",
+      "status": "ativa",
+      "agente": null,
+      "arquivo": "abrir-projeto.md"
+    },
+    {
+      "id": "abrir-sessao",
+      "nome": "Abrir Sessão de Trabalho no Javis",
+      "descricao": "",
+      "categoria": "Processo",
+      "status": "ativa",
+      "agente": null,
+      "arquivo": "abrir-sessao.md"
+    },
+    {
+      "id": "agente-advogado",
+      "nome": "agente-advogado",
+      "descricao": "Skill do agente Conclave Advogado — ataca o plano e expõe riscos.",
+      "categoria": "Agente",
+      "status": "ativa",
+      "agente": "advogado",
+      "arquivo": "agente-advogado.md"
+    },
+    {
+      "id": "agente-aios_master",
+      "nome": "agente-aios_master",
+      "descricao": "Skill do agente AIOS Master — coordena a squad e decide quais agentes usar.",
+      "categoria": "Agente",
+      "status": "ativa",
+      "agente": "aios_master",
+      "arquivo": "agente-aios_master.md"
+    },
+    {
+      "id": "agente-analyst",
+      "nome": "agente-analyst",
+      "descricao": "Skill do agente Analyst — pesquisa, estrutura dados, extrai insights e recomenda próximos passos.",
+      "categoria": "Agente",
+      "status": "ativa",
+      "agente": "analyst",
+      "arquivo": "agente-analyst.md"
+    },
+    {
+      "id": "agente-architect",
+      "nome": "agente-architect",
+      "descricao": "Skill do agente Architect — desenha estrutura de sistemas modular, clara e executável.",
+      "categoria": "Agente",
+      "status": "ativa",
+      "agente": "architect",
+      "arquivo": "agente-architect.md"
+    },
+    {
+      "id": "agente-critico",
+      "nome": "agente-critico",
+      "descricao": "Skill do agente Conclave Crítico — audita lógica, inconsistências e falhas.",
+      "categoria": "Agente",
+      "status": "ativa",
+      "agente": "critico",
+      "arquivo": "agente-critico.md"
+    },
+    {
+      "id": "agente-data_engineer",
+      "nome": "agente-data_engineer",
+      "descricao": "Skill do agente Data Engineer — modela bancos, pipelines, queries, índices e integridade de dados.",
+      "categoria": "Agente",
+      "status": "ativa",
+      "agente": "data_engineer",
+      "arquivo": "agente-data_engineer.md"
+    },
+    {
+      "id": "agente-developer",
+      "nome": "agente-developer",
+      "descricao": "Skill do agente Developer — programa e implementa soluções limpas, funcionais e aderentes ao Javis.",
+      "categoria": "Agente",
+      "status": "ativa",
+      "agente": "developer",
+      "arquivo": "agente-developer.md"
+    },
+    {
+      "id": "agente-devops",
+      "nome": "agente-devops",
+      "descricao": "Skill do agente DevOps — planeja deploy, infraestrutura, automação, operação e segurança.",
+      "categoria": "Agente",
+      "status": "ativa",
+      "agente": "devops",
+      "arquivo": "agente-devops.md"
+    },
+    {
+      "id": "agente-jarvis_soul",
+      "nome": "agente-jarvis_soul",
+      "descricao": "Skill do agente Jarvis Soul — identidade, tom e personalidade do Javis.",
+      "categoria": "Agente",
+      "status": "ativa",
+      "agente": "jarvis_soul",
+      "arquivo": "agente-jarvis_soul.md"
+    },
+    {
+      "id": "agente-pm",
+      "nome": "agente-pm",
+      "descricao": "Skill do agente Project Manager — organiza etapas, dependências, riscos e prazos realistas.",
+      "categoria": "Agente",
+      "status": "ativa",
+      "agente": "pm",
+      "arquivo": "agente-pm.md"
+    },
+    {
+      "id": "agente-po",
+      "nome": "agente-po",
+      "descricao": "Skill do agente Product Owner — prioriza valor, MVP, critérios de aceite e visão de produto.",
+      "categoria": "Agente",
+      "status": "ativa",
+      "agente": "po",
+      "arquivo": "agente-po.md"
+    },
+    {
+      "id": "agente-qa",
+      "nome": "agente-qa",
+      "descricao": "Skill do agente QA Tester — testa requisitos, edge cases, regressões e robustez do Javis.",
+      "categoria": "Agente",
+      "status": "ativa",
+      "agente": "qa",
+      "arquivo": "agente-qa.md"
+    },
+    {
+      "id": "agente-rootcause",
+      "nome": "agente-rootcause",
+      "descricao": "Skill do agente Rootcause — diagnóstico de falhas e aprendizado do sistema.",
+      "categoria": "Agente",
+      "status": "ativa",
+      "agente": "rootcause",
+      "arquivo": "agente-rootcause.md"
+    },
+    {
+      "id": "agente-scrum",
+      "nome": "agente-scrum",
+      "descricao": "Skill do agente Scrum Master — organiza tarefas, sprints, status e impedimentos de execução.",
+      "categoria": "Agente",
+      "status": "ativa",
+      "agente": "scrum",
+      "arquivo": "agente-scrum.md"
+    },
+    {
+      "id": "agente-sintetizador",
+      "nome": "agente-sintetizador",
+      "descricao": "Skill do agente Conclave Sintetizador — integra críticas e entrega a melhor solução.",
+      "categoria": "Agente",
+      "status": "ativa",
+      "agente": "sintetizador",
+      "arquivo": "agente-sintetizador.md"
+    },
+    {
+      "id": "agente-squad_creator",
+      "nome": "agente-squad_creator",
+      "descricao": "Skill do agente Squad Creator — monta squads dinamicamente com base na demanda.",
+      "categoria": "Agente",
+      "status": "ativa",
+      "agente": "squad_creator",
+      "arquivo": "agente-squad_creator.md"
+    },
+    {
+      "id": "agente-ux_designer",
+      "nome": "agente-ux_designer",
+      "descricao": "Skill do agente UX Designer — projeta interfaces, fluxos e interações acessíveis para o Javis.",
+      "categoria": "Agente",
+      "status": "ativa",
+      "agente": "ux_designer",
+      "arquivo": "agente-ux_designer.md"
+    },
+    {
+      "id": "analisar-arquivo",
+      "nome": "analisar-arquivo",
+      "descricao": "Converter qualquer arquivo (PDF, Word, Excel, PowerPoint, imagem, áudio, HTML, CSV) em Markdown e processar o conteúdo com o Javis.",
+      "categoria": "Processo",
+      "status": "ativa",
+      "agente": null,
+      "arquivo": "analisar-arquivo.md"
+    },
+    {
+      "id": "auditar-seguranca-local",
+      "nome": "auditar-seguranca-local",
+      "descricao": "Revisar periodicamente se as proteções do Javis Local Interface ainda estão funcionando: Command Router bloqueando ações perigosas, logs sendo gerados, dry-run ativo, whitelist de ações correta.",
+      "categoria": "Processo",
+      "status": "ativa",
+      "agente": null,
+      "arquivo": "auditar-seguranca-local.md"
+    },
+    {
+      "id": "capturar-ideia",
+      "nome": "capturar-ideia",
+      "descricao": "Capturar uma ideia solta de Murillo sem julgamento, organizar em poucas linhas e transformar em registro útil para consulta futura. O objetivo não é desenvolver a ideia agora — é garantir que ela não se perca e que tenha um próximo passo mí",
+      "categoria": "Processo",
+      "status": "ativa",
+      "agente": null,
+      "arquivo": "capturar-ideia.md"
+    },
+    {
+      "id": "checkpoint-antes-de-mudar",
+      "nome": "checkpoint-antes-de-mudar",
+      "descricao": "Criar um registro do estado atual do projeto antes de qualquer mudança arquitetural, integração nova ou refatoração significativa — para poder voltar ao ponto certo se algo der errado.",
+      "categoria": "Processo",
+      "status": "ativa",
+      "agente": null,
+      "arquivo": "checkpoint-antes-de-mudar.md"
+    },
+    {
+      "id": "codex-rotina-treinamento",
+      "nome": "codex-rotina-treinamento",
+      "descricao": "",
+      "categoria": "Processo",
+      "status": "ativa",
+      "agente": null,
+      "arquivo": "codex-rotina-treinamento.md"
+    },
+    {
+      "id": "comando-de-voz-local",
+      "nome": "comando-de-voz-local",
+      "descricao": "Processar um texto de comando local e retornar a ação mapeada pelo Command Router, sem executar nada sem aprovação explícita. Útil quando Murillo ditar um comando pelo sandbox de voz e quiser saber o que será feito antes.",
+      "categoria": "Processo",
+      "status": "ativa",
+      "agente": null,
+      "arquivo": "comando-de-voz-local.md"
+    },
+    {
+      "id": "criar-plano-semanal",
+      "nome": "criar-plano-semanal",
+      "descricao": "Transformar o que está na cabeça de Murillo (ideias abertas, projetos em andamento, compromissos da semana) em um plano semanal claro e leve — não um calendário, mas uma sequência de foco. O objetivo é começar a semana sabendo o que importa",
+      "categoria": "Processo",
+      "status": "ativa",
+      "agente": null,
+      "arquivo": "criar-plano-semanal.md"
+    },
+    {
+      "id": "executar-com-aprovacao",
+      "nome": "executar-com-aprovacao",
+      "descricao": "Apresentar uma ação que requer aprovação explícita de Murillo antes de qualquer execução, com contexto claro do que será feito, por que é necessária aprovação e o que pode ser revertido ou não.",
+      "categoria": "Processo",
+      "status": "ativa",
+      "agente": null,
+      "arquivo": "executar-com-aprovacao.md"
+    },
+    {
+      "id": "fechar-sessao",
+      "nome": "Fechar Sessão de Trabalho no Javis",
+      "descricao": "",
+      "categoria": "Processo",
+      "status": "ativa",
+      "agente": null,
+      "arquivo": "fechar-sessao.md"
+    },
+    {
+      "id": "planejar-proximo-passo",
+      "nome": "planejar-proximo-passo",
+      "descricao": "Quando Murillo estiver travado, sobrecarregado ou com muitas ideias em paralelo, ajudar a identificar a única coisa mais importante para fazer agora. Clareza sobre o próximo passo dissolve paralisia.",
+      "categoria": "Processo",
+      "status": "ativa",
+      "agente": null,
+      "arquivo": "planejar-proximo-passo.md"
+    },
+    {
+      "id": "quality-gate",
+      "nome": "quality-gate",
+      "descricao": "Antes de considerar uma tarefa concluída, verificar se o código/configuração atende critérios mínimos de qualidade: testes passando, sem erros silenciosos, logs funcionando, comportamento seguro preservado.",
+      "categoria": "Processo",
+      "status": "ativa",
+      "agente": null,
+      "arquivo": "quality-gate.md"
+    },
+    {
+      "id": "registrar-log",
+      "nome": "registrar-log",
+      "descricao": "Registrar um evento de ação no arquivo `_apps/javis-local-interface/logs/actions.jsonl` com o formato padrão JSONL do Javis Local Interface.",
+      "categoria": "Processo",
+      "status": "ativa",
+      "agente": null,
+      "arquivo": "registrar-log.md"
+    },
+    {
+      "id": "research-first",
+      "nome": "research-first",
+      "descricao": "Pesquisar e entender antes de implementar — evitar refatorações desnecessárias, decisões baseadas em suposições e soluções que já existem no projeto.",
+      "categoria": "Processo",
+      "status": "ativa",
+      "agente": null,
+      "arquivo": "research-first.md"
+    },
+    {
+      "id": "resumir-decisao",
+      "nome": "resumir-decisao",
+      "descricao": "Registrar decisões importantes de Murillo de forma estruturada para memória futura. Decisões bem registradas evitam retrabalho, explicam o contexto para o futuro e constroem uma base de aprendizado pessoal.",
+      "categoria": "Processo",
+      "status": "ativa",
+      "agente": null,
+      "arquivo": "resumir-decisao.md"
+    },
+    {
+      "id": "revisar-logs-de-voz",
+      "nome": "Revisar Logs de Voz do Javis",
+      "descricao": "",
+      "categoria": "Processo",
+      "status": "ativa",
+      "agente": null,
+      "arquivo": "revisar-logs-de-voz.md"
+    },
+    {
+      "id": "revisar-plano",
+      "nome": "revisar-plano",
+      "descricao": "Revisar um plano antes de executar para evitar retrabalho, gasto desnecessário, excesso de ferramentas e decisões precipitadas. Um plano revisado economiza mais tempo do que um plano executado errado.",
+      "categoria": "Processo",
+      "status": "ativa",
+      "agente": null,
+      "arquivo": "revisar-plano.md"
+    },
+    {
+      "id": "testar-antes-de-integrar",
+      "nome": "testar-antes-de-integrar",
+      "descricao": "Garantir que um módulo novo funciona isoladamente antes de conectá-lo a outro sistema — evitando que bugs de integração se misturem com bugs de implementação.",
+      "categoria": "Processo",
+      "status": "ativa",
+      "agente": null,
+      "arquivo": "testar-antes-de-integrar.md"
+    },
+    {
+      "id": "transformar-em-projeto",
+      "nome": "transformar-em-projeto",
+      "descricao": "Transformar uma ideia com potencial em um projeto simples, estruturado e executável. O resultado não é um plano detalhado — é a versão mínima que permite começar com clareza.",
+      "categoria": "Processo",
+      "status": "ativa",
+      "agente": null,
+      "arquivo": "transformar-em-projeto.md"
+    },
+    {
+      "id": "verificar-antes-de-concluir",
+      "nome": "verificar-antes-de-concluir",
+      "descricao": "Nunca afirmar que algo foi feito sem prova real. Verificar antes de declarar concluído. Antídoto contra \"disse que fez sem fazer\".",
+      "categoria": "Processo",
+      "status": "ativa",
+      "agente": null,
+      "arquivo": "verificar-antes-de-concluir.md"
+    },
+    {
+      "id": "voz-para-comando",
+      "nome": "voz-para-comando",
+      "descricao": "Classificar um texto transcrito por voz e mostrar o que o Command Router faria — sem executar nada. Útil para validar o roteamento de comandos de voz antes de liberar execução.",
+      "categoria": "Processo",
+      "status": "ativa",
+      "agente": null,
+      "arquivo": "voz-para-comando.md"
+    },
+    {
+      "id": "operacao-vendas-autonoma-follow-up-leads",
+      "nome": "operacao-vendas-autonoma-follow-up-leads",
+      "descricao": "Executa operação de vendas autônoma e follow-up de leads com base em dados.",
+      "categoria": "Forjada",
+      "status": "rascunho",
+      "agente": null,
+      "arquivo": "operacao-vendas-autonoma-follow-up-leads.md"
+    }
+  ]
+}

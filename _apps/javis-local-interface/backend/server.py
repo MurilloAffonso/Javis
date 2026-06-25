@@ -26,7 +26,7 @@ except ImportError:
     pass
 
 from fastapi import FastAPI, UploadFile, File
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.concurrency import run_in_threadpool
@@ -51,6 +51,12 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 _central_dir = FRONTEND_DIR / "central"
 if _central_dir.exists():
     app.mount("/central", StaticFiles(directory=str(_central_dir), html=True), name="central")
+
+# JAVIS Command Center (Fase 2/3) — servido em /command-center, isolado.
+# Só monta se a pasta existir; não altera nenhuma rota existente.
+_cc_dir = FRONTEND_DIR / "command-center"
+if _cc_dir.exists():
+    app.mount("/command-center", StaticFiles(directory=str(_cc_dir), html=True), name="command-center")
 
 orchestrator = Orchestrator()
 _history: list[dict] = []
@@ -150,10 +156,20 @@ class ChatRequest(BaseModel):
     model: str = "claude"
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/")
 async def serve_index():
-    index = FRONTEND_DIR / "index.html"
-    return HTMLResponse(index.read_text(encoding="utf-8"))
+    # Interface PRINCIPAL agora é a Central de Comando (nova). A antiga continua
+    # 100% acessível em /classic (nada foi removido). Se /central ainda não existir,
+    # cai na antiga para não quebrar.
+    if (FRONTEND_DIR / "central" / "index.html").exists():
+        return RedirectResponse(url="/central/")
+    return HTMLResponse((FRONTEND_DIR / "index.html").read_text(encoding="utf-8"))
+
+
+@app.get("/classic", response_class=HTMLResponse)
+async def serve_classic():
+    """Interface antiga (preservada). Acesse em /classic."""
+    return HTMLResponse((FRONTEND_DIR / "index.html").read_text(encoding="utf-8"))
 
 
 @app.get("/style.css")
@@ -1811,6 +1827,73 @@ async def set_mission_task_done(mission_id: str, node_id: str, req: TaskDoneRequ
             status_code=404,
         )
     return JSONResponse({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# UI / Command Center — rotas READ-ONLY (Fase 3). Aditivas: agregam o que já
+# existe (ui_state + telemetry_adapter), não tocam no _brain nem em nada acima.
+# ---------------------------------------------------------------------------
+@app.get("/ui/state")
+async def ui_full_state():
+    import ui_state
+    return JSONResponse(ui_state.full_state())
+
+
+@app.get("/ui/projects")
+async def ui_projects():
+    import ui_state
+    return JSONResponse({"projects": ui_state.get_projects()})
+
+
+@app.get("/ui/squads/{project_id}")
+async def ui_squads(project_id: str):
+    import ui_state
+    return JSONResponse({"squads": ui_state.get_squads(project_id)})
+
+
+@app.get("/ui/agents")
+async def ui_agents():
+    import ui_state
+    return JSONResponse({"agents": ui_state.get_agents()})
+
+
+@app.get("/ui/skills")
+async def ui_skills():
+    import ui_state
+    return JSONResponse({"skills": ui_state.get_skills()})
+
+
+@app.get("/ui/scripts")
+async def ui_scripts():
+    import ui_state
+    return JSONResponse({"scripts": ui_state.get_scripts()})
+
+
+@app.get("/ui/integrations")
+async def ui_integrations():
+    """Status REAL dos conectores (read-only, não dispara nada externo)."""
+    import os
+    try:
+        import integrations
+        av = integrations.available()
+    except Exception:
+        av = {}
+    av["whatsapp"] = bool(os.environ.get("OPENWA_URL") or os.environ.get("WHATSAPP_URL"))
+    av["openai"] = bool(os.environ.get("OPENAI_API_KEY"))
+    av["claude_code"] = __import__("claude_exec").available()
+    return JSONResponse({"integrations": av})
+
+
+@app.get("/ui/project/{project_id}")
+async def ui_project_manifest(project_id: str):
+    import ui_state
+    return JSONResponse(ui_state.get_project_manifest(project_id) or {})
+
+
+@app.get("/ui/telemetry")
+async def ui_telemetry():
+    import telemetry_adapter
+    return JSONResponse(telemetry_adapter.full())
 
 
 if __name__ == "__main__":
