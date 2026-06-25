@@ -392,3 +392,6 @@ body { background:
 /* World: torre pulsando quando agente está executando */
 .iso-tower.exec { animation:pulse 1.1s infinite; box-shadow:0 0 20px var(--run), 0 8px 18px rgba(0,0,0,.45); }
 .iso-node[style*="cursor"]:hover .iso-tower { transform:scale(1.08); transition:transform .15s; }
+
+/* Menu com 6 itens → 2 linhas de 3 */
+#nav-menu { grid-template-columns:repeat(3,1fr); }

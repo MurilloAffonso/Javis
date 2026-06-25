@@ -11,6 +11,7 @@ const ICONS = {
   tasks: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
   panel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>',
   config: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+  train: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1 3 2 6 2s6-1 6-2v-5"/></svg>',
 };
 
 const NAV = [
@@ -18,6 +19,7 @@ const NAV = [
   { id: "world",   label: "World",   icon: ICONS.world },
   { id: "tarefas", label: "Tarefas", icon: ICONS.tasks },
   { id: "painel",  label: "Painel",  icon: ICONS.panel },
+  { id: "treino",  label: "Treino",  icon: ICONS.train },
   { id: "config",  label: "Config",  icon: ICONS.config },
 ];
 
@@ -66,7 +68,7 @@ const pct = (id) => 70 + ([...String(id)].reduce((a, c) => a + c.charCodeAt(0), 
 
 const state = {
   projects: [], squads: [], agents: [], skills: [], scripts: [], manifests: {}, approvals: [],
-  integrations: {}, runnable: [],
+  integrations: {}, runnable: [], training: [],
   telemetry: null, online: false,
   view: "chat", q: "",
   activeAgentId: null, rpTab: "status",
@@ -93,6 +95,7 @@ async function loadData() {
     try { state.scripts = (await tryJson(BACKEND + "ui/scripts")).scripts || []; } catch (_) {}
     try { state.integrations = (await tryJson(BACKEND + "ui/integrations")).integrations || {}; } catch (_) {}
     try { state.runnable = (await tryJson(BACKEND + "agents")).agents || []; } catch (_) {}
+    try { state.training = (await tryJson(BACKEND + "treinamento/status")).areas || []; } catch (_) {}
     return true;
   } catch (_) {}
   try {
@@ -170,7 +173,7 @@ function fillAgentGroup(boxId, list) {
 }
 
 // ---------- Tabs / view ----------
-const TITLES = { chat: "Chat", world: "Javis World", tarefas: "Orquestrador de Tarefas", painel: "Painel", config: "Configurações" };
+const TITLES = { chat: "Chat", world: "Javis World", tarefas: "Orquestrador de Tarefas", painel: "Painel", treino: "Treinamento", config: "Configurações" };
 function setView(v) { state.view = v; renderSidebar(); renderCanvas(); renderRightPanel(); }
 function renderCanvas() {
   const body = $("canvas-body"); body.innerHTML = "";
@@ -179,7 +182,39 @@ function renderCanvas() {
     return viewSearch(body);
   }
   $("canvas-title").textContent = TITLES[state.view] || "";
-  ({ chat: viewChat, world: viewWorld, tarefas: viewTarefas, painel: viewPainel, config: viewConfig }[state.view] || viewChat)(body);
+  ({ chat: viewChat, world: viewWorld, tarefas: viewTarefas, painel: viewPainel, treino: viewTreino, config: viewConfig }[state.view] || viewChat)(body);
+}
+
+function viewTreino(body) {
+  body.appendChild(h(`<div class="card-sub" style="margin-bottom:16px">Pipeline: <b>_entrada</b> (vídeos/repos/PDFs, coletados ou manuais) → resumo no <b>NotebookLM</b> → <b>_resumos</b> entra na base RAG do Javis.</div>`));
+  if (!state.training.length) { body.appendChild(h(`<div class="empty-state">Sem dados de treinamento (backend offline?).</div>`)); return; }
+  const grid = h(`<div class="grid cols-2"></div>`);
+  state.training.forEach((a) => {
+    const ent = a.entrada || 0, res = a.resumos || 0;
+    const pc = ent ? Math.round((res / ent) * 100) : 0;
+    const card = h(`
+      <div class="card">
+        <div class="card-head"><div class="card-icon">🎓</div><div><div class="card-title" style="text-transform:capitalize">${a.area}</div><div class="card-sub">${ent} entrada · ${res} resumos</div></div></div>
+        <div class="skill-bar" style="margin:6px 0 4px"><div class="skill-fill" style="width:${pc}%"></div></div>
+        <div class="card-sub">${pc}% resumido (no RAG)</div>
+        <div style="margin-top:12px"><button class="btn ok btn-scout">📥 Coletar (YouTube + GitHub)</button></div>
+        <div class="scout-out card-sub" style="margin-top:8px"></div>
+      </div>`);
+    card.querySelector(".btn-scout").onclick = async (e) => {
+      const out = card.querySelector(".scout-out");
+      e.target.disabled = true; out.textContent = "Coletando matéria-prima (consultando YouTube e GitHub)...";
+      if (!state.online) { out.textContent = "Backend offline."; return; }
+      try {
+        const r = await tryJson(`${BACKEND}treinamento/scout/${a.area}`, { method: "POST" });
+        const n = (r.results && r.results.length) || r.coletados || r.total || 0;
+        out.textContent = `✅ Coleta concluída. Confira _treinamento/${a.area}/_entrada e suba no NotebookLM.`;
+        try { state.training = (await tryJson(BACKEND + "treinamento/status")).areas || []; renderCanvas(); } catch (_) {}
+      } catch (err) { out.textContent = "Falhou: " + err.message; e.target.disabled = false; }
+    };
+    grid.appendChild(card);
+  });
+  body.appendChild(grid);
+  body.appendChild(h(`<div class="card-sub" style="margin-top:18px">💡 <b>NotebookLM</b> é o passo de resumo (manual — sem API pública): suba o material do <code>_entrada</code>, gere o resumo e cole em <code>_resumos</code>. O Javis indexa automático no RAG.</div>`));
 }
 
 function viewSearch(body) {

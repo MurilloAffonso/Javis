@@ -63,3 +63,5 @@ busca global). Backend e chat no venv 3.11. Teste o 🎙️ em http://localhost:
   (architect/developer/qa/...) + tarefa → `POST /agents/run` (executa no Claude por
   assinatura, com skill+RAG) e mostra o resultado.
 - Verificação: **142 testes passed**, 0 erros de console, serviços no ar.
+
+- **Verificação 02:33** — serviços 8000/8001 OK · 142 testes passed · nada alterado (PNGs antigos na raiz preservados, regra sem-apagar).

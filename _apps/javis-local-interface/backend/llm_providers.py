@@ -31,13 +31,27 @@ def _split_messages(messages: list[dict]) -> tuple[str, str, str]:
     return system_text, context, question
 
 
+def _openrouter_fallback(messages: list[dict], temperature: float) -> str | None:
+    """Plano B free-first (OpenRouter). Só ativa se OPENROUTER_API_KEY existir."""
+    try:
+        import openrouter_fallback as orf
+        if orf.available():
+            return orf.call(messages, temperature)
+    except Exception:
+        pass
+    return None
+
+
 def call_claude(messages: list[dict], temperature: float = 0.7) -> str:
-    """Cérebro único — Claude pela assinatura. Sem fallback: mensagem clara se faltar."""
+    """Claude pela assinatura (primário). Plano B: OpenRouter free, se configurado."""
     if claude_brain.available():
         system_text, context, question = _split_messages(messages)
         out = claude_brain.answer(question, context, system=system_text or None)
         if out:
             return out
+    alt = _openrouter_fallback(messages, temperature)
+    if alt:
+        return alt
     return _SEM_CEREBRO
 
 
@@ -55,6 +69,10 @@ def stream_claude(messages: list[dict], temperature: float = 0.7):
             yield chunk
         if got:
             return
+    alt = _openrouter_fallback(messages, temperature)
+    if alt:
+        yield alt
+        return
     yield _SEM_CEREBRO
 
 
