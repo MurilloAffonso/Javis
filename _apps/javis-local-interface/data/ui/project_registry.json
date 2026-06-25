@@ -20,23 +20,6 @@
       "tipo": "interno"
     },
     {
-      "id": "javis-dev",
-      "nome": "Javis Dev",
-      "descricao": "Desenvolvimento e evolucao do proprio Javis (backend, interface, squads).",
-      "status": "ativo",
-      "objetivo": "Construir a Central de Comando e a arquitetura de squads como grafo de agentes.",
-      "squads": [],
-      "agentes": ["javis-core", "claude-code-exec", "squad-creator"],
-      "ferramentas": ["claude_exec", "command_router", "logger"],
-      "metricas": {},
-      "aprovacoes_pendentes": 0,
-      "proximos_passos": [
-        "Fase 2: frontend Command Center",
-        "Conectar telemetria real ao logger"
-      ],
-      "tipo": "interno"
-    },
-    {
       "id": "vempassear",
       "nome": "Vem Passear Jampa",
       "descricao": "Projeto real do Vem Passear Jampa (repo CEREBRO.JAMPA). Marketing, vendas e atendimento.",

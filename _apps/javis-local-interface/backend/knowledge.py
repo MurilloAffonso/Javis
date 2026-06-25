@@ -37,13 +37,28 @@ _lock = threading.Lock()
 _building = False
 
 
+def _external_vaults() -> list[Path]:
+    """Vaults de projetos externos plugados (read-only). Hoje: Cérebro Jampa.
+    Lê do project_registry; ignora silenciosamente se algo falhar."""
+    out = []
+    try:
+        import project_registry as pr
+        for slug, cfg in getattr(pr, "REGISTRY", {}).items():
+            p = cfg.get("path") if isinstance(cfg, dict) else None
+            if p and Path(p).is_dir():
+                out.append(Path(p))
+    except Exception:
+        pass
+    return out
+
+
 def _iter_files():
     count = 0
     # 1) arquivos .md soltos na raiz (CLAUDE.md, AGENTS.md, README.md…)
     for f in JAVIS_ROOT.glob("*.md"):
         yield f
         count += 1
-    # 2) só as pastas de conhecimento
+    # 2) só as pastas de conhecimento DO Javis
     for top in _KNOWLEDGE_DIRS:
         base = JAVIS_ROOT / top
         if not base.is_dir():
@@ -56,6 +71,29 @@ def _iter_files():
                         return
                     yield Path(root) / fn
                     count += 1
+    # 3) VAULTS EXTERNOS plugados (Cérebro Jampa etc.) — read-only.
+    # Pega a raiz do vault (FONTE-DA-VERDADE.md, AGENTS.md, CLAUDE.md…) e as
+    # pastas de conhecimento que existirem nele (docs/, skills/, _conhecimento/…).
+    _EXT_DIRS = {"docs", "skills", "_conhecimento", "_memoria", "_aprendizados",
+                 "planejamento", "templates", "google-business-profile"}
+    for vault in _external_vaults():
+        for f in vault.glob("*.md"):
+            if count >= _MAX_FILES:
+                return
+            yield f
+            count += 1
+        for top in _EXT_DIRS:
+            base = vault / top
+            if not base.is_dir():
+                continue
+            for root, dirs, files in os.walk(base):
+                dirs[:] = [d for d in dirs if d not in _SKIP_DIRS and not d.startswith(".")]
+                for fn in files:
+                    if Path(fn).suffix.lower() in _EXTS:
+                        if count >= _MAX_FILES:
+                            return
+                        yield Path(root) / fn
+                        count += 1
 
 
 def _chunks(text: str) -> list[str]:
@@ -120,9 +158,22 @@ def build_index(force: bool = False) -> dict:
         pending_meta: list[dict] = []
         files_done = 0
 
+        ext_roots = _external_vaults()
         for f in _iter_files():
             try:
-                rel = str(f.relative_to(JAVIS_ROOT))
+                # caminho relativo ao Javis OU a um vault externo plugado
+                try:
+                    rel = str(f.relative_to(JAVIS_ROOT))
+                except ValueError:
+                    rel = None
+                    for root in ext_roots:
+                        try:
+                            rel = f"[{root.name}] " + str(f.relative_to(root))
+                            break
+                        except ValueError:
+                            continue
+                    if rel is None:
+                        rel = str(f)
                 mtime = f.stat().st_mtime
             except OSError:
                 continue   # arquivo quebrado / symlink inacessível → ignora
