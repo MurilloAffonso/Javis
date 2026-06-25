@@ -1794,6 +1794,49 @@ async def treinamento_scout_all():
     return JSONResponse({"results": results})
 
 
+@app.post("/treinamento/resumir/{area}")
+async def treinamento_resumir(area: str):
+    """Resume com o Claude (assinatura) os arquivos pendentes de _entrada → _resumos
+    e reindexa o RAG. Fecha o ciclo de treino sem NotebookLM manual."""
+    import resumir_treino
+    out = await run_in_threadpool(resumir_treino.resumir_area, area)
+    return JSONResponse(out)
+
+
+class PulsoRequest(BaseModel):
+    topico: str
+
+
+@app.post("/pulso")
+async def pulso_mercado_route(req: PulsoRequest):
+    """Pulso de mercado: o que estão falando sobre o tópico (Reddit/YouTube/HN/GitHub)
+    sintetizado pelo Claude. Fontes grátis, sem API paga."""
+    import pulso_mercado
+    out = await run_in_threadpool(pulso_mercado.pulso, req.topico)
+    return JSONResponse(out)
+
+
+@app.get("/browser/status")
+async def browser_status():
+    """Disponibilidade da capacidade de operar o navegador (browser-use)."""
+    import browser_agent
+    return JSONResponse({"available": browser_agent.available()})
+
+
+class BrowserRequest(BaseModel):
+    task: str
+
+
+@app.post("/browser/run")
+async def browser_run(req: BrowserRequest):
+    """Opera o navegador (browser-use) para realizar a tarefa. Ação em site real =
+    risco — o caller deve usar com aprovação. Precisa de modelo com VISÃO
+    (BROWSER_USE_MODEL) + OPENROUTER_API_KEY."""
+    import browser_agent
+    out = await browser_agent.run_task(req.task)
+    return JSONResponse(out)
+
+
 @app.get("/missions")
 async def get_missions():
     """Missões reais: derivadas do backlog do Codex (_data/codex_backlog.md)."""
@@ -1867,6 +1910,32 @@ async def ui_skills():
 async def ui_scripts():
     import ui_state
     return JSONResponse({"scripts": ui_state.get_scripts()})
+
+
+@app.get("/ui/mcp")
+async def ui_mcp():
+    """Servidores MCP configurados que o Javis consome."""
+    import mcp_client
+    return JSONResponse({"servers": mcp_client.list_servers()})
+
+
+@app.get("/mcp/{server_id}/tools")
+async def mcp_tools(server_id: str):
+    """Conecta no servidor MCP e lista as tools dele."""
+    import mcp_client
+    return JSONResponse(await mcp_client.list_tools(server_id))
+
+
+class MCPCallRequest(BaseModel):
+    tool: str
+    arguments: dict = {}
+
+
+@app.post("/mcp/{server_id}/call")
+async def mcp_call(server_id: str, req: MCPCallRequest):
+    """Chama uma tool de um servidor MCP."""
+    import mcp_client
+    return JSONResponse(await mcp_client.call_tool(server_id, req.tool, req.arguments))
 
 
 @app.get("/ui/integrations")

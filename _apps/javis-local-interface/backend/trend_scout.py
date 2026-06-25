@@ -63,16 +63,29 @@ def _write_item(entrada_dir: Path, kind: str, item: dict) -> bool:
     today = datetime.now().strftime("%Y-%m-%d")
     h = hashlib.sha1(item["url"].encode()).hexdigest()[:8]
     fname = f"{today}_{kind}_{_slug(item['title'])}_{h}.md"
+
+    # Vídeo: tenta a transcrição (conteúdo real → resumo fiel, não só por tema)
+    transcricao = ""
+    if kind == "video":
+        try:
+            t = integrations.youtube_transcript(item["url"])
+            if t and t.strip():
+                transcricao = f"\n## Transcrição\n{t.strip()}\n"
+        except Exception:
+            transcricao = ""
+
     body = (
         f"# {item['title']}\n\n"
         f"Tipo: {kind}\n"
         f"Fonte: {item['url']}\n"
         f"Origem: {item.get('channel', '')}\n"
         f"Data: {item.get('published', '')}\n"
-        f"Coletado em: {today}\n\n"
-        f"{item.get('description', '')}\n\n"
-        f"## Próximo passo\nSubir este material no NotebookLM e colar o resumo em "
-        f"`_resumos/` quando processado.\n"
+        f"Coletado em: {today}\n"
+        f"Transcrição: {'sim' if transcricao else 'não disponível'}\n\n"
+        f"{item.get('description', '')}\n"
+        f"{transcricao}\n"
+        f"## Próximo passo\nResumir com o Javis ('Resumir pendentes' na aba Treino) → "
+        f"entra no RAG. (Ou NotebookLM, se preferir resumo manual.)\n"
     )
     (entrada_dir / fname).write_text(body, encoding="utf-8")
     return True

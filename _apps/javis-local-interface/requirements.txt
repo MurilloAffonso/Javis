@@ -14,3 +14,11 @@ playwright>=1.44
 ddgs>=7.0
 beautifulsoup4>=4.12
 youtube-transcript-api>=1.2
+
+# Command Center / capacidades novas (jun/2026)
+chainlit>=2.11
+markitdown[pdf,docx,xlsx,pptx]
+yt-dlp
+opencv-python
+browser-use            # operar navegador (precisa modelo com visão)
+mcp                    # cliente MCP (consome tools do ecossistema)

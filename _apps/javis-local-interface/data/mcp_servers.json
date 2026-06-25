@@ -1,0 +1,13 @@
+{
+  "_meta": {
+    "descricao": "Servidores MCP que o Javis consome (minerado do ecossistema MCP, conceito do PraisonAI). Cada um expõe tools que o Javis pode listar/chamar. Adicione servidores aqui (stdio: command + args).",
+    "atualizado_em": "2026-06-25"
+  },
+  "servers": {
+    "fetch": {
+      "command": "uvx",
+      "args": ["mcp-server-fetch"],
+      "descricao": "Busca uma URL e converte em markdown (read-only, seguro)."
+    }
+  }
+}

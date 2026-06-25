@@ -55,6 +55,7 @@ const CFG_MENU = [
   { id: "memorias", t: "Memórias", d: "Knowledge por agente" },
   { id: "scripts", t: "Scripts", d: "Catálogo do backend" },
   { id: "integracoes", t: "Integrações", d: "Conectores externos" },
+  { id: "mcp", t: "MCP", d: "Tools do ecossistema MCP" },
   { id: "workflows", t: "Workflows", d: "Fluxos de trabalho" },
   { id: "perfil", t: "Perfil", d: "Informações da conta" },
   { id: "apikeys", t: "API Keys", d: "Chaves dos provedores" },
@@ -68,7 +69,7 @@ const pct = (id) => 70 + ([...String(id)].reduce((a, c) => a + c.charCodeAt(0), 
 
 const state = {
   projects: [], squads: [], agents: [], skills: [], scripts: [], manifests: {}, approvals: [],
-  integrations: {}, runnable: [], training: [],
+  integrations: {}, runnable: [], training: [], mcp: [],
   telemetry: null, online: false,
   view: "chat", q: "",
   activeAgentId: null, rpTab: "status",
@@ -96,6 +97,7 @@ async function loadData() {
     try { state.integrations = (await tryJson(BACKEND + "ui/integrations")).integrations || {}; } catch (_) {}
     try { state.runnable = (await tryJson(BACKEND + "agents")).agents || []; } catch (_) {}
     try { state.training = (await tryJson(BACKEND + "treinamento/status")).areas || []; } catch (_) {}
+    try { state.mcp = (await tryJson(BACKEND + "ui/mcp")).servers || []; } catch (_) {}
     return true;
   } catch (_) {}
   try {
@@ -197,7 +199,10 @@ function viewTreino(body) {
         <div class="card-head"><div class="card-icon">🎓</div><div><div class="card-title" style="text-transform:capitalize">${a.area}</div><div class="card-sub">${ent} entrada · ${res} resumos</div></div></div>
         <div class="skill-bar" style="margin:6px 0 4px"><div class="skill-fill" style="width:${pc}%"></div></div>
         <div class="card-sub">${pc}% resumido (no RAG)</div>
-        <div style="margin-top:12px"><button class="btn ok btn-scout">📥 Coletar (YouTube + GitHub)</button></div>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn ok btn-scout">📥 Coletar (YouTube + GitHub)</button>
+          <button class="btn no btn-resumir">✍️ Resumir pendentes (Claude)</button>
+        </div>
         <div class="scout-out card-sub" style="margin-top:8px"></div>
       </div>`);
     card.querySelector(".btn-scout").onclick = async (e) => {
@@ -208,6 +213,17 @@ function viewTreino(body) {
         const r = await tryJson(`${BACKEND}treinamento/scout/${a.area}`, { method: "POST" });
         const n = (r.results && r.results.length) || r.coletados || r.total || 0;
         out.textContent = `✅ Coleta concluída. Confira _treinamento/${a.area}/_entrada e suba no NotebookLM.`;
+        try { state.training = (await tryJson(BACKEND + "treinamento/status")).areas || []; renderCanvas(); } catch (_) {}
+      } catch (err) { out.textContent = "Falhou: " + err.message; e.target.disabled = false; }
+    };
+    card.querySelector(".btn-resumir").onclick = async (e) => {
+      const out = card.querySelector(".scout-out");
+      e.target.disabled = true; out.textContent = "Resumindo pendentes com o Claude (pode levar um pouco)...";
+      if (!state.online) { out.textContent = "Backend offline."; e.target.disabled = false; return; }
+      try {
+        const r = await tryJson(`${BACKEND}treinamento/resumir/${a.area}`, { method: "POST" });
+        if (r.error) { out.textContent = "⚠️ " + r.error; }
+        else { out.textContent = `✅ ${r.resumidos} resumo(s) gerado(s) → entraram no RAG. Pendentes restantes: ${r.pendentes_restantes}.`; }
         try { state.training = (await tryJson(BACKEND + "treinamento/status")).areas || []; renderCanvas(); } catch (_) {}
       } catch (err) { out.textContent = "Falhou: " + err.message; e.target.disabled = false; }
     };
@@ -487,6 +503,44 @@ function viewTarefas(body) {
     };
   }
 
+  // Pulso de mercado (last30days) — o que estão falando, fontes grátis
+  body.appendChild(h(`<div class="section-h">📡 Pulso de mercado</div>`));
+  const pulso = h(`<div class="demanda" style="max-width:640px">
+    <div class="card-sub" style="margin-bottom:8px">O que estão falando sobre um tópico agora (Reddit, YouTube, HackerNews, GitHub) → o Claude sintetiza com implicações pro negócio. Grátis.</div>
+    <textarea id="pulso-topico" placeholder="Ex: turismo João Pessoa, passeio de barco, tendências Reels viagem"></textarea>
+    <div style="text-align:right"><button class="btn ok" id="pulso-run">📡 Captar pulso</button></div>
+  </div>`);
+  body.appendChild(pulso);
+  pulso.querySelector("#pulso-run").onclick = async () => {
+    const t = $("pulso-topico").value.trim(); if (!t) return;
+    const out = h(`<div class="card" style="max-width:640px;margin-bottom:18px"><div class="card-sub">Captando o pulso (consultando redes/fóruns + síntese)...</div></div>`);
+    pulso.after(out);
+    if (!state.online) { out.querySelector(".card-sub").textContent = "Backend offline."; return; }
+    try {
+      const r = await tryJson(BACKEND + "pulso", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ topico: t }) });
+      out.innerHTML = `<div class="card-sub" style="margin-bottom:6px">📡 ${t} · ${r.fontes || 0} fonte(s)</div><div class="card-desc" style="white-space:pre-wrap">${(r.brief || r.message || "").slice(0, 2000)}</div>`;
+    } catch (e) { out.querySelector(".card-sub").textContent = "Falhou: " + e.message; }
+  };
+
+  // Operar navegador (browser-use) — experimental, precisa modelo com visão
+  body.appendChild(h(`<div class="section-h">🌐 Operar navegador (experimental)</div>`));
+  const nav = h(`<div class="demanda" style="max-width:640px">
+    <div class="card-sub" style="margin-bottom:8px">O Javis abre o Chrome e age como humano (ler/postar/preencher). Precisa de modelo com VISÃO em <code>BROWSER_USE_MODEL</code>. Comece com tarefa de LEITURA.</div>
+    <textarea id="nav-task" placeholder="Ex: abra https://example.com e me diga o título da página"></textarea>
+    <div style="text-align:right"><button class="btn ok" id="nav-run">🌐 Operar</button></div>
+  </div>`);
+  body.appendChild(nav);
+  nav.querySelector("#nav-run").onclick = async () => {
+    const t = $("nav-task").value.trim(); if (!t) return;
+    const out = h(`<div class="card" style="max-width:640px;margin-bottom:18px"><div class="card-sub">Operando o navegador... (pode levar ~1 min)</div></div>`);
+    nav.after(out);
+    if (!state.online) { out.querySelector(".card-sub").textContent = "Backend offline."; return; }
+    try {
+      const r = await tryJson(BACKEND + "browser/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ task: t }) });
+      out.innerHTML = `<div class="card-desc" style="white-space:pre-wrap">${(r.result || r.message || JSON.stringify(r)).slice(0, 1500)}</div>`;
+    } catch (e) { out.querySelector(".card-sub").textContent = "Falhou: " + e.message; }
+  };
+
   // Workflows (lista)
   body.appendChild(h(`<div class="section-h">Workflows</div>`));
   WORKFLOW_LIST.forEach((w) => {
@@ -567,6 +621,22 @@ function cfgPanel(panel) {
       grid.appendChild(h(`<div class="card" style="padding:14px"><div class="card-title" style="font-size:13.5px">${s.arquivo}</div><div class="card-desc" style="margin:6px 0">${s.proposito || "—"}</div><div class="chips"><span class="chip">${s.funcoes} fn</span><span class="chip">${s.classes} cls</span></div></div>`));
     });
     panel.appendChild(grid);
+  } else if (state.cfgTab === "mcp") {
+    panel.appendChild(h(`<div class="section-h">MCP — tools que o Javis consome</div>`));
+    if (!state.mcp.length) { panel.appendChild(h(`<div class="card-sub">Nenhum servidor MCP configurado (data/mcp_servers.json).</div>`)); }
+    state.mcp.forEach((s) => {
+      const card = h(`<div class="card" style="margin-bottom:10px"><div class="card-head"><div class="card-icon">🔌</div><div><div class="card-title">${s.id}</div><div class="card-sub">${s.descricao || s.command}</div></div><button class="btn no" style="margin-left:auto" id="mcp-${s.id}">Listar tools</button></div><div class="mcp-out card-sub" style="margin-top:8px"></div></div>`);
+      card.querySelector(`#mcp-${s.id}`).onclick = async (e) => {
+        const out = card.querySelector(".mcp-out"); e.target.disabled = true; out.textContent = "Conectando ao servidor MCP...";
+        try {
+          const r = await tryJson(`${BACKEND}mcp/${s.id}/tools`);
+          if (r.error) out.textContent = "⚠️ " + r.error;
+          else out.innerHTML = (r.tools || []).map((t) => `<div>🔧 <b>${t.name}</b> — ${t.description || ""}</div>`).join("") || "Sem tools.";
+        } catch (err) { out.textContent = "Falhou: " + err.message; } finally { e.target.disabled = false; }
+      };
+      panel.appendChild(card);
+    });
+    panel.appendChild(h(`<div class="card-sub" style="margin-top:10px">Adicione servidores em <code>data/mcp_servers.json</code> (stdio: command + args). O Javis lista e chama as tools deles.</div>`));
   } else if (state.cfgTab === "integracoes") {
     panel.appendChild(h(`<div class="section-h">Integrações / Conectores</div>`));
     const labels = { youtube: "YouTube", google: "Google", canva: "Canva", spotify: "Spotify",
