@@ -35,6 +35,51 @@ _MAX_FILES = 800    # trava de segurança contra indexar demais
 
 _lock = threading.Lock()
 _building = False
+_last_auto_check = 0.0
+_AUTO_CHECK_COOLDOWN = 60   # segundos — não verifica mudanças mais de 1x/min
+
+
+def _has_external_changes(since_mtime: float) -> bool:
+    """True se algum arquivo dos vaults externos foi alterado depois de since_mtime."""
+    for vault in _external_vaults():
+        for f in vault.glob("*.md"):
+            try:
+                if f.stat().st_mtime > since_mtime:
+                    return True
+            except OSError:
+                continue
+        for top in ("docs", "skills", "_conhecimento"):
+            base = vault / top
+            if not base.is_dir():
+                continue
+            for root, _dirs, files in os.walk(base):
+                for fn in files:
+                    if Path(fn).suffix.lower() in _EXTS:
+                        try:
+                            if (Path(root) / fn).stat().st_mtime > since_mtime:
+                                return True
+                        except OSError:
+                            continue
+    return False
+
+
+def maybe_auto_sync() -> bool:
+    """Chamado a cada busca: se o índice está velho E há mudanças nos vaults externos,
+    dispara rebuild incremental em background. Cooldown evita varrer o disco toda hora."""
+    global _last_auto_check
+    import time as _t
+    now = _t.time()
+    if now - _last_auto_check < _AUTO_CHECK_COOLDOWN:
+        return False
+    _last_auto_check = now
+    try:
+        idx_mtime = INDEX_FILE.stat().st_mtime if INDEX_FILE.exists() else 0
+    except OSError:
+        idx_mtime = 0
+    if _has_external_changes(idx_mtime):
+        start_background_index()
+        return True
+    return False
 
 
 def _external_vaults() -> list[Path]:
@@ -214,6 +259,12 @@ def search(query: str, k: int = 5) -> list[dict]:
     query = (query or "").strip()
     if not query:
         return []
+    # Auto-sync lazy: se mudou algo nos vaults externos, dispara rebuild em
+    # background (não bloqueia a busca atual, próximas já pegam o índice novo).
+    try:
+        maybe_auto_sync()
+    except Exception:
+        pass
     index = _load_index()
     if not index:
         build_index()

@@ -559,12 +559,24 @@ function viewTarefas(body) {
 
 // ---------- Painel (dashboards) ----------
 function viewPainel(body) {
-  const sel = h(`<div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap"></div>`);
+  const sel = h(`<div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;align-items:center"></div>`);
   state.projects.forEach((p) => {
     const t = h(`<div class="view-tab ${p.id === state.activeProjectId ? "active" : ""}">${p.nome}</div>`);
     t.onclick = () => { state.activeProjectId = p.id; renderCanvas(); };
     sel.appendChild(t);
   });
+  // botão de sincronizar — útil quando o senhor edita o Cérebro Jampa
+  const sync = h(`<button class="btn no" style="margin-left:auto" id="sync-rag">🔄 Sincronizar conhecimento</button>`);
+  sync.onclick = async () => {
+    sync.disabled = true; const orig = sync.textContent; sync.textContent = "Sincronizando…";
+    if (!state.online) { sync.textContent = "Backend offline"; setTimeout(() => { sync.textContent = orig; sync.disabled = false; }, 2500); return; }
+    try {
+      const r = await tryJson(BACKEND + "knowledge/reindex", { method: "POST" });
+      sync.textContent = `✓ ${(r && (r.arquivos_reindexados || r.status)) || "ok"}`;
+    } catch (e) { sync.textContent = "Falhou"; }
+    setTimeout(() => { sync.textContent = orig; sync.disabled = false; }, 4000);
+  };
+  sel.appendChild(sync);
   body.appendChild(sel);
 
   const man = state.manifests[state.activeProjectId];
