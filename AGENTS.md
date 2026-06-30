@@ -1,8 +1,8 @@
-# AGENTS.md — Instruções para Agentes no Projeto Javis
+# AGENTS.md — Instruções para Agentes no Projeto Javes
 
-## O que é o Javis
+## O que é o Javes
 
-Javis é o assistente virtual pessoal e operacional de Murillo.
+Javes é o assistente virtual pessoal e operacional de Murillo.
 
 Foco:
 - Conversa e memória
@@ -13,18 +13,18 @@ Foco:
 - Gestão pessoal e operacional
 - Futura execução de ações no computador (com aprovação humana obrigatória)
 
-## O que o Javis NÃO é
+## O que o Javes NÃO é
 
-- Javis NÃO é radar financeiro
-- Javis NÃO é sistema de trading
-- Javis NÃO é scanner de mercado
-- Javis NÃO herda contexto de projetos antigos (Cérebro Jampa, Vem Passear Jampa, etc.)
+- Javes NÃO é radar financeiro
+- Javes NÃO é sistema de trading
+- Javes NÃO é scanner de mercado
+- Javes NÃO mistura contexto automaticamente — não herda o contexto de projetos externos
 
-Se você encontrar referências a esses projetos neste contexto, ignore-as. Elas são irrelevantes para o Javis.
+**Cérebro Jampa** e **Vem Passear Jampa** são projetos **externos** conectados ao Javes **por registro** (ver `_docs/GLOSSARIO-NOMES.md`), com fronteira clara — não fazem parte do núcleo do Javes e só são acessados quando estão registrados, autorizados e selecionados. Não confunda esses nomes com o orquestrador.
 
 ---
 
-## Regras de Operação Segura do Javis
+## Regras de Operação Segura do Javes
 
 Inspirado nos guardrails do ECC (`_referencias/ECC/.claude/rules/`). Estas regras são invioláveis.
 
@@ -166,9 +166,9 @@ A interface local (`_apps/javis-local-interface/`) tem seu próprio sistema de s
 
 ---
 
-## Uso das Skills do Javis
+## Uso das Skills do Javes
 
-O Javis tem 9 skills operacionais em `_skills/`. Use-as conforme a situação de Murillo:
+O Javes tem 9 skills operacionais em `_skills/`. Use-as conforme a situação de Murillo:
 
 ### Quando acionar cada skill
 
@@ -236,7 +236,7 @@ Todos têm sequência de parada `Acompanhamento` e capabilities perigosas desabi
 
 ## Codex CLI — Regras para o Agente de Produção
 
-O Codex (`codex` via `codex.ps1`) é o segundo programador do Javis — usa o plano OpenAI do Murillo (gpt-5.5), não consome tokens do Claude. Use-o para tarefas pesadas de produção de código/conteúdo.
+O Codex (`codex` via `codex.ps1`) é o segundo programador do Javes — usa o plano OpenAI do Murillo (gpt-5.5), não consome tokens do Claude. Use-o para tarefas pesadas de produção de código/conteúdo.
 
 ### Como disparar Codex
 
@@ -285,9 +285,9 @@ cmd /c "type _apps\javis-local-interface\_data\codex_task_X.txt | codex exec --s
 
 ---
 
-## Agentes do Javis — Squad Atual
+## Agentes do Javes — Squad Atual
 
-### Javis / Orion (Orquestrador Master)
+### Javes / Orion (Orquestrador Master)
 - **Role:** coordena todos os outros agentes, decide qual usar para cada tarefa
 - **Backend:** `backend/agent.py` + `backend/claude_brain.py`
 - **Ferramentas ativas:** busca web (DDG/Google), leitura de URL, hora/data, operações locais

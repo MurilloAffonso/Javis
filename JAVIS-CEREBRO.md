@@ -1,4 +1,4 @@
-# 🧠 Javis — Mapa Central
+# 🧠 Javes — Mapa Central
 
 > Assistente pessoal e operacional de Murillo.
 > Este arquivo é o ponto de entrada do cofre no Obsidian.

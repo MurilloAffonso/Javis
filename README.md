@@ -1,14 +1,14 @@
-# Javis — Assistente Virtual Pessoal e Operacional
+# Javes — Assistente Virtual Pessoal e Operacional
 
-Javis é o assistente de Murillo para gestão pessoal, operacional e intelectual.
+Javes é o assistente de Murillo para gestão pessoal, operacional e intelectual.
 
 ## Visão
 
-Javis é um espaço onde Murillo conversa, pensa, organiza e age.
+Javes é um espaço onde Murillo conversa, pensa, organiza e age.
 
 Não é um produto. É uma extensão digital do Murillo — um parceiro de trabalho que lembra, organiza, pesquisa e eventualmente age no computador (com aprovação).
 
-### O que Javis faz
+### O que Javes faz
 
 - Conversa e responde perguntas com contexto persistente
 - Guarda e recupera memórias relevantes
@@ -18,12 +18,22 @@ Não é um produto. É uma extensão digital do Murillo — um parceiro de traba
 - Registra decisões e aprendizados
 - (Futuro) Executa ações no computador com aprovação humana
 
-### O que Javis NÃO é
+### O que Javes NÃO é
 
 - Não é radar financeiro
 - Não é sistema de trading
 - Não é scanner de mercado
 - Não herda contexto de projetos antigos
+
+### Nomes oficiais
+
+Glossário completo: [`_docs/GLOSSARIO-NOMES.md`](_docs/GLOSSARIO-NOMES.md).
+
+- **Javes** — o orquestrador principal (este sistema). Organiza memória, ideias, projetos, tarefas, decisões, aprovações, execução e integrações. Alias humano: **Cérebro Murilo**.
+- **Cérebro Murilo** — alias humano de Javes; o mesmo sistema, chamado de forma pessoal.
+- **Cérebro Jampa** — projeto **externo** conectado ao Javes por registro; guarda os materiais ligados à Vem Passear.
+- **Vem Passear Jampa** — o negócio/agência de turismo, primeiro projeto operacional, **dentro do Cérebro Jampa** (não do núcleo do Javes).
+- **Registro / integração** — Javes **não mistura contexto automaticamente**; conecta projetos externos por registro, com fronteira clara, só quando estão registrados, autorizados e selecionados.
 
 ---
 
@@ -148,7 +158,7 @@ tree /F (Windows) ou ls -R (bash)
 
 ## Interface de Conversa — Open WebUI
 
-Open WebUI é a interface de conversa do Javis, rodando via Docker Compose e conectada ao Ollama local.
+Open WebUI é a interface de conversa do Javes, rodando via Docker Compose e conectada ao Ollama local.
 
 - Acesso local: **http://localhost:3000**
 - Dados persistidos em: `open-webui-data/` (dentro do projeto)
@@ -253,7 +263,7 @@ O Javis deve responder usando o formato **💡 IDEIA CAPTURADA** com resumo, cat
 
 ---
 
-## Ferramentas Futuras do Javis
+## Ferramentas Futuras do Javes
 
 | Ferramenta | Status | Função |
 |---|---|---|
@@ -268,11 +278,11 @@ Já configurado como MCP server. Reduz tokens em até 99% substituindo Read/Grep
 
 ### CodeGraph ✅
 
-CodeGraph foi inicializado no projeto Javis (v0.9.9).
+CodeGraph foi inicializado no projeto Javes (v0.9.9).
 
 **Função:** mapear a estrutura de código como grafo de símbolos, permitindo que Claude Code navegue por relações entre arquivos, funções e módulos sem precisar ler arquivos inteiros — economizando tokens em projetos com código.
 
-**Uso:** análise estrutural quando o projeto tiver código-fonte (Python, JS, TS, etc.). Atualmente o projeto é só Markdown e YAML — o índice crescerá conforme o Javis ganhar código.
+**Uso:** análise estrutural quando o projeto tiver código-fonte (Python, JS, TS, etc.). Atualmente o projeto é só Markdown e YAML — o índice crescerá conforme o Javes ganhar código.
 
 **Observação:** `.codegraph/` está no `.gitignore` e não será commitado. O índice é local por máquina.
 
@@ -294,13 +304,13 @@ Fluxo disciplinado para criação de features:
 Usar como modelo ao criar skills em `_skills/`. Não importar completo.
 
 ### ai-engineering-from-scratch (estudo futuro)
-Guia progressivo de engenharia de IA. Útil quando Javis precisar de RAG próprio ou agentes avançados. Não instalar agora — traz dependências desnecessárias.
+Guia progressivo de engenharia de IA. Útil quando o Javes precisar de RAG próprio ou agentes avançados. Não instalar agora — traz dependências desnecessárias.
 
 ---
 
-## Skills Iniciais do Javis
+## Skills Iniciais do Javes
 
-Skills são instruções operacionais que orientam o Javis sobre como processar situações específicas. Foram criadas do zero, inspiradas na lógica metodológica do projeto [agent-skills](https://github.com/addyosmani/agent-skills) (`/spec → /plan → /build → /test → /review`), mas **nenhuma skill externa foi instalada** — todas são próprias do Javis.
+Skills são instruções operacionais que orientam o Javes sobre como processar situações específicas. Foram criadas do zero, inspiradas na lógica metodológica do projeto [agent-skills](https://github.com/addyosmani/agent-skills) (`/spec → /plan → /build → /test → /review`), mas **nenhuma skill externa foi instalada** — todas são próprias do Javes.
 
 Localização: `_skills/`
 
@@ -375,7 +385,7 @@ Integração voz→comando: `_docs/JAVIS-VOICE-TO-COMMAND-ROUTER.md`
 
 ## Pipeline Operacional — Campanha com Gates de Aprovação
 
-O coração operacional do Javis é o **Quadro** (Kanban estilo Plane, na view
+O coração operacional do Javes é o **Quadro** (Kanban estilo Plane, na view
 do servidor em `http://localhost:8000/`) somado ao painel **CONVERSA**. Por ali
 roda uma campanha de marketing ponta a ponta, sempre em **modo seguro**: nada é
 publicado de verdade e nenhuma integração externa (WhatsApp/Instagram/Google Meu

@@ -1,15 +1,14 @@
-# CLAUDE.md — Regras para Claude Code no Projeto Javis
+# CLAUDE.md — Regras para Claude Code no Projeto Javes
 
 ## Identidade do Projeto
 
-Este é o projeto **Javis** — assistente pessoal e operacional de Murillo.
+Este é o projeto **Javes** — assistente pessoal e operacional de Murillo.
 
 Diretório raiz: `C:\Users\noteacer\Desktop\javis`
 
-Este projeto é independente. Não tem relação com:
-- Cérebro Jampa
-- Vem Passear Jampa
-- Qualquer projeto financeiro ou de trading
+Javes é independente e **não mistura contexto automaticamente**:
+- **Cérebro Jampa** e **Vem Passear Jampa** são projetos **externos** — conectados ao Javes **por registro**, com autorização e fronteira clara (ver `_docs/GLOSSARIO-NOMES.md`). Não fazem parte do núcleo do Javes e não são herdados sem registro/seleção explícita.
+- Não tem relação com qualquer projeto financeiro ou de trading.
 
 ---
 
@@ -18,7 +17,7 @@ Este projeto é independente. Não tem relação com:
 ### Escopo
 - Trabalhe SOMENTE dentro de `C:\Users\noteacer\Desktop\javis`
 - Nunca leia ou modifique arquivos fora desta pasta sem aprovação explícita
-- Se encontrar referências a outros projetos no contexto, ignore-as
+- Não misture contexto de outros projetos automaticamente — projetos externos só entram por registro autorizado, com fronteira clara
 
 ### Commits e Git
 - NÃO faça `git commit` sem aprovação explícita de Murillo
@@ -105,7 +104,7 @@ Conteúdo mínimo:
 javis/
 ├── AGENTS.md          — instruções para agentes
 ├── CLAUDE.md          — este arquivo
-├── JAVIS-CEREBRO.md   — identidade / mente do Javis
+├── JAVIS-CEREBRO.md   — identidade / mente do Javes
 ├── README.md          — visão geral do projeto
 ├── docker-compose.yml — orquestração de serviços
 ├── javis-start.bat    — launcher local
@@ -136,9 +135,9 @@ javis/
 
 ## Misturar com Outros Projetos
 
-**Nunca misture o contexto do Javis com outros projetos.**
+**Nunca misture o contexto do Javes com outros projetos.**
 
 Se Claude Code estiver sendo usado em múltiplos projetos, certifique-se de que:
-- O CLAUDE.md do Javis está ativo
+- O CLAUDE.md do Javes está ativo
 - O contexto de outros projetos não está no mesmo contexto de sessão
 - Variáveis globais não foram alteradas por outros projetos
