@@ -82,3 +82,16 @@ _apps/**/telas_extraidas_video/
 *.bak
 app_ui.py.py
 _apps/**/public/avatars/*.wav
+
+# Estado local do Obsidian (por máquina — não versionar)
+.obsidian/graph.json
+.obsidian/workspace.json
+
+# Gaveta de arquivos abandonados (local-only)
+_arquivo/
+
+# Scratch de desenvolvimento (descartável, regenerável)
+_apps/**/_scratch/
+
+# Dumps brutos raspados (regeneráveis)
+_logs/dumps/
