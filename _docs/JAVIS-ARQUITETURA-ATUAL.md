@@ -1,4 +1,4 @@
-# Javis — Arquitetura Atual
+# Javes — Arquitetura Atual
 
 Data: 2026-06-11  
 Status: v0 estável — Local Interface funcionando, voice bridge em dry-run

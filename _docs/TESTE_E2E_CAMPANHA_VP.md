@@ -15,7 +15,7 @@ UI: `http://localhost:8000/` (painel CONVERSA + Quadro).
 
 - [ ] **Rodar a suíte de testes:** `cd _apps/javis-local-interface && python -m pytest tests/ -q`
   → deve dar **117 passed** (baseline verde antes do teste manual).
-- [ ] **Abrir o Javis:** `http://localhost:8000/` no navegador; topbar com
+- [ ] **Abrir o Javes:** `http://localhost:8000/` no navegador; topbar com
   contadores reais (msgs / 16 agentes) e indicador **CLAUDE** online.
 - [ ] Servidor rodando (`uvicorn server:app --reload` dentro de `backend/`).
 - [ ] SQLite acessível (fonte principal de tasks/approvals).
@@ -33,7 +33,7 @@ UI: `http://localhost:8000/` (painel CONVERSA + Quadro).
 
 **Ação:** No painel CONVERSA, enviar a mensagem:
 
-> "Javis, cria a pauta da semana da Vem Passear"
+> "Javes, cria a pauta da semana da Vem Passear"
 
 (equivalente programático: `POST /chat` com esse texto, ou `server._brain(...)`).
 

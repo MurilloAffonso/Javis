@@ -1,14 +1,14 @@
-# Javis — Visão Operacional
+# Javes — Visão Operacional
 
-> Documento-resumo do que o Javis é **hoje** e como ele opera, ponta a ponta.
+> Documento-resumo do que o Javes é **hoje** e como ele opera, ponta a ponta.
 > Última atualização: 2026-06-20. Fonte de verdade técnica: o código em
 > `_apps/javis-local-interface/` e o roteiro `_docs/TESTE_E2E_CAMPANHA_VP.md`.
 
 ---
 
-## 1. O que é o Javis hoje
+## 1. O que é o Javes hoje
 
-Javis é o assistente pessoal e operacional de Murillo. Hoje ele já não é só um
+Javes é o assistente pessoal e operacional de Murillo. Hoje ele já não é só um
 chat: é um **orquestrador local** que conversa, lembra (RAG sobre as pastas do
 projeto), aciona agentes e conduz uma **campanha de marketing de ponta a ponta**
 com aprovação humana em cada etapa.
@@ -50,7 +50,7 @@ agentes) e indicador de cérebro online; painel **CONVERSA** + **Quadro**.
 ## 3. Pipeline Vem Passear Jampa
 
 O fluxo operacional principal é a **campanha semanal da Vem Passear Jampa**
-(projeto Cérebro Jampa, plugado como repo externo — o Javis não o absorve).
+(projeto Cérebro Jampa, plugado como repo externo — o Javes não o absorve).
 
 ```
 [Murillo] "cria a pauta da semana da Vem Passear"  (painel CONVERSA)
@@ -156,7 +156,7 @@ seguro e em que ordem as coisas aconteceram.
 
 ## 8. Digest
 
-Quando a task é concluída, a **entidade "morre"** e o Javis gera um **digest de
+Quando a task é concluída, a **entidade "morre"** e o Javes gera um **digest de
 IA** — um resumo curto da jornada daquela task. O card ganha o selo **📄
 digest** e, em "Ver jornada", aparece o bloco **"📄 Digest da entidade"** com:
 
@@ -179,7 +179,7 @@ Princípio inegociável do pipeline atual:
   local.
 - O entregável final, `pacote-publicacao-semana.md`, traz o aviso explícito:
   **"PUBLICAÇÃO MANUAL — nenhuma integração externa foi acionada."**
-- A publicação é **decisão e ação manual do Murillo**; o Javis prepara o pacote
+- A publicação é **decisão e ação manual do Murillo**; o Javes prepara o pacote
   e para.
 
 Verificação rápida de que segue seguro: `action_logs` não deve ter nenhum intent
@@ -203,7 +203,7 @@ python -m pytest tests/ -q
 → deve ficar **verde** (baseline do roteiro: 117 passed) antes de começar.
 
 **Teste manual, em resumo:**
-1. No painel CONVERSA: *"Javis, cria a pauta da semana da Vem Passear"* → gera
+1. No painel CONVERSA: *"Javes, cria a pauta da semana da Vem Passear"* → gera
    `pauta-semana.md` e abre a **Gate 1**.
 2. Aprovar Gate 1 → destrava Design → **"🎨 Rodar Estúdio"** → `criativos-semana.md`
    + **Gate 2**.

@@ -1,4 +1,4 @@
-# Blueprint: COHORT Marketing → OS de projetos do Javis
+# Blueprint: COHORT Marketing → OS de projetos do Javes
 
 > Análise estrutural do PDF "COHORT_MARKETING" (board único estilo Miro,
 > 14339×11918px, 304 imagens, ~10k de texto posicional). Extraído via PyMuPDF.
@@ -21,7 +21,7 @@ Pesquisa → Oferta → Funil → Conteúdo → Tráfego → Dados → Painel.
 Cada agente do board é um CONTRATO:
 `{ função (faz) · não-faz (delega) · input · output · ferramentas }`
 O **"Não-Faz"** é o mecanismo anti-caos — impede um agente de invadir o
-território do outro. ESTE é o padrão a adotar em todo `SKILL.md` do Javis.
+território do outro. ESTE é o padrão a adotar em todo `SKILL.md` do Javes.
 
 ## Squads identificados
 - Pesquisa: Research Analyst, Competitor, Trend Hunting, Swipe File
@@ -40,10 +40,10 @@ território do outro. ESTE é o padrão a adotar em todo `SKILL.md` do Javis.
   Matar (cortar o que não paga em 72h). Anti-padrões: decidir sem
   significância; olhar só topo do funil.
 
-## Como vira o OS do Javis
-| PDF | Javis hoje | Ação |
+## Como vira o OS do Javes
+| PDF | Javes hoje | Ação |
 |---|---|---|
-| VOCÊ orquestrador | Jamba | existe |
+| VOCÊ orquestrador | Javes | existe |
 | Clones IA / conselheiros | Conclave + 17 agentes da mente | formalizar personas c/ lógica de decisão |
 | Contrato faz/não-faz/in/out | SKILL.md | **adotar o schema de squad** |
 | Output→Input | pipeline campanha (3 gates) | generalizar p/ todo squad |
@@ -53,11 +53,11 @@ território do outro. ESTE é o padrão a adotar em todo `SKILL.md` do Javis.
 ## O que NÃO copiar
 1. Culto às lendas como marketing (use a técnica, não os ídolos).
 2. Stack do PDF (ClickUp/Notion/n8n/Make/Hotmart) — mapear funções p/ stack própria.
-3. "Treinar clones" — no Javis capacidade = SKILL.md + cérebro forte
+3. "Treinar clones" — no Javes capacidade = SKILL.md + cérebro forte
    (ver memória javis-agentes-skill-vs-treino).
 4. Geração de criativo em massa automática — conflita com regra "criativo só
    via plugin Adobe/Canva".
-5. Formato curso/aula — no Javis é pipeline contínuo, não módulos.
+5. Formato curso/aula — no Javes é pipeline contínuo, não módulos.
 6. Números de exemplo (CAC R$87 etc.) — usar dados reais.
 
 ## Vem Passear Jampa = primeiro grafo instanciado

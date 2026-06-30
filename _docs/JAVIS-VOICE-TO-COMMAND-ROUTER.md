@@ -1,4 +1,4 @@
-# Javis — Voice-to-Command Router
+# Javes — Voice-to-Command Router
 
 Data: 2026-06-11 (atualizado: 2026-06-11)
 Status: Fase 1 — dry-run ativo, bypass de LLM para comandos, execução não liberada

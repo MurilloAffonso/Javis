@@ -5,7 +5,7 @@ Status: Protótipo v0 — CLI funcional, frontend estático
 
 ---
 
-## 1. O que é a interface local do Javis
+## 1. O que é a interface local do Javes
 
 A **Javis Local Interface** é uma camada de execução local que complementa o Open WebUI.
 
@@ -180,7 +180,7 @@ Tudo é logado: sucesso, erro, aprovação recusada, ação desconhecida.
 - Automação de login
 - Compras
 - Executar shell arbitrário
-- Qualquer ação fora do escopo do Javis
+- Qualquer ação fora do escopo do Javes
 
 ---
 
