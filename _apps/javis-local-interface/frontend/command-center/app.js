@@ -338,8 +338,10 @@ function viewChat(body) {
     </div>`));
 
   const scroll = h(`<div class="chat-scroll" id="chat-scroll"></div>`);
-  hist.forEach((m) => scroll.appendChild(h(`<div class="chat-msg ${m.role}">${m.text}</div>`)));
+  hist.forEach((m) => scroll.appendChild(h(`<div class="chat-msg ${m.role}">${_esc(m.text)}</div>`)));
   chatBlock.appendChild(scroll);
+  // Volta pro final do histórico ao retornar pra aba chat
+  setTimeout(() => { scroll.scrollTop = scroll.scrollHeight; }, 0);
 
   const input = h(`
     <div class="chat-input">

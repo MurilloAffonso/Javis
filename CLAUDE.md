@@ -105,15 +105,28 @@ Conteúdo mínimo:
 javis/
 ├── AGENTS.md          — instruções para agentes
 ├── CLAUDE.md          — este arquivo
+├── JAVIS-CEREBRO.md   — identidade / mente do Javis
 ├── README.md          — visão geral do projeto
+├── docker-compose.yml — orquestração de serviços
+├── javis-start.bat    — launcher local
+│
+├── _apps/             — código de aplicação (javis-local-interface: backend + frontend)
+├── _estado/           — JSONs de estado vivo (brain_ativo, proximos-passos, estado-atual)
 ├── _memoria/          — memórias persistentes
 ├── _ideias/           — ideias capturadas
 ├── _projetos/         — contexto de projetos ativos
 ├── _prompts/          — prompts reutilizáveis
 ├── _skills/           — skills personalizadas
-├── _logs/             — decisões e registros
+├── _arquitetura/      — decisões arquiteturais
+├── _treinamento/      — material de treino de agentes
+├── _referencias/      — estudos externos (ECC, silero-vad, etc.)
+├── _templates/        — modelos reutilizáveis
+├── _sessoes/          — histórico de sessões
+├── _logs/             — decisões e registros (inclui _logs/screenshots/ e _logs/dumps/)
 ├── _inbox/            — entradas para processar
 ├── _outbox/           — saídas elaboradas
+├── _arquivo/          — gaveta de arquivos abandonados (revisar antes de deletar)
+├── docs/              — documentação geral
 └── _ferramentas/
     ├── leanctx/       — config e notas sobre LeanCTX
     └── headroom/      — config e notas sobre Headroom
