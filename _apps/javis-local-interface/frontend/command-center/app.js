@@ -1340,17 +1340,42 @@ async function vpConteudos() {
 
 async function vpPauta() {
   const host = $("vp-content"); if (!host) return;
+  host.innerHTML = "";
+  // Form de criação (escrita — protegida por confirmação forte). Projeto conectado.
+  const form = h(`<div class="vp-form">
+    <div class="vp-form-h">➕ Nova pauta <span class="card-sub">(escrita no projeto conectado — exige confirmação forte)</span></div>
+    <div class="vp-form-row">
+      <input id="vpp-data" class="cs-input vp-in" placeholder="data (ex: 2026-07-05)" />
+      <input id="vpp-canal" class="cs-input vp-in" placeholder="canal (ex: Instagram)" value="Instagram" />
+    </div>
+    <textarea id="vpp-ideia" class="cv-task" placeholder="ideia do post…"></textarea>
+    <div style="text-align:right;margin-top:8px"><button class="op-btn studio" id="vpp-add">➕ Criar pauta</button></div>
+  </div>`);
+  host.appendChild(form);
+  form.querySelector("#vpp-add").onclick = () => {
+    const data = ($("vpp-data").value || "").trim(), canal = ($("vpp-canal").value || "Instagram").trim(), ideia = ($("vpp-ideia").value || "").trim();
+    if (!ideia) { opToast("Escreva a ideia da pauta.", "warn"); return; }
+    confirmStrong({ title: "Criar pauta (Vem Passear · projeto conectado)", endpoint: "/vp/pauta", method: "POST", target: (data || "s/data") + " · " + canal, before: "—", after: "cria nova pauta: " + ideia.slice(0, 40), risk: "leve", phrase: "CONFIRMAR", onConfirm: () => vpCreatePauta(data, canal, ideia) });
+  };
+  const listHost = h(`<div id="vp-pauta-list"></div>`); host.appendChild(listHost);
   let pauta = [];
   try { pauta = (await tryJson(BACKEND + "vp/pauta")).pauta || []; }
-  catch (e) { host.innerHTML = `<div class="card-sub">Não consegui carregar a pauta.</div>`; return; }
-  if (!pauta.length) { host.innerHTML = `<div class="op-empty">Nenhuma pauta planejada.</div>`; return; }
-  host.innerHTML = "";
+  catch (e) { listHost.innerHTML = `<div class="card-sub">Não consegui carregar a pauta.</div>`; return; }
+  if (!pauta.length) { listHost.innerHTML = `<div class="op-empty">Nenhuma pauta planejada.</div>`; return; }
   pauta.forEach((p) => {
     const pub = p.status === "publicado";
     const card = h(`<div class="vp-item"><div class="vp-item-h"><span class="vp-tag ${pub ? "fechado" : "lead"}">${_esc(p.data || "")}</span> · ${_esc(p.canal || "")} <span class="opcard-st">${_esc(p.status || "")}</span></div><div class="vp-item-body"></div></div>`);
     card.querySelector(".vp-item-body").textContent = p.ideia || "";
-    host.appendChild(card);
+    listHost.appendChild(card);
   });
+}
+
+async function vpCreatePauta(data, canal, ideia) {
+  try {
+    const res = await opSend(BACKEND + "vp/pauta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data, canal, ideia }) });
+    if (res.ok && (res.data.status === "ok")) { opToast("Pauta criada.", "ok"); vpPauta(); }
+    else opToast(res.data.message || ("Falha (" + res.status + ")"), "warn");
+  } catch (e) { opToast("Backend offline — não criei a pauta.", "err"); }
 }
 
 async function vpAgentes() {
