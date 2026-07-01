@@ -880,3 +880,54 @@ body { background:
 .at-f-v { color:var(--text); font-weight:500; text-align:right; }
 .at-voucher-btn { width:100%; }
 @media (max-width: 1100px) { .at-cols { grid-template-columns: 1fr; } }
+
+/* Atendimento — checklist de briefing + alerta */
+.at-alert { background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.35); color:var(--warn); font-size:12px; padding:8px 11px; border-radius:8px; margin-bottom:10px; }
+.at-briefing { border:1px solid var(--border); border-radius:8px; padding:8px 11px; margin-bottom:4px; }
+.at-briefing summary { cursor:pointer; font-size:12.5px; font-weight:600; color:var(--text); }
+.at-briefing-grid { display:flex; flex-wrap:wrap; gap:7px; margin-top:9px; }
+.at-check { font-size:11px; padding:3px 8px; border-radius:99px; border:1px solid var(--border); color:var(--muted); }
+.at-check.ok { color:var(--ok); border-color:rgba(34,197,94,.3); }
+.at-funnel-step.lost { color:var(--err); border-color:rgba(239,68,68,.3); background:rgba(239,68,68,.08); }
+
+/* Dashboard do dia */
+.at-dash-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
+.at-dash-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px; text-align:center; }
+.at-dash-ic { font-size:18px; margin-bottom:4px; }
+.at-dash-n { font-size:19px; font-weight:700; color:var(--accent-2); }
+.at-dash-l { font-size:11px; color:var(--muted); margin-top:2px; }
+.at-dash-alerts { display:flex; flex-direction:column; gap:7px; }
+.at-dash-alert { background:rgba(245,158,11,.1); border:1px solid rgba(245,158,11,.3); color:var(--warn); font-size:12.5px; padding:8px 12px; border-radius:8px; }
+
+/* Funil / Marketing — Kanban visual estático */
+.fk-board { display:flex; gap:12px; overflow-x:auto; padding-bottom:8px; }
+.fk-col { background:var(--bg-2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px; min-width:230px; flex:0 0 230px; }
+.fk-col-h { display:flex; justify-content:space-between; align-items:center; font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; margin-bottom:9px; }
+.fk-cards { display:flex; flex-direction:column; gap:8px; }
+.fk-card { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:9px 10px; }
+.fk-card-nome { font-size:12.5px; font-weight:600; color:var(--text); }
+.fk-card-meta { font-size:11px; color:var(--muted); margin-top:3px; }
+.fk-card-next { font-size:11px; color:var(--accent-2); margin-top:5px; }
+.fk-card-actions { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+
+/* Reservas — tabela visual */
+.vp-table-wrap { overflow-x:auto; }
+.vp-table { border-collapse:collapse; width:100%; font-size:11.5px; }
+.vp-table th, .vp-table td { padding:7px 9px; border-bottom:1px solid var(--border); text-align:left; white-space:nowrap; }
+.vp-table th { color:var(--muted); text-transform:uppercase; font-size:10px; letter-spacing:.4px; }
+.vp-table-actions { display:flex; gap:5px; flex-wrap:wrap; }
+
+/* Modal genérico "fase visual" */
+.vp-modal { max-width:560px; }
+.vp-modal-warn { margin:8px 0; }
+.vp-modal-body { font-size:12.5px; color:var(--text); }
+
+/* Voucher visual */
+.voucher-card { border:1px dashed var(--border-2); border-radius:10px; padding:14px; }
+.voucher-h { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.voucher-logo { width:34px; height:34px; border-radius:8px; background:linear-gradient(135deg,var(--accent),var(--accent-2)); display:grid; place-items:center; font-size:16px; }
+.voucher-brand { font-weight:700; font-size:14px; }
+.voucher-sub { font-size:11px; color:var(--muted); }
+.voucher-block { margin-top:10px; font-size:12px; }
+.voucher-block b { color:var(--text); }
+.voucher-block p { color:var(--muted); margin-top:2px; line-height:1.5; }
