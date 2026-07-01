@@ -29,8 +29,7 @@ Não é um produto. É uma extensão digital do Murillo — um parceiro de traba
 
 Glossário completo: [`_docs/GLOSSARIO-NOMES.md`](_docs/GLOSSARIO-NOMES.md).
 
-- **Javes** — o orquestrador principal (este sistema). Organiza memória, ideias, projetos, tarefas, decisões, aprovações, execução e integrações. Alias humano: **Cérebro Murilo**.
-- **Cérebro Murilo** — alias humano de Javes; o mesmo sistema, chamado de forma pessoal.
+- **Javes** — o orquestrador principal (este sistema). Organiza memória, ideias, projetos, tarefas, decisões, aprovações, execução e integrações.
 - **Cérebro Jampa** — projeto **externo** conectado ao Javes por registro; guarda os materiais ligados à Vem Passear.
 - **Vem Passear Jampa** — o negócio/agência de turismo, primeiro projeto operacional, **dentro do Cérebro Jampa** (não do núcleo do Javes).
 - **Registro / integração** — Javes **não mistura contexto automaticamente**; conecta projetos externos por registro, com fronteira clara, só quando estão registrados, autorizados e selecionados.

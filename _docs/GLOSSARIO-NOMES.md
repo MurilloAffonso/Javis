@@ -16,12 +16,6 @@
   execução e integrações.
 - **Não mistura contexto automaticamente.**
 - Pode conectar projetos externos **por registro**, com fronteira clara.
-- Alias humano: **Cérebro Murilo**.
-
-### Cérebro Murilo
-- É o **alias humano de Javes** — o mesmo sistema, chamado de forma pessoal.
-- Não é um sistema separado, nem um projeto externo.
-- Usar como apelido em prosa; **não** como nome técnico de módulo, path ou arquivo.
 
 ### Cérebro Jampa
 - É um **projeto externo** conectado ao Javes **por registro**.
@@ -61,7 +55,6 @@
 | Termo | Significado correto | Quando usar | Quando NÃO usar |
 |---|---|---|---|
 | **Javes** | Sistema central / orquestrador principal | Falando do sistema que organiza memória, ideias, projetos, execução e integrações | Para nomear o projeto externo ou o negócio de turismo |
-| **Cérebro Murilo** | Alias humano de Javes | Como apelido pessoal do orquestrador, em prosa | Como nome técnico de módulo, path ou arquivo |
 | **Cérebro Jampa** | Projeto externo conectado por registro | Falando do repositório/conhecimento ligado ao Vem Passear | Como nome do orquestrador (nunca substitui Javes) |
 | **Vem Passear Jampa** | Negócio/agência de turismo; 1º projeto operacional | Falando da operação de turismo dentro do Cérebro Jampa | Como sinônimo de Javes ou de Cérebro Jampa |
 | **Integração / Registro** | Conexão controlada Javes ↔ Cérebro Jampa | Descrevendo como Javes acessa contexto externo (registrado, autorizado, selecionado) | Para sugerir herança ou mistura automática de contexto |
