@@ -248,7 +248,7 @@ function viewTreino(body) {
     grid.appendChild(card);
   });
   body.appendChild(grid);
-  body.appendChild(h(`<div class="card-sub" style="margin-top:18px">💡 <b>NotebookLM</b> é o passo de resumo (manual — sem API pública): suba o material do <code>_entrada</code>, gere o resumo e cole em <code>_resumos</code>. O Javis indexa automático no RAG.</div>`));
+  body.appendChild(h(`<div class="card-sub" style="margin-top:18px">💡 <b>NotebookLM</b> é o passo de resumo (manual — sem API pública): suba o material do <code>_entrada</code>, gere o resumo e cole em <code>_resumos</code>. O Javes indexa automático no RAG.</div>`));
 }
 
 function viewSearch(body) {
@@ -1529,7 +1529,7 @@ function viewTarefas(body) {
   // Operar navegador (browser-use) — experimental, precisa modelo com visão
   body.appendChild(h(`<div class="section-h">🌐 Operar navegador (experimental)</div>`));
   const nav = h(`<div class="demanda" style="max-width:640px">
-    <div class="card-sub" style="margin-bottom:8px">O Javis abre o Chrome e age como humano (ler/postar/preencher). Precisa de modelo com VISÃO em <code>BROWSER_USE_MODEL</code>. Comece com tarefa de LEITURA.</div>
+    <div class="card-sub" style="margin-bottom:8px">O Javes abre o Chrome e age como humano (ler/postar/preencher). Precisa de modelo com VISÃO em <code>BROWSER_USE_MODEL</code>. Comece com tarefa de LEITURA.</div>
     <textarea id="nav-task" placeholder="Ex: abra https://example.com e me diga o título da página"></textarea>
     <div style="text-align:right"><button class="btn ok" id="nav-run">🌐 Operar</button></div>
   </div>`);
@@ -1548,7 +1548,7 @@ function viewTarefas(body) {
   // Workflows (lista)
   body.appendChild(h(`<div class="section-h">Workflows</div>`));
   WORKFLOW_LIST.forEach((w) => {
-    body.appendChild(h(`<div class="wf-card"><div class="wf-main"><div class="wf-name">${w.nome}</div><div class="wf-desc">${w.desc}</div><div class="wf-meta">${w.steps} steps · trigger manual · active</div></div><button class="btn ok">▶ Executar</button></div>`));
+    body.appendChild(h(`<div class="wf-card"><div class="wf-main"><div class="wf-name">${w.nome}</div><div class="wf-desc">${w.desc}</div><div class="wf-meta">${w.steps} steps · demo</div></div><button class="btn ok" disabled title="Workflow de exemplo — ativação em fase futura">▶ Executar (em breve)</button></div>`));
   });
 
   // Grafo (demo)
@@ -1638,7 +1638,7 @@ function cfgPanel(panel) {
     });
     panel.appendChild(grid);
   } else if (state.cfgTab === "mcp") {
-    panel.appendChild(h(`<div class="section-h">MCP — tools que o Javis consome</div>`));
+    panel.appendChild(h(`<div class="section-h">MCP — tools que o Javes consome</div>`));
     if (!state.mcp.length) { panel.appendChild(h(`<div class="card-sub">Nenhum servidor MCP configurado (data/mcp_servers.json).</div>`)); }
     state.mcp.forEach((s) => {
       const card = h(`<div class="card" style="margin-bottom:10px"><div class="card-head"><div class="card-icon">🔌</div><div><div class="card-title">${s.id}</div><div class="card-sub">${s.descricao || s.command}</div></div><button class="btn no" style="margin-left:auto" id="mcp-${s.id}">Listar tools</button></div><div class="mcp-out card-sub" style="margin-top:8px"></div></div>`);
@@ -1652,7 +1652,7 @@ function cfgPanel(panel) {
       };
       panel.appendChild(card);
     });
-    panel.appendChild(h(`<div class="card-sub" style="margin-top:10px">Adicione servidores em <code>data/mcp_servers.json</code> (stdio: command + args). O Javis lista e chama as tools deles.</div>`));
+    panel.appendChild(h(`<div class="card-sub" style="margin-top:10px">Adicione servidores em <code>data/mcp_servers.json</code> (stdio: command + args). O Javes lista e chama as tools deles.</div>`));
   } else if (state.cfgTab === "integracoes") {
     panel.appendChild(h(`<div class="section-h">Integrações / Conectores</div>`));
     const labels = { youtube: "YouTube", google: "Google", canva: "Canva", spotify: "Spotify",
@@ -2205,7 +2205,7 @@ function viewExec(body) {
         <button class="exec-clear-btn" id="exec-clear">Limpar log</button>
       </div>
     </div>
-    <div id="exec-term" class="exec-terminal"><div class="exec-hint">Aguardando execução... Peça ao Javis para "programar", "analisar" ou "criar" algo e acompanhe aqui em tempo real.</div></div>
+    <div id="exec-term" class="exec-terminal"><div class="exec-hint">Aguardando execução... Peça ao Javes para "programar", "analisar" ou "criar" algo e acompanhe aqui em tempo real.</div></div>
   </div>`);
   body.appendChild(wrap);
 
