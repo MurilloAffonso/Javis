@@ -35,8 +35,10 @@ cd _apps/javis-local-interface/backend
 uvicorn server:app --reload
 ```
 
-Abre em **http://localhost:8000/** — topbar com contadores reais (mensagens /
-agentes) e indicador de cérebro online; painel **CONVERSA** + **Quadro**.
+Abre em **http://localhost:8000/**, que agora **redireciona para `/command-center/`** —
+a interface oficial do Javes (Chat, Operação/Quadro, Conclave, Missões, Rotina,
+Vem Passear). As interfaces legadas seguem acessíveis como fallback:
+**`/classic`** (Quadro + CONVERSA antigo), **`/central/`**, **`/painel`**, **`/vempassear`**.
 
 **Pré-requisitos:**
 - SQLite acessível (fonte principal de tasks/aprovações — criado no `init_db()`).
@@ -100,7 +102,8 @@ Por que isso importa:
 
 ## 5. Quadro operacional
 
-O **Quadro** é o Kanban (estilo Plane) servido em `http://localhost:8000/`. Cada
+O **Quadro** é o Kanban (estilo Plane) na aba **Operação** do `/command-center/`
+(a raiz `/` redireciona para lá; a versão antiga fica em `/classic`). Cada
 etapa da campanha é uma **task** com agente responsável e um botão de ação:
 
 - **Pauta** (Nova) — nasce do chat.

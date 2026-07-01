@@ -4,7 +4,7 @@ Roteiro manual para validar, ponta a ponta, o fluxo:
 **Pauta (chat) → Gate 1 → Design/Estúdio → Gate 2 → Distribuição → Gate 3 → pacote manual.**
 
 Servidor: `_apps/javis-local-interface/backend/server.py` (porta 8000, `uvicorn server:app`).
-UI: `http://localhost:8000/` (painel CONVERSA + Quadro).
+UI: `http://localhost:8000/` → redireciona para `/command-center/` (interface oficial; Operação = Quadro, Chat = CONVERSA). Versão antiga em `/classic`.
 
 > Modo seguro confirmado em todas as etapas: sem publicação real, sem integração
 > externa (WhatsApp/Instagram/GMB), sem geração de imagem. Tudo template/local.
