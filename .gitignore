@@ -95,3 +95,6 @@ _apps/**/_scratch/
 
 # Dumps brutos raspados (regeneráveis)
 _logs/dumps/
+
+# Dados reais da Vem Passear (clientes/leads/passeios/pauta) — local-only, não versionar
+_apps/**/_data/vp_*.json
