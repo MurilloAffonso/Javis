@@ -15,17 +15,21 @@ const ICONS = {
   exec: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>',
   board: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="4" height="15" rx="1"/></svg>',
   conclave: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9a2 2 0 0 1-2 2H6l-4 3V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-3h-6a2 2 0 0 1-2-2v-1"/></svg>',
+  missoes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/></svg>',
+  rotina: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
 };
 
 const NAV = [
   { id: "chat",    label: "Chat",    icon: ICONS.chat },
   { id: "operacao",label: "Operação", icon: ICONS.board },
   { id: "conclave",label: "Conclave", icon: ICONS.conclave },
+  { id: "missoes", label: "Missões", icon: ICONS.missoes },
   { id: "exec",    label: "Execução", icon: ICONS.exec },
   { id: "world",   label: "World",   icon: ICONS.world },
   { id: "tarefas", label: "Tarefas", icon: ICONS.tasks },
   { id: "painel",  label: "Painel",  icon: ICONS.panel },
   { id: "treino",  label: "Treino",  icon: ICONS.train },
+  { id: "rotina",  label: "Rotina",  icon: ICONS.rotina },
   { id: "config",  label: "Config",  icon: ICONS.config },
 ];
 
@@ -182,7 +186,7 @@ function fillAgentGroup(boxId, list) {
 }
 
 // ---------- Tabs / view ----------
-const TITLES = { chat: "Chat", operacao: "Operação · Quadro & Aprovações", conclave: "Conclave · Debate de Agentes", exec: "Execução em Tempo Real", world: "Javis World", tarefas: "Orquestrador de Tarefas", painel: "Painel", treino: "Treinamento", config: "Configurações" };
+const TITLES = { chat: "Chat", operacao: "Operação · Quadro & Aprovações", conclave: "Conclave · Debate de Agentes", missoes: "Missões", exec: "Execução em Tempo Real", world: "Javis World", tarefas: "Orquestrador de Tarefas", painel: "Painel", treino: "Treinamento", rotina: "Rotina · Briefing, Histórico & Lembretes", config: "Configurações" };
 function setView(v) {
   if (window._execPollTimer) { clearInterval(window._execPollTimer); window._execPollTimer = null; }
   state.view = v; renderSidebar(); renderCanvas(); renderRightPanel();
@@ -194,7 +198,7 @@ function renderCanvas() {
     return viewSearch(body);
   }
   $("canvas-title").textContent = TITLES[state.view] || "";
-  ({ chat: viewChat, operacao: viewOperacao, conclave: viewConclave, exec: viewExec, world: viewWorld, tarefas: viewTarefas, painel: viewPainel, treino: viewTreino, config: viewConfig }[state.view] || viewChat)(body);
+  ({ chat: viewChat, operacao: viewOperacao, conclave: viewConclave, missoes: viewMissoes, exec: viewExec, world: viewWorld, tarefas: viewTarefas, painel: viewPainel, treino: viewTreino, rotina: viewRotina, config: viewConfig }[state.view] || viewChat)(body);
 }
 
 function viewTreino(body) {
@@ -907,6 +911,131 @@ function cvRenderResult(d, task) {
     result.appendChild(det);
   }
   if (d.saved_to) result.appendChild(h(`<div class="card-sub" style="margin-top:10px">💾 Decisão salva em <code>_memoria/${_esc(d.saved_to)}</code></div>`));
+}
+
+// ---------- Missões (leitura) — GET /missions + /missions/{id}/nodes ----------
+// Read-only: lista missões (backlog do Codex) e mostra os nodes/progresso.
+// Sem ações de escrita (marcar node como done fica para fase futura, com confirmação).
+let _miSel = null;
+
+function viewMissoes(body) {
+  body.appendChild(h(`<div class="card-sub" style="margin-bottom:14px">Missões reais derivadas do backlog. Somente leitura — clique numa missão para ver as tarefas (nodes) e o progresso.</div>`));
+  if (!state.online) { body.appendChild(h(`<div class="banner">⚠️ Backend offline — conecte o servidor em <code>:8000</code> para ver as missões.</div>`)); return; }
+  body.appendChild(h(`<div class="mi-wrap"><div id="mi-list" class="mi-list"><div class="card-sub">Carregando missões…</div></div><div id="mi-nodes" class="mi-nodes"><div class="op-empty">Selecione uma missão.</div></div></div>`));
+  miLoadList();
+}
+
+async function miLoadList() {
+  const list = $("mi-list");
+  if (!list) return;
+  let missions = [];
+  try { missions = (await tryJson(BACKEND + "missions")).missions || []; }
+  catch (e) { list.innerHTML = `<div class="card-sub">Não consegui carregar as missões.</div>`; return; }
+  if (!missions.length) { list.innerHTML = `<div class="op-empty">Nenhuma missão no backlog.</div>`; return; }
+  list.innerHTML = "";
+  missions.forEach((m) => {
+    const pctv = Math.max(0, Math.min(100, Number(m.pct) || 0));
+    const card = h(`<div class="mi-card${m.id === _miSel ? " active" : ""}">
+      <div class="mi-name"></div>
+      <div class="mi-bar"><div class="mi-fill" style="width:${pctv}%"></div></div>
+      <div class="mi-meta"><span>${pctv}%</span><span>${_esc((m.tasks_done ?? "?") + "/" + (m.tasks_total ?? "?"))} tarefas</span>${m.last_activity ? "<span>" + _esc(m.last_activity) + "</span>" : ""}</div>
+    </div>`);
+    card.querySelector(".mi-name").textContent = m.name || m.id || "(sem nome)";
+    card.onclick = () => { _miSel = m.id; miLoadList(); miLoadNodes(m.id); };
+    list.appendChild(card);
+  });
+}
+
+async function miLoadNodes(id) {
+  const host = $("mi-nodes");
+  if (!host) return;
+  host.innerHTML = `<div class="card-sub">Carregando tarefas…</div>`;
+  let nodes = [];
+  try { nodes = (await tryJson(BACKEND + `missions/${encodeURIComponent(id)}/nodes`)).nodes || []; }
+  catch (e) { host.innerHTML = `<div class="card-sub">Não consegui carregar as tarefas desta missão.</div>`; return; }
+  if (!nodes.length) { host.innerHTML = `<div class="op-empty">Missão sem tarefas detalhadas.</div>`; return; }
+  host.innerHTML = "";
+  nodes.forEach((n) => {
+    const pctv = Math.max(0, Math.min(100, Number(n.pct) || 0));
+    const row = h(`<div class="mi-node">
+      <div class="mi-node-h"><span class="mi-node-label"></span><span class="opcard-st">${_esc(n.status || "")}</span></div>
+      <div class="mi-node-sub">${_esc(n.type || "")}</div>
+      <div class="mi-bar"><div class="mi-fill" style="width:${pctv}%"></div></div>
+    </div>`);
+    row.querySelector(".mi-node-label").textContent = n.label || n.id || "(node)";
+    host.appendChild(row);
+  });
+}
+
+// ---------- Rotina (leitura) — Briefing + Histórico + Lembretes ----------
+// Read-only: /briefing (sob demanda), /history e /reminders. Treino/scout tem
+// aba própria ("Treino"); aqui só apontamos para ela, sem duplicar.
+function viewRotina(body) {
+  body.appendChild(h(`<div class="card-sub" style="margin-bottom:14px">Resumo do dia do Javes — leitura. O status de treino/scout fica na aba <b>Treino</b>.</div>`));
+  if (!state.online) { body.appendChild(h(`<div class="banner">⚠️ Backend offline — conecte o servidor em <code>:8000</code> para ver a rotina.</div>`)); return; }
+
+  // Briefing (sob demanda)
+  body.appendChild(h(`<div class="section-h">👋 Briefing</div>`));
+  const brWrap = h(`<div class="ro-card"><button class="op-btn" id="ro-brief-btn">Carregar briefing</button><div id="ro-brief" class="ro-brief"></div></div>`);
+  body.appendChild(brWrap);
+  brWrap.querySelector("#ro-brief-btn").onclick = roLoadBriefing;
+
+  // Histórico
+  body.appendChild(h(`<div class="section-h" style="margin-top:20px">🕑 Histórico de conversa</div>`));
+  body.appendChild(h(`<div id="ro-history" class="ro-card"><div class="card-sub">Carregando histórico…</div></div>`));
+
+  // Lembretes
+  body.appendChild(h(`<div class="section-h" style="margin-top:20px">⏰ Lembretes</div>`));
+  body.appendChild(h(`<div id="ro-reminders" class="ro-card"><div class="card-sub">Carregando lembretes…</div></div>`));
+
+  roLoadHistory();
+  roLoadReminders();
+}
+
+async function roLoadBriefing() {
+  const host = $("ro-brief");
+  if (!host) return;
+  host.textContent = "carregando…";
+  try {
+    const b = await tryJson(BACKEND + "briefing");
+    host.textContent = b && b.saudacao ? b.saudacao : "Sem briefing agora.";   // textContent = seguro
+  } catch (e) { host.textContent = "Não consegui carregar o briefing."; }
+}
+
+async function roLoadHistory() {
+  const host = $("ro-history");
+  if (!host) return;
+  let items = [];
+  try {
+    const d = await tryJson(BACKEND + "history");
+    items = Array.isArray(d) ? d : (d.history || d.messages || []);
+  } catch (e) { host.innerHTML = `<div class="card-sub">Não consegui carregar o histórico.</div>`; return; }
+  if (!items.length) { host.innerHTML = `<div class="op-empty">Sem histórico ainda.</div>`; return; }
+  host.innerHTML = "";
+  items.slice(-30).forEach((it) => {
+    const role = it.role || it.actor || "—";
+    const txt = it.content || it.text || it.message || "";
+    const when = it.ts || it.time || it.created_at || "";
+    const row = h(`<div class="ro-hrow"><div class="ro-hmeta"><span class="ro-role">${_esc(role)}</span>${when ? "<span class='ro-when'>" + _esc(String(when)) + "</span>" : ""}</div><div class="ro-htext"></div></div>`);
+    row.querySelector(".ro-htext").textContent = String(txt);
+    host.appendChild(row);
+  });
+  host.scrollTop = host.scrollHeight;
+}
+
+async function roLoadReminders() {
+  const host = $("ro-reminders");
+  if (!host) return;
+  let items = [];
+  try { items = (await tryJson(BACKEND + "reminders")).pending || []; }
+  catch (e) { host.innerHTML = `<div class="card-sub">Não consegui carregar os lembretes.</div>`; return; }
+  if (!items.length) { host.innerHTML = `<div class="op-empty">Nenhum lembrete pendente.</div>`; return; }
+  host.innerHTML = "";
+  items.forEach((r) => {
+    const row = h(`<div class="ro-rem"><span class="ro-rem-txt"></span><span class="ro-rem-when">${r.falta_min != null ? "em " + _esc(String(r.falta_min)) + " min" : _esc(String(r.due || ""))}</span></div>`);
+    row.querySelector(".ro-rem-txt").textContent = r.text || "(lembrete)";
+    host.appendChild(row);
+  });
 }
 
 function viewTarefas(body) {

@@ -733,3 +733,33 @@ body { background:
 .cv-agent { background:var(--bg-2); border:1px solid var(--border); border-radius:8px; padding:9px 11px; margin-bottom:8px; }
 .cv-agent-h { font-size:12px; font-weight:600; color:var(--text); margin-bottom:4px; }
 .cv-agent-txt { font-size:12.5px; color:var(--muted); line-height:1.5; white-space:pre-wrap; word-break:break-word; }
+
+/* ============ Missões (leitura) ============ */
+.mi-wrap { display:grid; grid-template-columns:minmax(220px,320px) 1fr; gap:16px; align-items:start; }
+.mi-list { display:flex; flex-direction:column; gap:10px; }
+.mi-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius-sm); padding:11px 13px; cursor:pointer; transition:border-color .15s; }
+.mi-card:hover { border-color:var(--border-2); }
+.mi-card.active { border-color:var(--accent); background:var(--accent-soft); }
+.mi-name { font-size:13px; font-weight:600; color:var(--text); margin-bottom:8px; }
+.mi-bar { height:6px; background:var(--bg-2); border-radius:99px; overflow:hidden; }
+.mi-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent-2)); }
+.mi-meta { display:flex; gap:10px; flex-wrap:wrap; font-size:11px; color:var(--muted); margin-top:6px; }
+.mi-nodes { display:flex; flex-direction:column; gap:9px; }
+.mi-node { background:var(--bg-2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; }
+.mi-node-h { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.mi-node-label { font-size:13px; color:var(--text); font-weight:500; }
+.mi-node-sub { font-size:11px; color:var(--muted); margin:2px 0 7px; }
+@media (max-width:820px) { .mi-wrap { grid-template-columns:1fr; } }
+
+/* ============ Rotina (leitura) ============ */
+.ro-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 14px; max-width:760px; }
+.ro-brief { margin-top:10px; font-size:13.5px; color:var(--text); line-height:1.5; white-space:pre-wrap; word-break:break-word; }
+#ro-history { max-height:320px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; }
+.ro-hrow { border-bottom:1px solid var(--border); padding-bottom:8px; }
+.ro-hmeta { display:flex; gap:8px; align-items:center; margin-bottom:3px; }
+.ro-role { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--accent-2); }
+.ro-when { font-size:10px; color:var(--muted-2); }
+.ro-htext { font-size:13px; color:var(--muted); line-height:1.45; white-space:pre-wrap; word-break:break-word; }
+.ro-rem { display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:1px solid var(--border); }
+.ro-rem-txt { font-size:13px; color:var(--text); }
+.ro-rem-when { font-size:11px; color:var(--warn); white-space:nowrap; }
