@@ -17,6 +17,7 @@ const ICONS = {
   conclave: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9a2 2 0 0 1-2 2H6l-4 3V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-3h-6a2 2 0 0 1-2-2v-1"/></svg>',
   missoes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/></svg>',
   rotina: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
+  vp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12s3-4 9-4 9 4 9 4M3 17s3-3 9-3 9 3 9 3"/><circle cx="12" cy="6" r="2"/></svg>',
 };
 
 const NAV = [
@@ -30,6 +31,7 @@ const NAV = [
   { id: "painel",  label: "Painel",  icon: ICONS.panel },
   { id: "treino",  label: "Treino",  icon: ICONS.train },
   { id: "rotina",  label: "Rotina",  icon: ICONS.rotina },
+  { id: "vempassear", label: "Vem Passear", icon: ICONS.vp },
   { id: "config",  label: "Config",  icon: ICONS.config },
 ];
 
@@ -186,7 +188,7 @@ function fillAgentGroup(boxId, list) {
 }
 
 // ---------- Tabs / view ----------
-const TITLES = { chat: "Chat", operacao: "Operação · Quadro & Aprovações", conclave: "Conclave · Debate de Agentes", missoes: "Missões", exec: "Execução em Tempo Real", world: "Javis World", tarefas: "Orquestrador de Tarefas", painel: "Painel", treino: "Treinamento", rotina: "Rotina · Briefing, Histórico & Lembretes", config: "Configurações" };
+const TITLES = { chat: "Chat", operacao: "Operação · Quadro & Aprovações", conclave: "Conclave · Debate de Agentes", missoes: "Missões", exec: "Execução em Tempo Real", world: "Javis World", tarefas: "Orquestrador de Tarefas", painel: "Painel", treino: "Treinamento", rotina: "Rotina · Briefing, Histórico & Lembretes", vempassear: "Projeto conectado · Vem Passear Jampa", config: "Configurações" };
 function setView(v) {
   if (window._execPollTimer) { clearInterval(window._execPollTimer); window._execPollTimer = null; }
   state.view = v; renderSidebar(); renderCanvas(); renderRightPanel();
@@ -198,7 +200,7 @@ function renderCanvas() {
     return viewSearch(body);
   }
   $("canvas-title").textContent = TITLES[state.view] || "";
-  ({ chat: viewChat, operacao: viewOperacao, conclave: viewConclave, missoes: viewMissoes, exec: viewExec, world: viewWorld, tarefas: viewTarefas, painel: viewPainel, treino: viewTreino, rotina: viewRotina, config: viewConfig }[state.view] || viewChat)(body);
+  ({ chat: viewChat, operacao: viewOperacao, conclave: viewConclave, missoes: viewMissoes, exec: viewExec, world: viewWorld, tarefas: viewTarefas, painel: viewPainel, treino: viewTreino, rotina: viewRotina, vempassear: viewVempassear, config: viewConfig }[state.view] || viewChat)(body);
 }
 
 function viewTreino(body) {
@@ -1035,6 +1037,136 @@ async function roLoadReminders() {
     const row = h(`<div class="ro-rem"><span class="ro-rem-txt"></span><span class="ro-rem-when">${r.falta_min != null ? "em " + _esc(String(r.falta_min)) + " min" : _esc(String(r.due || ""))}</span></div>`);
     row.querySelector(".ro-rem-txt").textContent = r.text || "(lembrete)";
     host.appendChild(row);
+  });
+}
+
+// ---------- Vem Passear Jampa (projeto conectado — LEITURA) ----------
+// Fronteira: projeto EXTERNO do Cérebro Jampa, consultado pelo Javes por registro.
+// NÃO mistura contexto com o núcleo. 100% leitura nesta fase: nenhum POST/PATCH/
+// DELETE, nenhuma execução de agente, nenhum envio/publicação. Tudo escapado.
+let _vpTab = "resumo";
+const VP_TABS = [
+  { id: "resumo",    label: "Resumo" },
+  { id: "passeios",  label: "Passeios" },
+  { id: "clientes",  label: "Clientes" },
+  { id: "conteudos", label: "Conteúdos" },
+  { id: "pauta",     label: "Pauta" },
+  { id: "agentes",   label: "Agentes" },
+];
+const vpBRL = (v) => { const n = Number(v); return isNaN(n) ? _esc(String(v ?? "—")) : "R$ " + n.toFixed(2).replace(".", ","); };
+const vpMask = (s) => { const t = String(s || "").trim(); if (!t) return ""; if (t.length <= 4) return "••"; return t.slice(0, 2) + "•••" + t.slice(-2); };
+
+function viewVempassear(body) {
+  body.appendChild(h(`<div class="vp-boundary">🔗 <b>Projeto conectado via Cérebro Jampa.</b> O Javes consulta e organiza este projeto <b>por registro</b>, sem misturar contexto automaticamente com o núcleo. Contexto externo · somente leitura nesta fase.</div>`));
+  if (!state.online) { body.appendChild(h(`<div class="banner">⚠️ Backend offline — conecte o servidor em <code>:8000</code> para ver os dados da Vem Passear.</div>`)); return; }
+  const chips = h(`<div class="vp-chips"></div>`);
+  VP_TABS.forEach((t) => {
+    const c = h(`<button class="vp-chip${t.id === _vpTab ? " active" : ""}">${_esc(t.label)}</button>`);
+    c.onclick = () => { _vpTab = t.id; renderCanvas(); };
+    chips.appendChild(c);
+  });
+  body.appendChild(chips);
+  body.appendChild(h(`<div id="vp-content" class="vp-content"><div class="card-sub">Carregando…</div></div>`));
+  ({ resumo: vpResumo, passeios: vpPasseios, clientes: vpClientes, conteudos: vpConteudos, pauta: vpPauta, agentes: vpAgentes }[_vpTab] || vpResumo)();
+}
+
+async function vpResumo() {
+  const host = $("vp-content"); if (!host) return;
+  let resumo = {};
+  try { resumo = (await tryJson(BACKEND + "vp/passeios")).resumo || {}; }
+  catch (e) { host.innerHTML = `<div class="card-sub">Não consegui carregar o resumo.</div>`; return; }
+  host.innerHTML = `
+    <div class="vp-card">
+      <div class="vp-row"><span class="vp-k">Nome</span><span class="vp-v">Vem Passear Jampa</span></div>
+      <div class="vp-row"><span class="vp-k">Projeto externo</span><span class="vp-v">Cérebro Jampa</span></div>
+      <div class="vp-row"><span class="vp-k">Relação</span><span class="vp-v">conectado ao Javes por registro</span></div>
+      <div class="vp-row"><span class="vp-k">Estado</span><span class="vp-v"><span class="badge ok"><span class="dot ok"></span>online</span></span></div>
+    </div>
+    <div class="section-h" style="margin-top:16px">Resumo operacional</div>
+    <div class="vp-stats">
+      <div class="vp-stat"><div class="vp-stat-n">${_esc(String(resumo.total_passeios ?? 0))}</div><div class="vp-stat-l">passeios</div></div>
+      <div class="vp-stat"><div class="vp-stat-n">${_esc(String(resumo.total_pessoas ?? 0))}</div><div class="vp-stat-l">pessoas</div></div>
+      <div class="vp-stat"><div class="vp-stat-n">${vpBRL(resumo.faturamento ?? 0)}</div><div class="vp-stat-l">faturamento</div></div>
+    </div>`;
+}
+
+async function vpPasseios() {
+  const host = $("vp-content"); if (!host) return;
+  let passeios = [];
+  try { passeios = (await tryJson(BACKEND + "vp/passeios")).passeios || []; }
+  catch (e) { host.innerHTML = `<div class="card-sub">Não consegui carregar os passeios.</div>`; return; }
+  if (!passeios.length) { host.innerHTML = `<div class="op-empty">Nenhum passeio cadastrado.</div>`; return; }
+  host.innerHTML = "";
+  passeios.forEach((p) => {
+    const card = h(`<div class="vp-item"><div class="vp-item-h"></div><div class="vp-item-meta"><span class="accent">${_esc(p.data || "s/ data")}</span> · ${_esc(String(p.pessoas ?? "?"))} pessoa(s) · ${vpBRL(p.valor)}/p</div></div>`);
+    card.querySelector(".vp-item-h").textContent = p.tipo || "(passeio)";
+    host.appendChild(card);
+  });
+}
+
+async function vpClientes() {
+  const host = $("vp-content"); if (!host) return;
+  let d = {};
+  try { d = await tryJson(BACKEND + "vp/clientes"); }
+  catch (e) { host.innerHTML = `<div class="card-sub">Não consegui carregar os clientes.</div>`; return; }
+  const leads = d.leads || [], fechados = d.fechados || [];
+  if (!leads.length && !fechados.length) { host.innerHTML = `<div class="op-empty">Nenhum cliente/lead ainda.</div>`; return; }
+  host.innerHTML = "";
+  const block = (titulo, arr, tagClass) => {
+    host.appendChild(h(`<div class="section-h">${_esc(titulo)} (${arr.length})</div>`));
+    if (!arr.length) { host.appendChild(h(`<div class="op-empty">—</div>`)); return; }
+    arr.forEach((c) => {
+      const row = h(`<div class="vp-item"><div class="vp-item-h"><span class="vp-tag ${tagClass}"></span></div><div class="vp-item-meta">${_esc(vpMask(c.contato))}${c.obs ? " · " + _esc(c.obs) : ""}</div></div>`);
+      row.querySelector(".vp-tag").textContent = c.nome || "(cliente)";
+      host.appendChild(row);
+    });
+  };
+  block("Leads abertos", leads, "lead");
+  block("Fechados", fechados, "fechado");
+}
+
+async function vpConteudos() {
+  const host = $("vp-content"); if (!host) return;
+  let conteudos = [];
+  try { conteudos = (await tryJson(BACKEND + "vp/conteudos")).conteudos || []; }
+  catch (e) { host.innerHTML = `<div class="card-sub">Não consegui carregar os conteúdos.</div>`; return; }
+  if (!conteudos.length) { host.innerHTML = `<div class="op-empty">Nenhum conteúdo salvo.</div>`; return; }
+  host.innerHTML = "";
+  conteudos.forEach((c) => {
+    const card = h(`<div class="vp-item"><div class="vp-item-h"><span class="accent">${_esc(c.tipo || "conteúdo")}</span></div><div class="vp-item-body"></div></div>`);
+    card.querySelector(".vp-item-body").textContent = (c.texto || "").slice(0, 400);
+    host.appendChild(card);
+  });
+}
+
+async function vpPauta() {
+  const host = $("vp-content"); if (!host) return;
+  let pauta = [];
+  try { pauta = (await tryJson(BACKEND + "vp/pauta")).pauta || []; }
+  catch (e) { host.innerHTML = `<div class="card-sub">Não consegui carregar a pauta.</div>`; return; }
+  if (!pauta.length) { host.innerHTML = `<div class="op-empty">Nenhuma pauta planejada.</div>`; return; }
+  host.innerHTML = "";
+  pauta.forEach((p) => {
+    const pub = p.status === "publicado";
+    const card = h(`<div class="vp-item"><div class="vp-item-h"><span class="vp-tag ${pub ? "fechado" : "lead"}">${_esc(p.data || "")}</span> · ${_esc(p.canal || "")} <span class="opcard-st">${_esc(p.status || "")}</span></div><div class="vp-item-body"></div></div>`);
+    card.querySelector(".vp-item-body").textContent = p.ideia || "";
+    host.appendChild(card);
+  });
+}
+
+async function vpAgentes() {
+  const host = $("vp-content"); if (!host) return;
+  let agents = [];
+  try { agents = (await tryJson(BACKEND + "vp/agents")).agents || []; }
+  catch (e) { host.innerHTML = `<div class="card-sub">Não consegui carregar os agentes.</div>`; return; }
+  if (!agents.length) { host.innerHTML = `<div class="op-empty">Nenhum agente VP.</div>`; return; }
+  host.innerHTML = `<div class="card-sub" style="margin-bottom:10px">Squad de marketing da Vem Passear (leitura). Execução de agente fica para fase futura, com confirmação.</div>`;
+  agents.forEach((a) => {
+    const ic = a.icon || "🤖";
+    const card = h(`<div class="vp-item"><div class="vp-item-h">${ic} <span class="vp-agent-nome"></span></div><div class="vp-item-meta"></div></div>`);
+    card.querySelector(".vp-agent-nome").textContent = a.nome || "(agente)";
+    card.querySelector(".vp-item-meta").textContent = a.papel || "";
+    host.appendChild(card);
   });
 }
 
