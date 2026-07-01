@@ -46,11 +46,8 @@ HISTORY_FILE.parent.mkdir(exist_ok=True)
 app = FastAPI(title="Javis v2", version="2.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# Interface "Central de Comando" (protótipo) — servida em /central, isolada do
-# frontend atual. Só monta se a pasta existir; não altera nenhuma rota existente.
-_central_dir = FRONTEND_DIR / "central"
-if _central_dir.exists():
-    app.mount("/central", StaticFiles(directory=str(_central_dir), html=True), name="central")
+# Interface legada "Central de Comando" (/central) ARQUIVADA em UI-4B
+# (movida para _arquivo/interfaces-legadas/). Mount removido.
 
 # JAVIS Command Center (Fase 2/3) — servido em /command-center, isolado.
 # Só monta se a pasta existir; não altera nenhuma rota existente.
@@ -163,8 +160,6 @@ async def serve_index():
     # foi removido. Fallbacks preservados para não quebrar se a pasta não existir.
     if (FRONTEND_DIR / "command-center" / "index.html").exists():
         return RedirectResponse(url="/command-center/")
-    if (FRONTEND_DIR / "central" / "index.html").exists():
-        return RedirectResponse(url="/central/")
     return HTMLResponse((FRONTEND_DIR / "index.html").read_text(encoding="utf-8"))
 
 
@@ -185,24 +180,8 @@ async def serve_js():
 
 
 # ── Painel (dashboard) — arquivos criados pelo Codex ──
-@app.get("/painel", response_class=HTMLResponse)
-async def serve_painel():
-    f = FRONTEND_DIR / "painel.html"
-    if f.exists():
-        return HTMLResponse(f.read_text(encoding="utf-8"))
-    return HTMLResponse("<h1>Painel ainda não criado</h1>", status_code=404)
-
-
-@app.get("/painel.css")
-async def serve_painel_css():
-    f = FRONTEND_DIR / "painel.css"
-    return FileResponse(f, media_type="text/css") if f.exists() else JSONResponse({"error": "não criado"}, status_code=404)
-
-
-@app.get("/painel.js")
-async def serve_painel_js():
-    f = FRONTEND_DIR / "painel.js"
-    return FileResponse(f, media_type="application/javascript") if f.exists() else JSONResponse({"error": "não criado"}, status_code=404)
+# Rotas legadas /painel /painel.css /painel.js ARQUIVADAS em UI-4B
+# (movidas para _arquivo/interfaces-legadas/). Rotas removidas.
 
 
 # ── Painel Vem Passear (Cérebro VP) — mesmo padrão do /painel ──────────
