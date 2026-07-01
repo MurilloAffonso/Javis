@@ -155,28 +155,13 @@ class ChatRequest(BaseModel):
 
 @app.get("/")
 async def serve_index():
-    # Interface PRINCIPAL agora é o Command Center (/command-center/). As antigas
-    # continuam 100% acessíveis (/classic, /central/, /painel, /vempassear) — nada
-    # foi removido. Fallbacks preservados para não quebrar se a pasta não existir.
-    if (FRONTEND_DIR / "command-center" / "index.html").exists():
-        return RedirectResponse(url="/command-center/")
-    return HTMLResponse((FRONTEND_DIR / "index.html").read_text(encoding="utf-8"))
+    # Interface oficial: Command Center. Raiz sempre redireciona pra lá.
+    return RedirectResponse(url="/command-center/")
 
 
-@app.get("/classic", response_class=HTMLResponse)
-async def serve_classic():
-    """Interface antiga (preservada). Acesse em /classic."""
-    return HTMLResponse((FRONTEND_DIR / "index.html").read_text(encoding="utf-8"))
-
-
-@app.get("/style.css")
-async def serve_css():
-    return FileResponse(FRONTEND_DIR / "style.css", media_type="text/css")
-
-
-@app.get("/app.js")
-async def serve_js():
-    return FileResponse(FRONTEND_DIR / "app.js", media_type="application/javascript")
+# Interface legada /classic (index.html/app.js/style.css) ARQUIVADA em UI-4D
+# (movida para _arquivo/interfaces-legadas/classic/). Rotas /classic /style.css
+# /app.js removidas.
 
 
 # ── Painel (dashboard) — arquivos criados pelo Codex ──
