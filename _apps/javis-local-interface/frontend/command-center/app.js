@@ -1291,16 +1291,44 @@ async function vpResumo() {
 
 async function vpPasseios() {
   const host = $("vp-content"); if (!host) return;
+  host.innerHTML = "";
+  const form = h(`<div class="vp-form">
+    <div class="vp-form-h">➕ Cadastrar passeio <span class="card-sub">(escrita no projeto conectado — exige confirmação forte)</span></div>
+    <div class="vp-form-row">
+      <input id="vps-tipo" class="cs-input vp-in" placeholder="tipo/nome do passeio" />
+      <input id="vps-data" class="cs-input vp-in" placeholder="data (ex: 2026-07-10)" />
+    </div>
+    <div class="vp-form-row">
+      <input id="vps-pessoas" class="cs-input vp-in" type="number" min="1" placeholder="pessoas" value="1" />
+      <input id="vps-valor" class="cs-input vp-in" type="number" min="0" step="0.01" placeholder="valor/p" value="0" />
+    </div>
+    <div style="text-align:right;margin-top:8px"><button class="op-btn studio" id="vps-add">➕ Cadastrar passeio</button></div>
+  </div>`);
+  host.appendChild(form);
+  form.querySelector("#vps-add").onclick = () => {
+    const tipo = ($("vps-tipo").value || "").trim(), data = ($("vps-data").value || "").trim();
+    const pessoas = parseInt($("vps-pessoas").value || "1", 10) || 1, valor = parseFloat($("vps-valor").value || "0") || 0;
+    if (!tipo) { opToast("Informe o tipo do passeio.", "warn"); return; }
+    confirmStrong({ title: "Cadastrar passeio (Vem Passear · projeto conectado)", endpoint: "/vp/passeios", method: "POST", target: tipo, before: "—", after: `${data || "s/data"} · ${pessoas}p · ${vpBRL(valor)}`, risk: "leve", phrase: "CONFIRMAR", onConfirm: () => vpCreatePasseio(tipo, data, pessoas, valor) });
+  };
+  const listHost = h(`<div id="vp-pas-list"></div>`); host.appendChild(listHost);
   let passeios = [];
   try { passeios = (await tryJson(BACKEND + "vp/passeios")).passeios || []; }
-  catch (e) { host.innerHTML = `<div class="card-sub">Não consegui carregar os passeios.</div>`; return; }
-  if (!passeios.length) { host.innerHTML = `<div class="op-empty">Nenhum passeio cadastrado.</div>`; return; }
-  host.innerHTML = "";
+  catch (e) { listHost.innerHTML = `<div class="card-sub">Não consegui carregar os passeios.</div>`; return; }
+  if (!passeios.length) { listHost.innerHTML = `<div class="op-empty">Nenhum passeio cadastrado.</div>`; return; }
   passeios.forEach((p) => {
     const card = h(`<div class="vp-item"><div class="vp-item-h"></div><div class="vp-item-meta"><span class="accent">${_esc(p.data || "s/ data")}</span> · ${_esc(String(p.pessoas ?? "?"))} pessoa(s) · ${vpBRL(p.valor)}/p</div></div>`);
     card.querySelector(".vp-item-h").textContent = p.tipo || "(passeio)";
-    host.appendChild(card);
+    listHost.appendChild(card);
   });
+}
+
+async function vpCreatePasseio(tipo, data, pessoas, valor) {
+  try {
+    const res = await opSend(BACKEND + "vp/passeios", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo, data, pessoas, valor }) });
+    if (res.ok && res.data.status === "ok") { opToast("Passeio cadastrado.", "ok"); vpPasseios(); }
+    else opToast(res.data.message || ("Falha (" + res.status + ")"), "warn");
+  } catch (e) { opToast("Backend offline — não cadastrei.", "err"); }
 }
 
 async function vpClientes() {
