@@ -9,7 +9,7 @@
   "agents": [
     {
       "id": "javis-core",
-      "nome": "Javis Core Orchestrator",
+      "nome": "Javes Core Orchestrator",
       "tipo": "orquestrador",
       "squad": null,
       "projeto": "geral",
