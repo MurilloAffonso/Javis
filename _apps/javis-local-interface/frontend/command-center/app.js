@@ -1333,23 +1333,47 @@ async function vpCreatePasseio(tipo, data, pessoas, valor) {
 
 async function vpClientes() {
   const host = $("vp-content"); if (!host) return;
+  host.innerHTML = "";
+  const form = h(`<div class="vp-form">
+    <div class="vp-form-h">➕ Cadastrar cliente/lead <span class="card-sub">(dado sensível — exige confirmação forte)</span></div>
+    <div class="vp-form-row">
+      <input id="vpcl-nome" class="cs-input vp-in" placeholder="nome" />
+      <input id="vpcl-contato" class="cs-input vp-in" placeholder="contato (use teste)" />
+    </div>
+    <textarea id="vpcl-obs" class="cv-task" placeholder="observação (opcional)…"></textarea>
+    <div style="text-align:right;margin-top:8px"><button class="op-btn studio" id="vpcl-add">➕ Cadastrar cliente</button></div>
+  </div>`);
+  host.appendChild(form);
+  form.querySelector("#vpcl-add").onclick = () => {
+    const nome = ($("vpcl-nome").value || "").trim(), contato = ($("vpcl-contato").value || "").trim(), obs = ($("vpcl-obs").value || "").trim();
+    if (!nome) { opToast("Informe o nome.", "warn"); return; }
+    confirmStrong({ title: "Cadastrar cliente (Vem Passear · projeto conectado)", endpoint: "/vp/clientes", method: "POST", target: nome, before: "—", after: "cria lead" + (contato ? " · " + vpMask(contato) : ""), risk: "leve", phrase: "CONFIRMAR", onConfirm: () => vpCreateCliente(nome, contato, obs) });
+  };
+  const listHost = h(`<div id="vp-cli-list"></div>`); host.appendChild(listHost);
   let d = {};
   try { d = await tryJson(BACKEND + "vp/clientes"); }
-  catch (e) { host.innerHTML = `<div class="card-sub">Não consegui carregar os clientes.</div>`; return; }
+  catch (e) { listHost.innerHTML = `<div class="card-sub">Não consegui carregar os clientes.</div>`; return; }
   const leads = d.leads || [], fechados = d.fechados || [];
-  if (!leads.length && !fechados.length) { host.innerHTML = `<div class="op-empty">Nenhum cliente/lead ainda.</div>`; return; }
-  host.innerHTML = "";
+  if (!leads.length && !fechados.length) { listHost.innerHTML = `<div class="op-empty">Nenhum cliente/lead ainda.</div>`; return; }
   const block = (titulo, arr, tagClass) => {
-    host.appendChild(h(`<div class="section-h">${_esc(titulo)} (${arr.length})</div>`));
-    if (!arr.length) { host.appendChild(h(`<div class="op-empty">—</div>`)); return; }
+    listHost.appendChild(h(`<div class="section-h">${_esc(titulo)} (${arr.length})</div>`));
+    if (!arr.length) { listHost.appendChild(h(`<div class="op-empty">—</div>`)); return; }
     arr.forEach((c) => {
       const row = h(`<div class="vp-item"><div class="vp-item-h"><span class="vp-tag ${tagClass}"></span></div><div class="vp-item-meta">${_esc(vpMask(c.contato))}${c.obs ? " · " + _esc(c.obs) : ""}</div></div>`);
       row.querySelector(".vp-tag").textContent = c.nome || "(cliente)";
-      host.appendChild(row);
+      listHost.appendChild(row);
     });
   };
   block("Leads abertos", leads, "lead");
   block("Fechados", fechados, "fechado");
+}
+
+async function vpCreateCliente(nome, contato, obs) {
+  try {
+    const res = await opSend(BACKEND + "vp/clientes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome, contato, obs }) });
+    if (res.ok && res.data.status === "ok") { opToast("Cliente cadastrado.", "ok"); vpClientes(); }
+    else opToast(res.data.message || ("Falha (" + res.status + ")"), "warn");
+  } catch (e) { opToast("Backend offline — não cadastrei.", "err"); }
 }
 
 async function vpConteudos() {
