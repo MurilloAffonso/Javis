@@ -357,6 +357,7 @@ function viewChat(body) {
 
   const input = h(`
     <div class="chat-input">
+      <label class="upload-btn" id="chat-upload-lbl" title="Anexar arquivo para análise (não publica; só analisa)">📎<input type="file" id="chat-file" hidden /></label>
       <textarea id="chat-text" placeholder="Mensagem para ${a.nome}... (ou clica no 🎤 acima)"></textarea>
       <button class="send-btn" id="chat-send" title="Enviar">➤</button>
     </div>`);
@@ -365,6 +366,7 @@ function viewChat(body) {
 
   const send = () => sendChat(a);
   input.querySelector("#chat-send").onclick = send;
+  input.querySelector("#chat-file").onchange = (e) => { const f = e.target.files[0]; if (f) uploadChatFile(a, f); e.target.value = ""; };
   input.querySelector("#chat-text").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
 
   // ===== HABILIDADES + SUGESTÕES (rodapé colapsável) =====
@@ -468,6 +470,32 @@ async function sendChat(a, explicitMsg, speak) {
       ? "Servidor offline — não consegui conversar agora, senhor."
       : ("Falhou: " + (e && e.message ? e.message : e));
     hist.push({ role: "bot", text: bot.textContent });
+  }
+  scroll.scrollTop = scroll.scrollHeight;
+}
+
+// Upload de arquivo p/ análise (migrado da /classic). POST /upload (multipart).
+// Só ANALISA (salva em temp no backend); não publica, não envia. Texto escapado.
+async function uploadChatFile(a, file) {
+  const scroll = $("chat-scroll");
+  if (!scroll) return;
+  const hist = state.chats[a.id] = state.chats[a.id] || [];
+  const u = h(`<div class="chat-msg user"></div>`); u.textContent = "📎 " + file.name; scroll.appendChild(u);
+  hist.push({ role: "user", text: "📎 " + file.name });
+  const bot = h(`<div class="chat-msg bot streaming"><span class="stream-cursor">▋</span> analisando…</div>`);
+  scroll.appendChild(bot); scroll.scrollTop = scroll.scrollHeight;
+  if (!state.online) { bot.classList.remove("streaming"); bot.textContent = "Backend offline — não consegui analisar o arquivo."; return; }
+  try {
+    const fd = new FormData(); fd.append("file", file);
+    const res = await fetch(BACKEND + "upload", { method: "POST", body: fd });
+    const d = await res.json().catch(() => ({}));
+    bot.classList.remove("streaming");
+    const txt = (d.status === "ok") ? (d.message || "Análise concluída.") : ("Erro ao analisar: " + (d.message || res.status));
+    bot.textContent = txt;
+    hist.push({ role: "bot", text: txt });
+  } catch (e) {
+    bot.classList.remove("streaming");
+    bot.textContent = (e && e.name === "TypeError") ? "Servidor offline — não consegui enviar o arquivo." : ("Falhou: " + (e && e.message ? e.message : e));
   }
   scroll.scrollTop = scroll.scrollHeight;
 }

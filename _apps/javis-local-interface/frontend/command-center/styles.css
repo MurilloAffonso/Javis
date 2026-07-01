@@ -836,3 +836,7 @@ body { background:
 .cs-input { width:100%; background:var(--bg-2); border:1px solid var(--border-2); color:var(--text); padding:9px 11px; border-radius:8px; font-size:14px; letter-spacing:1px; text-align:center; }
 .cs-actions { display:flex; gap:10px; margin-top:14px; }
 .cs-fb { font-size:11.5px; color:var(--muted); margin-top:8px; min-height:0; }
+
+/* Upload no chat */
+.upload-btn { display:flex; align-items:center; justify-content:center; width:38px; min-width:38px; cursor:pointer; font-size:17px; border:1px solid var(--border); border-radius:10px; background:var(--bg-2); }
+.upload-btn:hover { border-color:var(--accent-2); }
