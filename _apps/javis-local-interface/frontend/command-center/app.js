@@ -1326,16 +1326,38 @@ async function vpClientes() {
 
 async function vpConteudos() {
   const host = $("vp-content"); if (!host) return;
+  host.innerHTML = "";
+  // Salvar conteúdo manual (escrita — confirmação forte). NÃO gera via LLM.
+  const form = h(`<div class="vp-form">
+    <div class="vp-form-h">➕ Salvar conteúdo <span class="card-sub">(texto manual; não gera via LLM — exige confirmação forte)</span></div>
+    <div class="vp-form-row"><input id="vpc-tipo" class="cs-input vp-in" placeholder="tipo (ex: legenda)" value="ideias" /></div>
+    <textarea id="vpc-texto" class="cv-task" placeholder="texto do conteúdo…"></textarea>
+    <div style="text-align:right;margin-top:8px"><button class="op-btn studio" id="vpc-add">➕ Salvar conteúdo</button></div>
+  </div>`);
+  host.appendChild(form);
+  form.querySelector("#vpc-add").onclick = () => {
+    const tipo = ($("vpc-tipo").value || "ideias").trim(), texto = ($("vpc-texto").value || "").trim();
+    if (!texto) { opToast("Escreva o texto do conteúdo.", "warn"); return; }
+    confirmStrong({ title: "Salvar conteúdo (Vem Passear · projeto conectado)", endpoint: "/vp/conteudos", method: "POST", target: tipo, before: "—", after: "salva conteúdo: " + texto.slice(0, 40), risk: "leve", phrase: "CONFIRMAR", onConfirm: () => vpCreateConteudo(tipo, texto) });
+  };
+  const listHost = h(`<div id="vp-cont-list"></div>`); host.appendChild(listHost);
   let conteudos = [];
   try { conteudos = (await tryJson(BACKEND + "vp/conteudos")).conteudos || []; }
-  catch (e) { host.innerHTML = `<div class="card-sub">Não consegui carregar os conteúdos.</div>`; return; }
-  if (!conteudos.length) { host.innerHTML = `<div class="op-empty">Nenhum conteúdo salvo.</div>`; return; }
-  host.innerHTML = "";
+  catch (e) { listHost.innerHTML = `<div class="card-sub">Não consegui carregar os conteúdos.</div>`; return; }
+  if (!conteudos.length) { listHost.innerHTML = `<div class="op-empty">Nenhum conteúdo salvo.</div>`; return; }
   conteudos.forEach((c) => {
     const card = h(`<div class="vp-item"><div class="vp-item-h"><span class="accent">${_esc(c.tipo || "conteúdo")}</span></div><div class="vp-item-body"></div></div>`);
     card.querySelector(".vp-item-body").textContent = (c.texto || "").slice(0, 400);
-    host.appendChild(card);
+    listHost.appendChild(card);
   });
+}
+
+async function vpCreateConteudo(tipo, texto) {
+  try {
+    const res = await opSend(BACKEND + "vp/conteudos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo, texto }) });
+    if (res.ok && res.data.status === "ok") { opToast("Conteúdo salvo.", "ok"); vpConteudos(); }
+    else opToast(res.data.message || ("Falha (" + res.status + ")"), "warn");
+  } catch (e) { opToast("Backend offline — não salvei.", "err"); }
 }
 
 async function vpPauta() {
