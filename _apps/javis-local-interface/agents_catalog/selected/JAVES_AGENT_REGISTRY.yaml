@@ -1,0 +1,48 @@
+# JAVES_AGENT_REGISTRY.yaml — PROPOSTA (não carregado em runtime)
+# Catálogo de especialistas do repo externo `agency-agents` conectados ao Javes
+# por REGISTRO (não instala os 232; só referencia os selecionados). Fronteira
+# clara: núcleo Javes ≠ projeto Vem Passear Jampa.
+version: 0
+status: proposta            # ainda não ativo; nenhum runtime alterado
+source_repo: agency-agents  # origem externa; agentes ficam como referência
+
+defaults:
+  can_execute: false        # nunca executa por padrão
+  requires_approval: true   # toda ESCRITA exige aprovação (confirmação forte)
+  install: false            # não instalar; só catalogar
+
+scopes:                     # separação de contexto (não misturar)
+  javes_core:  "núcleo do Javes: orquestração, código, arquitetura, voz"
+  vp_project:  "projeto conectado Vem Passear Jampa (Cérebro Jampa) — não é núcleo"
+  validation:  "checagem/revisão; não altera dados"
+
+agents:
+  - name: "Minimal Change Engineer"
+    scope: javes_core
+    role: "aplica a menor mudança segura; evita refactor amplo"
+    can_execute: false
+    requires_approval: true
+
+  - name: "Reality Checker"
+    scope: validation
+    role: "confere se o que foi dito realmente aconteceu (evidência > afirmação)"
+    can_execute: false
+    requires_approval: false   # só leitura/validação
+
+  - name: "Software Architect"
+    scope: javes_core
+    role: "desenho de estrutura e decisões arquiteturais"
+    can_execute: false
+    requires_approval: true
+
+  - name: "Voice AI Integration Engineer"
+    scope: javes_core
+    role: "integração de voz/STT/TTS (preserva wake-word técnico)"
+    can_execute: false
+    requires_approval: true
+
+  - name: "SEO Specialist"
+    scope: vp_project
+    role: "SEO da Vem Passear Jampa; projeto conectado, não núcleo"
+    can_execute: false
+    requires_approval: true
