@@ -794,3 +794,30 @@ body { background:
 .vp-tag.lead { background:rgba(245,158,11,.15); color:var(--warn); }
 .vp-tag.fechado { background:rgba(34,197,94,.15); color:var(--ok); }
 .vp-agent-nome { font-weight:600; }
+
+/* ============ Conclave · aviso de tempo ============ */
+.cv-notice {
+  background:rgba(245,158,11,.1); border:1px solid rgba(245,158,11,.4);
+  border-radius:var(--radius-sm); padding:9px 13px; font-size:12.5px; color:var(--warn);
+  margin-bottom:14px; max-width:680px;
+}
+
+/* ============ Central de Ações Seguras (governança) ============ */
+.ac-summary { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
+.ac-sum { flex:1; min-width:110px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px; text-align:center; border-top:3px solid var(--wait); }
+.ac-sum.ok { border-top-color:var(--ok); } .ac-sum.run { border-top-color:var(--run); }
+.ac-sum.warn { border-top-color:var(--warn); } .ac-sum.err { border-top-color:var(--err); }
+.ac-sum-n { font-size:22px; font-weight:700; color:var(--text); }
+.ac-sum-l { font-size:11px; color:var(--muted); margin-top:2px; }
+.ac-group-h { display:flex; justify-content:space-between; align-items:center; gap:10px; margin:22px 0 10px; font-size:13px; font-weight:700; color:var(--accent-2); text-transform:uppercase; letter-spacing:.5px; }
+.ac-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 14px; margin-bottom:10px; max-width:760px; }
+.ac-card-top { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.ac-name { font-size:13.5px; font-weight:600; color:var(--text); }
+.ac-ep { margin:6px 0; }
+.ac-ep code { font-size:11.5px; background:var(--bg-2); border:1px solid var(--border); border-radius:6px; padding:2px 8px; color:var(--accent-2); }
+.ac-flags { font-size:11.5px; color:var(--muted); }
+.ac-status { color:var(--wait); font-weight:600; }
+.ac-next { font-size:11.5px; color:var(--muted-2); margin-top:4px; }
+.ac-next-v { color:var(--muted); }
+.ac-actions { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+.op-btn[disabled] { opacity:.5; cursor:not-allowed; }
