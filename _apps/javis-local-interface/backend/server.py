@@ -158,9 +158,11 @@ class ChatRequest(BaseModel):
 
 @app.get("/")
 async def serve_index():
-    # Interface PRINCIPAL agora é a Central de Comando (nova). A antiga continua
-    # 100% acessível em /classic (nada foi removido). Se /central ainda não existir,
-    # cai na antiga para não quebrar.
+    # Interface PRINCIPAL agora é o Command Center (/command-center/). As antigas
+    # continuam 100% acessíveis (/classic, /central/, /painel, /vempassear) — nada
+    # foi removido. Fallbacks preservados para não quebrar se a pasta não existir.
+    if (FRONTEND_DIR / "command-center" / "index.html").exists():
+        return RedirectResponse(url="/command-center/")
     if (FRONTEND_DIR / "central" / "index.html").exists():
         return RedirectResponse(url="/central/")
     return HTMLResponse((FRONTEND_DIR / "index.html").read_text(encoding="utf-8"))
