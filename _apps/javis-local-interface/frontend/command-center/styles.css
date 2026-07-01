@@ -701,3 +701,12 @@ body { background:
 .op-toast-item.info { border-left:3px solid var(--accent-2); }
 
 @media (max-width:900px) { .op-board { grid-template-columns:repeat(2, 1fr); } }
+
+/* ============ Chat com streaming (SSE) ============ */
+.chat-msg { white-space:pre-wrap; word-break:break-word; }
+.chat-msg.bot.streaming { opacity:.96; }
+.stream-cursor {
+  display:inline-block; width:7px; color:var(--accent-2); font-weight:700;
+  animation:op-blink 1s steps(2, start) infinite;
+}
+@keyframes op-blink { to { opacity:0; } }

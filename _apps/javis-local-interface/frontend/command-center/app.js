@@ -383,6 +383,8 @@ function viewChat(body) {
   body.appendChild(det);
 }
 
+// Conversa com STREAMING (SSE) via /chat/stream — token a token, igual à
+// interface clássica. Mantém histórico, voz/tts, conclave e escape de texto.
 async function sendChat(a, explicitMsg, speak) {
   const ta = $("chat-text");
   const msg = ((explicitMsg != null ? explicitMsg : (ta ? ta.value : "")) || "").trim();
@@ -390,26 +392,72 @@ async function sendChat(a, explicitMsg, speak) {
   const hist = state.chats[a.id] = state.chats[a.id] || [];
   hist.push({ role: "user", text: msg });
   const scroll = $("chat-scroll");
-  scroll.appendChild(h(`<div class="chat-msg user">${msg}</div>`));
+  scroll.appendChild(h(`<div class="chat-msg user">${_esc(msg)}</div>`));
   if (ta && explicitMsg == null) ta.value = "";
-  const thinking = h(`<div class="chat-msg bot">…</div>`);
-  scroll.appendChild(thinking); scroll.scrollTop = scroll.scrollHeight;
+  const bot = h(`<div class="chat-msg bot streaming"><span class="stream-cursor">▋</span></div>`);
+  scroll.appendChild(bot); scroll.scrollTop = scroll.scrollHeight;
 
-  if (!state.online) { thinking.textContent = "Backend offline — suba o server.py para conversar de verdade, senhor."; hist.push({ role: "bot", text: thinking.textContent }); return; }
+  if (!state.online) {
+    bot.classList.remove("streaming");
+    bot.textContent = "Backend offline — suba o server.py para conversar de verdade, senhor.";
+    hist.push({ role: "bot", text: bot.textContent });
+    return;
+  }
+
+  let full = "", meta = {};
   try {
-    const out = await tryJson(BACKEND + "chat", {
+    const res = await fetch(BACKEND + "chat/stream", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: msg, model: "claude-3-5-sonnet" }),
+      body: JSON.stringify({ message: msg, use_conclave: !!state.useConclave, model: "claude" }),
     });
-    const resp = out.response || out.message || "Pronto, senhor.";
-    thinking.textContent = resp;
-    hist.push({ role: "bot", text: resp });
-    state.lastBrain = out.brain || state.lastBrain;
-    state.lastTools = (out.tools && out.tools.length) ? out.tools.join(", ") : (out.intent || state.lastTools);
-    if (speak) speakText(resp);
+    if (!res.ok || !res.body) {
+      const err = await res.json().catch(() => ({}));
+      bot.classList.remove("streaming");
+      bot.textContent = "Erro " + res.status + ": " + (err.error || res.statusText || "falha");
+      hist.push({ role: "bot", text: bot.textContent });
+      return;
+    }
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "", done = false;
+    while (!done) {
+      const { done: rd, value } = await reader.read();
+      if (rd) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;          // ignora padding/SSE comments
+        const raw = line.slice(6).trim();
+        if (raw === "[DONE]") { done = true; break; }
+        let ev; try { ev = JSON.parse(raw); } catch (_) { continue; }
+        if (ev.type === "token") {
+          full += ev.text;
+          bot.innerHTML = _esc(full) + '<span class="stream-cursor">▋</span>';
+          scroll.scrollTop = scroll.scrollHeight;
+        } else if (ev.type === "meta") {
+          meta = Object.assign(meta, ev);
+          if (ev.brain) state.lastBrain = ev.brain;
+        } else if (ev.type === "done") {
+          if (ev.text) full = ev.text;
+          if (ev.brain) state.lastBrain = ev.brain;
+          if (ev.intent) state.lastTools = ev.intent;
+          meta = Object.assign(meta, ev);
+        }
+      }
+    }
+    const finalText = full || "Sem resposta.";
+    bot.classList.remove("streaming");
+    bot.textContent = finalText;        // textContent = render seguro, sem cursor
+    hist.push({ role: "bot", text: finalText });
+    if (speak) speakText(finalText);
     try { state.telemetry = await tryJson(BACKEND + "ui/telemetry"); renderRightPanel(); } catch (_) {}
   } catch (e) {
-    thinking.textContent = "Falhou: " + e.message;
+    bot.classList.remove("streaming");
+    bot.textContent = (e && e.name === "TypeError")
+      ? "Servidor offline — não consegui conversar agora, senhor."
+      : ("Falhou: " + (e && e.message ? e.message : e));
+    hist.push({ role: "bot", text: bot.textContent });
   }
   scroll.scrollTop = scroll.scrollHeight;
 }
