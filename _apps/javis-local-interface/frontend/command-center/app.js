@@ -1245,6 +1245,7 @@ function viewAcoes(body) {
 // DELETE, nenhuma execução de agente, nenhum envio/publicação. Tudo escapado.
 let _vpTab = "resumo";
 const VP_TABS = [
+  { id: "atendimento", label: "Atendimento" },
   { id: "resumo",    label: "Resumo" },
   { id: "passeios",  label: "Passeios" },
   { id: "clientes",  label: "Clientes" },
@@ -1266,7 +1267,7 @@ function viewVempassear(body) {
   });
   body.appendChild(chips);
   body.appendChild(h(`<div id="vp-content" class="vp-content"><div class="card-sub">Carregando…</div></div>`));
-  ({ resumo: vpResumo, passeios: vpPasseios, clientes: vpClientes, conteudos: vpConteudos, pauta: vpPauta, agentes: vpAgentes }[_vpTab] || vpResumo)();
+  ({ atendimento: vpAtendimento, resumo: vpResumo, passeios: vpPasseios, clientes: vpClientes, conteudos: vpConteudos, pauta: vpPauta, agentes: vpAgentes }[_vpTab] || vpResumo)();
 }
 
 async function vpResumo() {
@@ -1466,6 +1467,182 @@ async function vpAgentes() {
     card.querySelector(".vp-item-meta").textContent = a.papel || "";
     host.appendChild(card);
   });
+}
+
+// ---------- Atendimento (VP · MVP1 — 3 colunas, visual/frontend-only) ----------
+// Dados sintéticos só pra visual. Nenhuma escrita real: nem em disco, nem em backend.
+// Resolve: briefing incompleto, lead perdido no WhatsApp, proposta confusa,
+// reserva sem controle, voucher manual. IA aparece só como copiloto discreto.
+const AT_FUNNEL = ["Lead novo", "Em atendimento", "Proposta enviada", "Aguardando reserva", "Reserva paga", "Voucher gerado", "Passeio realizado", "Pós-venda"];
+
+const AT_LEADS = [
+  {
+    id: "l1", cliente: "Marina Silva", status: "Em atendimento", passeio: "Escuna · Ilha Grande",
+    ultimaMsg: "Quanto fica pra 4 adultos e 2 crianças?", prioridade: "alta",
+    chat: [
+      { from: "cliente", texto: "Oi, vocês têm horário pra sábado?" },
+      { from: "agente", texto: "Temos sim! Saída às 9h ou 14h." },
+      { from: "cliente", texto: "Quanto fica pra 4 adultos e 2 crianças?" },
+    ],
+    sugestao: "Oi Marina! Pra 4 adultos e 2 crianças no passeio de Escuna sai R$ 720 (criança até 8 anos tem 50% off). Posso reservar às 9h de sábado?",
+    reserva: { passeio: "Escuna · Ilha Grande", pessoas: 4, criancas: 2, hotel: "Recanto do Sol · Centro", data: "2026-07-06", horario: "09:00", valorTotal: 720, sinal: 200, saldo: 520, pagamento: "Pix (parcial)", parceiro: "Escuna Vitória", obs: "Pediu confirmação por WhatsApp." },
+  },
+  {
+    id: "l2", cliente: "Rafael & Bia", status: "Lead novo", passeio: "Trilha Pico do Papagaio",
+    ultimaMsg: "Vi o story, ainda tem vaga pra sexta?", prioridade: "media",
+    chat: [{ from: "cliente", texto: "Vi o story, ainda tem vaga pra sexta?" }],
+    sugestao: "Oi! Temos vaga sim pra sexta. É pra quantas pessoas e vocês já têm experiência com trilha?",
+    reserva: { passeio: "Trilha Pico do Papagaio", pessoas: 2, criancas: 0, hotel: "—", data: "2026-07-04", horario: "07:00", valorTotal: 260, sinal: 0, saldo: 260, pagamento: "—", parceiro: "Guia Zé Trilheiro", obs: "Ainda sem briefing completo." },
+  },
+  {
+    id: "l3", cliente: "Fernanda Costa", status: "Proposta enviada", passeio: "Passeio de Lancha · Praias",
+    ultimaMsg: "Vou ver com meu marido e te aviso.", prioridade: "media",
+    chat: [
+      { from: "cliente", texto: "Manda a proposta pra 6 pessoas?" },
+      { from: "agente", texto: "Proposta enviada: R$ 1.380 pra 6 adultos, saída 10h." },
+      { from: "cliente", texto: "Vou ver com meu marido e te aviso." },
+    ],
+    sugestao: "Oi Fernanda, ficou alguma dúvida sobre a proposta? Posso segurar o horário das 10h até amanhã à noite.",
+    reserva: { passeio: "Lancha · Praias", pessoas: 6, criancas: 0, hotel: "Pousada Mar Azul", data: "2026-07-09", horario: "10:00", valorTotal: 1380, sinal: 0, saldo: 1380, pagamento: "—", parceiro: "Lancha Netuno", obs: "Aguardando decisão do casal." },
+  },
+  {
+    id: "l4", cliente: "Grupo Amigos RJ (8p)", status: "Aguardando reserva", passeio: "Bike + Praia",
+    ultimaMsg: "Fechado! Só falta o sinal.", prioridade: "alta",
+    chat: [
+      { from: "cliente", texto: "Fechado! Só falta o sinal." },
+      { from: "agente", texto: "Show! Te mando a chave Pix do sinal agora." },
+    ],
+    sugestao: "Perfeito! Segue a chave Pix pra sinal de R$ 150. Assim que cair eu confirmo a reserva e mando o voucher.",
+    reserva: { passeio: "Bike + Praia", pessoas: 8, criancas: 0, hotel: "Hostel Vista Mar", data: "2026-07-12", horario: "08:30", valorTotal: 960, sinal: 150, saldo: 810, pagamento: "Pix (sinal pendente)", parceiro: "Bike Tour Jampa", obs: "Cobrar sinal até quinta." },
+  },
+  {
+    id: "l5", cliente: "Casal Andrade", status: "Reserva paga", passeio: "City Tour Histórico",
+    ultimaMsg: "Pagamento feito, obrigada!", prioridade: "baixa",
+    chat: [{ from: "cliente", texto: "Pagamento feito, obrigada!" }, { from: "agente", texto: "Recebido! Já vou gerar o voucher de vocês." }],
+    sugestao: "Ótimo, pagamento confirmado! Posso gerar o voucher do City Tour pra amanhã às 9h?",
+    reserva: { passeio: "City Tour Histórico", pessoas: 2, criancas: 0, hotel: "Hotel Costa Verde", data: "2026-07-03", horario: "09:00", valorTotal: 340, sinal: 340, saldo: 0, pagamento: "Pago integral", parceiro: "Guia Local Centro", obs: "Pronto pra gerar voucher." },
+  },
+  {
+    id: "l6", cliente: "Beatriz Lima", status: "Voucher gerado", passeio: "Mergulho · Naufrágio",
+    ultimaMsg: "Chegou o voucher, obrigada 🙏", prioridade: "baixa",
+    chat: [{ from: "agente", texto: "Voucher enviado no seu e-mail e WhatsApp." }, { from: "cliente", texto: "Chegou o voucher, obrigada 🙏" }],
+    sugestao: "De nada! Qualquer dúvida antes do passeio de amanhã é só chamar por aqui.",
+    reserva: { passeio: "Mergulho · Naufrágio", pessoas: 1, criancas: 0, hotel: "Pousada do Mar", data: "2026-07-02", horario: "08:00", valorTotal: 280, sinal: 280, saldo: 0, pagamento: "Pago integral", parceiro: "Dive Jampa", obs: "Voucher #VP-0342 enviado." },
+  },
+];
+
+let _atLeadId = AT_LEADS[0].id;
+const atLead = (id) => AT_LEADS.find((l) => l.id === id) || AT_LEADS[0];
+const atPrioClass = { alta: "err", media: "warn", baixa: "ok" };
+const atFunnelIdx = (status) => { const i = AT_FUNNEL.indexOf(status); return i < 0 ? 0 : i; };
+
+function vpAtendimento() {
+  const host = $("vp-content"); if (!host) return;
+  host.classList.add("at-wide");
+  host.innerHTML = "";
+  host.appendChild(h(`<div class="card-sub" style="margin-bottom:12px">MVP1 · Atendimento — visual apenas, dados sintéticos. Escrita real desligada nesta fase.</div>`));
+
+  const wrap = h(`<div class="at-cols"></div>`);
+  wrap.appendChild(atColLeft());
+  wrap.appendChild(atColCenter());
+  wrap.appendChild(atColRight());
+  host.appendChild(wrap);
+}
+
+function atColLeft() {
+  const col = h(`<div class="at-col at-col-left"><div class="at-col-h">Leads / Conversas</div><div class="at-lead-list"></div></div>`);
+  const list = col.querySelector(".at-lead-list");
+  AT_LEADS.forEach((l) => {
+    const active = l.id === _atLeadId;
+    const it = h(`<div class="at-lead-item${active ? " active" : ""}">
+      <div class="at-lead-top"><span class="at-lead-nome"></span><span class="badge ${atPrioClass[l.prioridade] || "wait"}">●</span></div>
+      <div class="at-lead-status"></div>
+      <div class="at-lead-passeio"></div>
+      <div class="at-lead-msg"></div>
+    </div>`);
+    it.querySelector(".at-lead-nome").textContent = l.cliente;
+    it.querySelector(".at-lead-status").textContent = l.status;
+    it.querySelector(".at-lead-passeio").textContent = "🎯 " + l.passeio;
+    it.querySelector(".at-lead-msg").textContent = "💬 " + l.ultimaMsg;
+    it.onclick = () => { _atLeadId = l.id; vpAtendimento(); };
+    list.appendChild(it);
+  });
+  return col;
+}
+
+function atColCenter() {
+  const l = atLead(_atLeadId);
+  const col = h(`<div class="at-col at-col-center"></div>`);
+  const idx = atFunnelIdx(l.status);
+  const funnel = h(`<div class="at-funnel"></div>`);
+  AT_FUNNEL.forEach((step, i) => {
+    funnel.appendChild(h(`<span class="at-funnel-step${i === idx ? " current" : ""}${i < idx ? " done" : ""}">${_esc(step)}</span>`));
+  });
+  col.appendChild(funnel);
+
+  col.appendChild(h(`<div class="at-col-h">Conversa · ${_esc(l.cliente)}</div>`));
+  const chat = h(`<div class="at-chat"></div>`);
+  l.chat.forEach((m) => chat.appendChild(h(`<div class="at-msg ${m.from === "agente" ? "agente" : "cliente"}">${_esc(m.texto)}</div>`)));
+  col.appendChild(chat);
+
+  const ai = h(`<div class="at-ai-box">
+    <div class="at-ai-h">✨ Sugestão da IA</div>
+    <div class="at-ai-text"></div>
+    <div class="at-ai-actions">
+      <button class="op-btn ok at-copy-btn">📋 Copiar sugestão</button>
+      <button class="op-btn ghost" disabled title="em breve">✏️ Reescrever <span class="chip">em breve</span></button>
+    </div>
+  </div>`);
+  ai.querySelector(".at-ai-text").textContent = l.sugestao;
+  ai.querySelector(".at-copy-btn").onclick = async (e) => {
+    try { await navigator.clipboard.writeText(l.sugestao); opToast("Sugestão copiada.", "ok"); }
+    catch (_) { opToast("Não consegui copiar (permissão do navegador).", "warn"); }
+  };
+  col.appendChild(ai);
+  return col;
+}
+
+function atField(k, v) {
+  return `<div class="at-f"><span class="at-f-k">${_esc(k)}</span><span class="at-f-v">${_esc(String(v ?? "—"))}</span></div>`;
+}
+
+function atColRight() {
+  const l = atLead(_atLeadId);
+  const r = l.reserva;
+  const col = h(`<div class="at-col at-col-right"><div class="at-col-h">CRM rápido · Reserva</div></div>`);
+  const box = h(`<div class="at-crm"></div>`);
+  box.innerHTML = [
+    atField("Passeio", r.passeio), atField("Pessoas", r.pessoas), atField("Crianças", r.criancas),
+    atField("Hotel/Bairro", r.hotel), atField("Data", r.data), atField("Horário", r.horario),
+    atField("Valor total", vpBRL(r.valorTotal)), atField("Reserva/Sinal", vpBRL(r.sinal)), atField("Saldo", vpBRL(r.saldo)),
+    atField("Pagamento", r.pagamento), atField("Parceiro", r.parceiro), atField("Observações", r.obs),
+  ].join("");
+  col.appendChild(box);
+  const btn = h(`<button class="op-btn studio at-voucher-btn">🎫 Gerar reserva/voucher</button>`);
+  btn.onclick = () => atVoucherModal(l);
+  col.appendChild(btn);
+  return col;
+}
+
+// Modal de aviso — MVP1 não grava nada, é só a maquete da ação.
+function atVoucherModal(lead) {
+  const ov = h(`<div class="cs-overlay">
+    <div class="cs-modal">
+      <div class="cs-h">🎫 Gerar reserva/voucher</div>
+      <div class="banner">⚠️ Fase visual — sem gravação real. Nenhum dado é salvo, nenhum voucher é emitido nesta etapa.</div>
+      <div class="cs-grid">
+        <div><span class="cs-k">Cliente</span> <span></span></div>
+        <div><span class="cs-k">Passeio</span> <span></span></div>
+      </div>
+      <div class="cs-actions"><button class="op-btn ghost at-modal-close">Fechar</button></div>
+    </div>
+  </div>`);
+  const spans = ov.querySelectorAll(".cs-grid span:last-child");
+  spans[0].textContent = lead.cliente; spans[1].textContent = lead.passeio;
+  const close = () => ov.remove();
+  ov.querySelector(".at-modal-close").onclick = close;
+  ov.addEventListener("click", (e) => { if (e.target === ov) close(); });
+  document.body.appendChild(ov);
 }
 
 function viewTarefas(body) {

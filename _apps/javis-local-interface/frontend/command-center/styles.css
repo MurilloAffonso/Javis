@@ -846,3 +846,37 @@ body { background:
 .vp-form-h { font-size:13px; font-weight:600; color:var(--text); margin-bottom:9px; }
 .vp-form-row { display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
 .vp-in { flex:1; min-width:140px; text-align:left; letter-spacing:0; font-size:13px; }
+
+/* Atendimento (VP · MVP1) — 3 colunas */
+.vp-content.at-wide { max-width: none; }
+.at-cols { display:grid; grid-template-columns: 260px 1fr 300px; gap:14px; align-items:start; }
+.at-col { background:var(--card); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px; }
+.at-col-h { font-size:12.5px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; margin-bottom:10px; }
+.at-col-left { max-height:640px; overflow-y:auto; }
+.at-lead-list { display:flex; flex-direction:column; gap:8px; }
+.at-lead-item { border:1px solid var(--border); border-radius:8px; padding:9px 10px; cursor:pointer; }
+.at-lead-item:hover { border-color:var(--border-2); }
+.at-lead-item.active { border-color:var(--accent); background:var(--accent-soft); }
+.at-lead-top { display:flex; align-items:center; justify-content:space-between; font-size:13px; font-weight:600; color:var(--text); }
+.at-lead-status { font-size:11px; color:var(--accent-2); margin-top:2px; }
+.at-lead-passeio, .at-lead-msg { font-size:11.5px; color:var(--muted); margin-top:3px; }
+.at-col-center { display:flex; flex-direction:column; gap:10px; }
+.at-funnel { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:4px; }
+.at-funnel-step { font-size:10.5px; padding:3px 8px; border-radius:99px; border:1px solid var(--border); color:var(--muted); }
+.at-funnel-step.done { color:var(--ok); border-color:rgba(34,197,94,.3); }
+.at-funnel-step.current { color:#c7d2fe; border-color:var(--accent); background:var(--accent-soft); font-weight:600; }
+.at-chat { display:flex; flex-direction:column; gap:8px; max-height:260px; overflow-y:auto; padding:4px 2px; }
+.at-msg { max-width:80%; padding:8px 11px; border-radius:10px; font-size:12.5px; line-height:1.4; }
+.at-msg.cliente { align-self:flex-start; background:var(--bg-2); color:var(--text); }
+.at-msg.agente { align-self:flex-end; background:var(--accent-soft); color:#c7d2fe; }
+.at-ai-box { border:1px dashed var(--accent); border-radius:8px; padding:10px 12px; background:rgba(99,102,241,.06); }
+.at-ai-h { font-size:12px; font-weight:700; color:#c7d2fe; margin-bottom:6px; }
+.at-ai-text { font-size:12.5px; color:var(--text); line-height:1.5; margin-bottom:9px; }
+.at-ai-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.at-crm { display:flex; flex-direction:column; gap:0; margin-bottom:12px; }
+.at-f { display:flex; justify-content:space-between; gap:8px; padding:6px 0; border-bottom:1px solid var(--border); font-size:12px; }
+.at-f:last-child { border-bottom:none; }
+.at-f-k { color:var(--muted); }
+.at-f-v { color:var(--text); font-weight:500; text-align:right; }
+.at-voucher-btn { width:100%; }
+@media (max-width: 1100px) { .at-cols { grid-template-columns: 1fr; } }
