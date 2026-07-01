@@ -618,8 +618,52 @@ function opToast(msg, kind) {
   setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 250); }, 3200);
 }
 
+// Confirmação FORTE reutilizável para ações de escrita. Não executa nada por si:
+// só chama opts.onConfirm() depois que o usuário digita a frase exata e clica.
+// Todo texto dinâmico é escapado. Cancelar sempre disponível.
+function confirmStrong(opts) {
+  const phrase = opts.phrase || "CONFIRMAR";
+  const ov = h(`<div class="cs-overlay">
+    <div class="cs-modal">
+      <div class="cs-h">⚠️ Confirmação forte — esta ação altera dados</div>
+      <div class="cs-action"></div>
+      <div class="cs-grid">
+        <div><span class="cs-k">Endpoint</span> <code>${_esc((opts.method || "POST") + " " + (opts.endpoint || ""))}</code></div>
+        <div><span class="cs-k">Alvo</span> <span class="cs-target"></span></div>
+        <div><span class="cs-k">Status atual</span> <span class="cs-before"></span></div>
+        <div><span class="cs-k">Efeito</span> <span class="cs-after"></span></div>
+        <div><span class="cs-k">Risco</span> ${acRiskBadge(opts.risk || "op")}</div>
+      </div>
+      <div class="cs-phrase-lbl">Para liberar, digite exatamente <b>${_esc(phrase)}</b>:</div>
+      <input class="cs-input" placeholder="${_esc(phrase)}" autocomplete="off" />
+      <div class="cs-actions">
+        <button class="op-btn ok cs-go" disabled>Confirmar</button>
+        <button class="op-btn ghost cs-cancel">Cancelar</button>
+      </div>
+      <div class="cs-fb"></div>
+    </div>
+  </div>`);
+  ov.querySelector(".cs-action").textContent = opts.title || "Ação de escrita";
+  ov.querySelector(".cs-target").textContent = opts.target || "—";
+  ov.querySelector(".cs-before").textContent = opts.before || "—";
+  ov.querySelector(".cs-after").textContent = opts.after || "—";
+  const input = ov.querySelector(".cs-input");
+  const go = ov.querySelector(".cs-go");
+  const close = () => ov.remove();
+  input.addEventListener("input", () => { go.disabled = (input.value.trim() !== phrase); });
+  ov.querySelector(".cs-cancel").onclick = close;
+  ov.addEventListener("click", (e) => { if (e.target === ov) close(); });
+  go.onclick = async () => {
+    if (input.value.trim() !== phrase) return;
+    go.disabled = true; go.textContent = "Executando…";
+    try { await opts.onConfirm(); } catch (_) {} finally { close(); }
+  };
+  document.body.appendChild(ov);
+  setTimeout(() => input.focus(), 30);
+}
+
 function viewOperacao(body) {
-  body.appendChild(h(`<div class="card-sub" style="margin-bottom:14px">Quadro operacional + gates da campanha (modo seguro — nada é publicado). Aprovações exigem decisão humana explícita.</div>`));
+  body.appendChild(h(`<div class="card-sub" style="margin-bottom:14px">Quadro operacional + gates da campanha (modo seguro — nada é publicado). Aprovações exigem decisão humana explícita. <b>Ações de escrita agora exigem confirmação forte.</b></div>`));
   if (!state.online) {
     body.appendChild(h(`<div class="banner">⚠️ Backend offline — conecte o servidor em <code>:8000</code> para ver tarefas e aprovações.</div>`));
     return;
@@ -656,8 +700,16 @@ async function opLoadApprovals() {
       <div class="op-journey" data-open="0"></div>
       <div class="op-ap-fb"></div>
     </div>`);
-    card.querySelector('[data-act="approve"]').onclick = () => opDecide(a.id, "approved", card);
-    card.querySelector('[data-act="reject"]').onclick = () => opDecide(a.id, "rejected", card);
+    const askDecide = (decision) => confirmStrong({
+      title: (decision === "approved" ? "Aprovar" : "Rejeitar") + " gate — decisão humana",
+      endpoint: `/approvals/${a.id}/decide`, method: "POST",
+      target: a.subject || ("aprovação #" + a.id), before: "pendente",
+      after: decision === "approved" ? "aprovado (avança o workflow)" : "rejeitado (pede ajuste)",
+      risk: "alto", phrase: "CONFIRMAR",
+      onConfirm: () => opDecide(a.id, decision, card),
+    });
+    card.querySelector('[data-act="approve"]').onclick = () => askDecide("approved");
+    card.querySelector('[data-act="reject"]').onclick = () => askDecide("rejected");
     const jb = card.querySelector('[data-act="journey"]');
     if (jb) jb.onclick = () => opJourney(a.task_id, card.querySelector(".op-journey"));
     box.appendChild(card);
@@ -727,7 +779,10 @@ async function opRenderBoard() {
     colEl.addEventListener("dragleave", () => colEl.classList.remove("drag-over"));
     colEl.addEventListener("drop", (e) => {
       e.preventDefault(); colEl.classList.remove("drag-over");
-      if (_opDrag) { const ext = _opDrag; _opDrag = null; opMoveStatus(ext, col.setStatus); }
+      if (_opDrag) {
+        const ext = _opDrag; _opDrag = null;
+        confirmStrong({ title: "Mover status no Quadro", endpoint: `/tasks/${encodeURIComponent(ext)}/status`, method: "POST", target: ext, before: "(status atual)", after: col.setStatus, risk: "op", phrase: "CONFIRMAR", onConfirm: () => opMoveStatus(ext, col.setStatus) });
+      }
     });
     board.appendChild(colEl);
   });
@@ -751,12 +806,12 @@ function opCard(t) {
   if (t.has_digest) actions.appendChild(h(`<span class="opcard-digest" title="tem digest">📄</span>`));
   if (titleLow.startsWith("[design]") && liberada) {
     const b = h(`<button class="op-btn studio sm">🎨 Rodar Estúdio</button>`);
-    b.onclick = () => opRunStudio(ext);
+    b.onclick = () => confirmStrong({ title: "Rodar Estúdio (Gate 2)", endpoint: `/tasks/${ext}/run-studio`, method: "POST", target: t.title || ext, before: t.status || "—", after: "gera criativos + cria Gate 2 (modo seguro)", risk: "op", phrase: "CONFIRMAR", onConfirm: () => opRunStudio(ext) });
     actions.appendChild(b);
   }
   if (titleLow.startsWith("[distribuição] preparar") && liberada) {
     const b = h(`<button class="op-btn studio sm">📤 Preparar Distribuição</button>`);
-    b.onclick = () => opRunDistribution(ext);
+    b.onclick = () => confirmStrong({ title: "Preparar Distribuição (Gate 3)", endpoint: `/tasks/${ext}/prepare-distribution`, method: "POST", target: t.title || ext, before: t.status || "—", after: "gera pacote + cria Gate 3 (modo seguro)", risk: "op", phrase: "CONFIRMAR", onConfirm: () => opRunDistribution(ext) });
     actions.appendChild(b);
   }
   if (!encerrada) {
@@ -1058,7 +1113,7 @@ const AC_RISK = {
 };
 const AC_GROUPS = [
   { id: "chat",     titulo: "Núcleo Javes · Chat & Voz", view: "chat" },
-  { id: "operacao", titulo: "Operação · Kanban & Gates", view: "operacao" },
+  { id: "operacao", titulo: "Operação · Kanban & Gates", view: "operacao", note: "🧪 Piloto de escrita segura: as ações de escrita da Operação já passam por confirmação forte (digitar CONFIRMAR). Só devem rodar em task descartável. Ações reais seguem bloqueadas nesta central." },
   { id: "missoes",  titulo: "Missões",                   view: "missoes" },
   { id: "rotina",   titulo: "Rotina · Lembretes",        view: "rotina" },
   { id: "treino",   titulo: "Treino / Scout",            view: "treino" },
@@ -1133,6 +1188,7 @@ function viewAcoes(body) {
       head.appendChild(open);
     }
     body.appendChild(head);
+    if (grp.note) { const n = h(`<div class="ac-note"></div>`); n.textContent = grp.note; body.appendChild(n); }
     items.forEach((a) => {
       const card = h(`<div class="ac-card">
         <div class="ac-card-top"><span class="ac-name"></span>${acRiskBadge(a.risk)}</div>
