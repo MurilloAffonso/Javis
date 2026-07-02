@@ -196,6 +196,8 @@ function setView(v) {
   state.view = v; renderSidebar(); renderCanvas(); renderRightPanel();
 }
 function renderCanvas() {
+  // Operação da agência não expõe painel técnico (tokens/LLM/logs do Javes)
+  document.querySelector(".app")?.classList.toggle("vp-mode", state.view === "vempassear");
   const body = $("canvas-body"); body.innerHTML = "";
   if ((state.q || "").trim()) {
     $("canvas-title").textContent = `Busca: "${state.q}"`;

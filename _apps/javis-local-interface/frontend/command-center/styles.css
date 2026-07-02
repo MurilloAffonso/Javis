@@ -931,3 +931,7 @@ body { background:
 .voucher-block { margin-top:10px; font-size:12px; }
 .voucher-block b { color:var(--text); }
 .voucher-block p { color:var(--muted); margin-top:2px; line-height:1.5; }
+
+/* Área Vem Passear: operação da agência sem painel técnico do Javes */
+.app.vp-mode { grid-template-columns: 272px 1fr; }
+.app.vp-mode .rightpanel { display:none; }
