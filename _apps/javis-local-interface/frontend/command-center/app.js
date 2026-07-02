@@ -206,7 +206,7 @@ function renderCanvas() {
 }
 
 function viewTreino(body) {
-  body.appendChild(h(`<div class="card-sub" style="margin-bottom:16px">Pipeline: <b>_entrada</b> (vídeos/repos/PDFs, coletados ou manuais) → resumo no <b>NotebookLM</b> → <b>_resumos</b> entra na base RAG do Javis.</div>`));
+  body.appendChild(h(`<div class="card-sub" style="margin-bottom:16px">Pipeline: <b>_entrada</b> (vídeos/repos/PDFs, coletados ou manuais) → resumo no <b>NotebookLM</b> → <b>_resumos</b> entra na base RAG do Javes.</div>`));
   if (!state.training.length) { body.appendChild(h(`<div class="empty-state">Sem dados de treinamento (backend offline?).</div>`)); return; }
   const grid = h(`<div class="grid cols-2"></div>`);
   state.training.forEach((a) => {
@@ -1305,8 +1305,10 @@ async function vpResumo() {
       <div class="vp-stat"><div class="vp-stat-n">${vpBRL(resumo.faturamento ?? 0)}</div><div class="vp-stat-l">faturamento</div></div>
     </div>`;
 
-  // ---- Dashboard do dia (sintético, sem backend) ----
-  const leadsHoje = AT_LEADS.filter((l) => l.status === "Lead novo").length;
+  // ---- Dashboard do dia (sintético + leads reais em leitura quando online) ----
+  await vpSyncRealLeads();
+  if (_vpTab !== "resumo" || !$("vp-content")) return;
+  const leadsHoje = AT_LEADS.filter((l) => l.status === "Lead novo").length + _vpRealLeads.length;
   const reservasPendentes = AT_LEADS.filter((l) => ["Proposta enviada", "Aguardando reserva"].includes(l.status)).length;
   const vouchersPendentes = AT_LEADS.filter((l) => l.status === "Reserva paga").length;
   const passeiosHoje = AT_LEADS.filter((l) => l.reserva.data === VP_HOJE).length;
@@ -1611,16 +1613,42 @@ const AT_LEADS = [
   },
 ];
 
+// Leads REAIS (leitura via GET /vp/clientes, mesmo endpoint da aba legado).
+// Só leitura: nenhum botão escreve; telefone sempre mascarado na tela.
+let _vpRealLeads = [];
+async function vpSyncRealLeads() {
+  if (!state.online) { _vpRealLeads = []; return; }
+  try {
+    const d = await tryJson(BACKEND + "vp/clientes");
+    _vpRealLeads = (d.leads || []).map((c, i) => ({
+      id: "real-" + i, real: true,
+      cliente: c.nome || "(cliente)", telefone: c.contato || "",
+      status: "Lead novo", passeio: "—", prioridade: "media",
+      ultimaMsg: c.obs || "sem observação registrada",
+      proximaAcao: "Completar briefing (passeio, data, pessoas).",
+      chat: [],
+      sugestao: `Oi ${(c.nome || "").split(" ")[0] || ""}! Aqui é da Vem Passear Jampa 😊 Qual passeio você tem interesse e pra qual data?`.replace("  ", " "),
+      reserva: { passeio: "—", pessoas: "—", criancas: "—", hotel: "—", data: "—", horario: "—", valorTotal: 0, sinal: 0, saldo: 0, pagamento: "—", parceiro: "—", obs: c.obs || "—" },
+    }));
+  } catch (_) { _vpRealLeads = []; }
+}
+const atLeads = () => AT_LEADS.concat(_vpRealLeads);
+
 let _atLeadId = AT_LEADS[0].id;
-const atLead = (id) => AT_LEADS.find((l) => l.id === id) || AT_LEADS[0];
+const atLead = (id) => atLeads().find((l) => l.id === id) || AT_LEADS[0];
 const atPrioClass = { alta: "err", media: "warn", baixa: "ok" };
 const atFunnelIdx = (status) => { const i = AT_FUNNEL.indexOf(status); return i < 0 ? 0 : i; };
 
-function vpAtendimento() {
+async function vpAtendimento() {
   const host = $("vp-content"); if (!host) return;
   host.classList.add("at-wide");
   host.innerHTML = "";
-  host.appendChild(h(`<div class="card-sub" style="margin-bottom:12px">MVP1 · Atendimento — visual apenas, dados sintéticos. Escrita real desligada nesta fase.</div>`));
+  const note = state.online
+    ? "Atendimento — demo sintética + leads reais em leitura (marcados com 🔗). Escrita real desligada nesta fase."
+    : "Atendimento — visual, dados sintéticos. Escrita real desligada nesta fase.";
+  host.appendChild(h(`<div class="card-sub" style="margin-bottom:12px">${_esc(note)}</div>`));
+  await vpSyncRealLeads();
+  if (_vpTab !== "atendimento" || !$("vp-content")) return; // usuário trocou de aba durante o fetch
 
   const wrap = h(`<div class="at-cols"></div>`);
   wrap.appendChild(atColLeft());
@@ -1632,7 +1660,7 @@ function vpAtendimento() {
 function atColLeft() {
   const col = h(`<div class="at-col at-col-left"><div class="at-col-h">Leads / Conversas</div><div class="at-lead-list"></div></div>`);
   const list = col.querySelector(".at-lead-list");
-  AT_LEADS.forEach((l) => {
+  atLeads().forEach((l) => {
     const active = l.id === _atLeadId;
     const it = h(`<div class="at-lead-item${active ? " active" : ""}">
       <div class="at-lead-top"><span class="at-lead-nome"></span><span class="badge ${atPrioClass[l.prioridade] || "wait"}">●</span></div>
@@ -1640,8 +1668,8 @@ function atColLeft() {
       <div class="at-lead-passeio"></div>
       <div class="at-lead-msg"></div>
     </div>`);
-    it.querySelector(".at-lead-nome").textContent = l.cliente;
-    it.querySelector(".at-lead-status").textContent = l.status;
+    it.querySelector(".at-lead-nome").textContent = (l.real ? "🔗 " : "") + l.cliente;
+    it.querySelector(".at-lead-status").textContent = l.status + (l.real ? " · leitura real" : "");
     it.querySelector(".at-lead-passeio").textContent = "🎯 " + l.passeio;
     it.querySelector(".at-lead-msg").textContent = "💬 " + l.ultimaMsg;
     it.onclick = () => { _atLeadId = l.id; vpAtendimento(); };
@@ -1682,6 +1710,7 @@ function atColCenter() {
 
   col.appendChild(h(`<div class="at-col-h">Conversa · ${_esc(l.cliente)}</div>`));
   const chat = h(`<div class="at-chat"></div>`);
+  if (!l.chat.length) chat.appendChild(h(`<div class="op-empty">Sem histórico de conversa ainda.</div>`));
   l.chat.forEach((m) => chat.appendChild(h(`<div class="at-msg ${m.from === "agente" ? "agente" : "cliente"}">${_esc(m.texto)}</div>`)));
   col.appendChild(chat);
 
@@ -1782,20 +1811,23 @@ function vpVoucherModal(lead) {
 }
 
 // ---------- Funil de Vendas (Kanban visual — sem drag real) ----------
-function vpFunil() {
+async function vpFunil() {
   const host = $("vp-content"); if (!host) return;
   host.classList.add("at-wide");
-  host.innerHTML = `<div class="card-sub" style="margin-bottom:12px">Funil de vendas · visual, dados sintéticos. Sem drag-and-drop nesta fase.</div>`;
+  host.innerHTML = `<div class="card-sub" style="margin-bottom:12px">Funil de vendas · demo sintética${state.online ? " + leads reais em leitura (🔗)" : ""}. Sem drag-and-drop nesta fase.</div>`;
+  await vpSyncRealLeads();
+  if (_vpTab !== "funil" || !$("vp-content")) return;
+  const all = atLeads();
   const board = h(`<div class="fk-board"></div>`);
   const cols = AT_FUNNEL.concat(["Perdido"]);
   cols.forEach((col) => {
-    const leads = AT_LEADS.filter((l) => l.status === col);
+    const leads = all.filter((l) => l.status === col);
     const colEl = h(`<div class="fk-col"><div class="fk-col-h">${_esc(col)} <span class="ti-count">${leads.length}</span></div><div class="fk-cards"></div></div>`);
     const cardsBox = colEl.querySelector(".fk-cards");
     leads.forEach((l) => {
       const r = l.reserva;
       const card = h(`<div class="fk-card">
-        <div class="fk-card-nome">${_esc(l.cliente)}</div>
+        <div class="fk-card-nome">${l.real ? "🔗 " : ""}${_esc(l.cliente)}${l.real ? ` <span class="chip">leitura real</span>` : ""}</div>
         <div class="fk-card-meta">🎯 ${_esc(l.passeio)}</div>
         <div class="fk-card-meta">👥 ${_esc(String(r.pessoas))}p · 📅 ${_esc(r.data)} · 💰 ${vpBRL(r.valorTotal)}</div>
         <div class="fk-card-next">➡ ${_esc(l.proximaAcao || "—")}</div>
