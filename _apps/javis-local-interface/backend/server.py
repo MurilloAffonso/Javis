@@ -1178,6 +1178,31 @@ async def upload_file(file: UploadFile = File(...)):
             pass
 
 
+class WAAnalyzeRequest(BaseModel):
+    text: str
+    me:   str = ""
+
+
+@app.post("/wa/analyze")
+async def wa_analyze(req: WAAnalyzeRequest):
+    """Analisa um export de conversa do WhatsApp (local, via Claude assinatura)."""
+    import wa_analyzer
+    out = await run_in_threadpool(wa_analyzer.analyze, req.text, req.me)
+    return JSONResponse(out)
+
+
+class WASaveRequest(BaseModel):
+    content: str
+
+
+@app.post("/wa/save-voice")
+async def wa_save_voice(req: WASaveRequest):
+    """Salva o material destilado como grounding do squad (voz-murillo.md)."""
+    import wa_analyzer
+    path = wa_analyzer.save_voice_doc(req.content)
+    return JSONResponse({"status": "ok", "file": path})
+
+
 class TTSRequest(BaseModel):
     text: str
     voice: str = ""

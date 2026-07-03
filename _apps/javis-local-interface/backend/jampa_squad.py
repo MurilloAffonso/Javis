@@ -188,10 +188,16 @@ def responder_lead(nome_lead: str = "", contato: str = "", interesse: str = "",
     contexto = "\n".join(ctx_partes)
     tarefa = (
         "Escreva UMA mensagem de WhatsApp pronta para enviar a este lead que chegou "
-        "(provavelmente pelo anúncio das Piscinas Naturais). Seja caloroso e direto, "
-        "no tom da Vem Passear: cumprimente, confirme o interesse, dê o preço correto "
-        "do catálogo, use a urgência real da maré e termine pedindo data e número de "
-        "pessoas. Sem markdown, pronta pra colar."
+        "(provavelmente pelo anúncio das Piscinas Naturais). Siga esta lógica de "
+        "qualificação (discovery) — qualifique ANTES de despejar proposta:\n"
+        "1) Cumprimente pelo nome e confirme, em uma frase, o interesse que ele demonstrou.\n"
+        "2) Dê o preço correto do catálogo e use a urgência real da maré (se souber).\n"
+        "3) TERMINE com no máximo 2 perguntas naturais para preencher o que falta para "
+        "fechar: data desejada, número de pessoas (adultos/crianças) e local de busca/hotel. "
+        "Pergunte como quem quer ajudar a organizar o passeio, NUNCA como interrogatório.\n"
+        "Regra de ouro do discovery: se faltar dado essencial (data, pessoas, local), a "
+        "mensagem DEVE terminar puxando esse dado — não invente proposta detalhada no vácuo. "
+        "Tom caloroso e local da Vem Passear. Sem markdown, pronta pra colar."
     )
     msg = run("LNS", tarefa, contexto)
     num = "".join(c for c in (contato or "") if c.isdigit())

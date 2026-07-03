@@ -27,6 +27,41 @@ function viewTreino(body) {
     btn.disabled = false;
   };
 
+  // Analisar export de conversa do WhatsApp → estilo/vendas/leads perdidos + voz-murillo.md
+  body.appendChild(h(`<div class="section-h" style="margin-top:20px">📱 Analisar conversas do WhatsApp</div>`));
+  const wa = h(`<div class="demanda" style="max-width:760px">
+    <div class="card-sub" style="margin-bottom:8px">Exporte uma conversa no WhatsApp (⋮ → Mais → <b>Exportar conversa</b> → <b>Sem mídia</b>) e cole o texto aqui. O Javes analisa seu estilo, onde os leads travam/somem, e destila uma "voz do Murillo" que vira treino do squad. <b>Local — nada é enviado.</b></div>
+    <input id="wa-me" class="cs-input" style="width:100%;margin-bottom:8px" placeholder="seu nome como aparece no WhatsApp (opcional, ex: Murillo)" />
+    <textarea id="wa-text" placeholder="cole aqui o conteúdo do .txt exportado…" style="min-height:120px"></textarea>
+    <div style="text-align:right;margin-top:6px"><button class="btn ok" id="wa-run">📱 Analisar conversa</button></div>
+    <div class="wa-out" style="margin-top:10px"></div>
+  </div>`);
+  body.appendChild(wa);
+  wa.querySelector("#wa-run").onclick = async () => {
+    const text = (wa.querySelector("#wa-text").value || "").trim();
+    const me = (wa.querySelector("#wa-me").value || "").trim();
+    const out = wa.querySelector(".wa-out");
+    if (text.length < 40) { out.textContent = "Cole o texto da conversa exportada primeiro."; return; }
+    if (!state.online) { out.textContent = "Backend offline."; return; }
+    const btn = wa.querySelector("#wa-run"); btn.disabled = true;
+    out.innerHTML = `<div class="card-sub">Analisando (pode levar ~1 min — lendo a conversa inteira)…</div>`;
+    try {
+      const r = await tryJson(BACKEND + "wa/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, me }) });
+      out.innerHTML = "";
+      if (r.error && !r.analysis) { const b = h(`<div class="banner"></div>`); b.textContent = "⚠️ " + r.error; out.appendChild(b); btn.disabled = false; return; }
+      if (r.stats && r.stats.total) out.appendChild(h(`<div class="card-sub" style="margin-bottom:8px">${r.stats.total} mensagens · ${r.stats.periodo || "—"} · você: ${r.stats.minhas_msgs || 0} · pico ${r.stats.hora_pico != null ? r.stats.hora_pico + "h" : "—"}</div>`));
+      const box = h(`<div class="card" style="white-space:pre-wrap"></div>`); box.textContent = r.analysis || ""; out.appendChild(box);
+      const saveRow = h(`<div style="text-align:right;margin-top:8px"><button class="btn no" id="wa-save">💾 Salvar como treino (voz-murillo.md)</button> <span class="wa-save-fb card-sub"></span></div>`);
+      out.appendChild(saveRow);
+      saveRow.querySelector("#wa-save").onclick = async (e) => {
+        e.target.disabled = true;
+        try { const s = await tryJson(BACKEND + "wa/save-voice", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: r.analysis }) }); saveRow.querySelector(".wa-save-fb").textContent = "✓ salvo em " + (s.file || "voz-murillo.md"); }
+        catch (err) { saveRow.querySelector(".wa-save-fb").textContent = "falhou: " + err.message; e.target.disabled = false; }
+      };
+    } catch (e) { const d = h(`<div class="card-sub"></div>`); d.textContent = "Falhou: " + e.message; out.innerHTML = ""; out.appendChild(d); }
+    btn.disabled = false;
+  };
+
   body.appendChild(h(`<div class="section-h" style="margin-top:20px">🎓 Áreas de treino</div>`));
   if (!state.training.length) { body.appendChild(h(`<div class="empty-state">Sem dados de treinamento (backend offline?).</div>`)); return; }
   const grid = h(`<div class="grid cols-2"></div>`);
