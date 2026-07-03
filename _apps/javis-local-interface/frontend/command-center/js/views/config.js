@@ -37,6 +37,23 @@ function cfgPanel(panel) {
       grid.appendChild(h(`<div class="kpi"><div class="kpi-label">${k}</div><div class="kpi-value">${v}</div></div>`)));
     panel.appendChild(grid);
     panel.appendChild(h(`<div class="card-sub">Cada agente pode ter sua própria base de knowledge (skills, referências, contexto). As ${total} skills reais já estão indexadas em <code>_skills/</code>.</div>`));
+    // Memória persistente do Javes (decisões/aprendizados do Conclave) — GET /memory
+    panel.appendChild(h(`<div class="section-h" style="margin-top:18px">🧠 Memória do Javes (decisões & aprendizados)</div>`));
+    const mrow = h(`<div class="demanda" style="max-width:640px">
+      <input id="mem-q" class="cs-input" style="width:100%;margin-bottom:8px" placeholder="buscar na memória… (vazio = decisões recentes)" />
+      <div style="text-align:right"><button class="btn ok" id="mem-go">🔎 Buscar</button></div>
+      <div class="mem-out card-sub" style="margin-top:8px;white-space:pre-wrap"></div>
+    </div>`);
+    panel.appendChild(mrow);
+    const runMem = async () => {
+      const q = (mrow.querySelector("#mem-q").value || "").trim();
+      const out = mrow.querySelector(".mem-out"); out.textContent = "buscando…";
+      try { const d = await tryJson(BACKEND + "memory" + (q ? "?q=" + encodeURIComponent(q) : "")); out.textContent = (d.results || "").trim() || "Nada na memória ainda."; }
+      catch (e) { out.textContent = "Não consegui buscar na memória (backend offline?)."; }
+    };
+    mrow.querySelector("#mem-go").onclick = runMem;
+    mrow.querySelector("#mem-q").addEventListener("keydown", (e) => { if (e.key === "Enter") runMem(); });
+    runMem();
   } else if (state.cfgTab === "scripts") {
     panel.appendChild(h(`<div class="section-h">Scripts do backend (${state.scripts.length})</div>`));
     const grid = h(`<div class="grid cols-2"></div>`);
@@ -80,6 +97,17 @@ function cfgPanel(panel) {
   } else if (state.cfgTab === "apikeys") {
     panel.appendChild(h(`<div class="section-h">API Keys</div>`));
     (tele().status).forEach((s) => panel.appendChild(h(`<div class="status-row"><span class="sr-label">${s.label}</span><span class="sr-val badge ${s.cls}"><span class="dot ${s.cls}"></span>${s.val}</span></div>`)));
+  } else if (state.cfgTab === "perfil") {
+    panel.appendChild(h(`<div class="section-h">Perfil — o que o Javes sabe sobre você</div>`));
+    const box = h(`<div id="cfg-perfil"><div class="card-sub">Carregando fatos…</div></div>`);
+    panel.appendChild(box);
+    tryJson(BACKEND + "profile").then((d) => {
+      if (state.cfgTab !== "perfil") return;
+      const facts = d.facts || [];
+      if (!facts.length) { box.innerHTML = `<div class="op-empty">Nenhum fato registrado ainda. O Javes aprende sobre você conversando.</div>`; return; }
+      box.innerHTML = "";
+      facts.forEach((f) => { const row = h(`<div class="status-row"><span class="sr-label"></span></div>`); row.querySelector(".sr-label").textContent = "• " + f; box.appendChild(row); });
+    }).catch(() => { box.innerHTML = `<div class="card-sub">Não consegui carregar o perfil (backend offline?).</div>`; });
   } else if (state.cfgTab === "sobre") {
     panel.appendChild(h(`<div class="card"><div class="card-title">Javes Core Platform</div><div class="card-desc">v1.0.0 · Backend Python (FastAPI) + Chainlit + Command Center. Inspirado na lógica AIOS, sem copiar identidade.</div></div>`));
   } else {

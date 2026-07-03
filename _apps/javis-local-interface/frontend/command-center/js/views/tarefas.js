@@ -79,6 +79,29 @@ function viewTarefas(body) {
       out.innerHTML = `<div class="card-desc" style="white-space:pre-wrap">${(r.result || r.message || JSON.stringify(r)).slice(0, 1500)}</div>`;
     } catch (e) { out.querySelector(".card-sub").textContent = "Falhou: " + e.message; }
   };
+
+  // Causa raiz — diagnostica uma resposta ruim e registra a lição (POST /rootcause).
+  body.appendChild(h(`<div class="section-h">🔍 Causa raiz (diagnóstico)</div>`));
+  const rc = h(`<div class="demanda" style="max-width:640px">
+    <div class="card-sub" style="margin-bottom:8px">Cole a tarefa e a resposta ruim que o Javes deu. Ele diagnostica por que falhou e registra o aprendizado pra não repetir.</div>
+    <input id="rc-task" class="cs-input" style="width:100%;margin-bottom:8px" placeholder="qual era a tarefa/pergunta" />
+    <textarea id="rc-bad" placeholder="a resposta ruim que veio…"></textarea>
+    <div style="text-align:right"><button class="btn ok" id="rc-run">🔍 Diagnosticar</button></div>
+    <div class="rc-out card-sub" style="margin-top:8px;white-space:pre-wrap"></div>
+  </div>`);
+  body.appendChild(rc);
+  rc.querySelector("#rc-run").onclick = async () => {
+    const task = ($("rc-task").value || "").trim(), bad = ($("rc-bad").value || "").trim();
+    const out = rc.querySelector(".rc-out");
+    if (!task || !bad) { out.textContent = "Preencha a tarefa e a resposta ruim."; return; }
+    if (!state.online) { out.textContent = "Backend offline."; return; }
+    const btn = rc.querySelector("#rc-run"); btn.disabled = true; out.textContent = "Diagnosticando (pode levar um pouco)…";
+    try {
+      const r = await tryJson(BACKEND + "rootcause", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ task, failed_response: bad }) });
+      out.textContent = (r.diagnosis || JSON.stringify(r)) + (r.learned ? "\n\n✓ lição registrada." : "");
+    } catch (e) { out.textContent = "Falhou: " + e.message; }
+    btn.disabled = false;
+  };
 }
 
 export { viewTarefas };
