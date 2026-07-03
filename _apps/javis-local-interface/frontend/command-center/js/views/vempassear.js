@@ -1,6 +1,6 @@
 // Vem Passear — view do projeto conectado. Extraído de app.js em 2026-07-02.
 // MESMO comportamento; agora é um módulo ES que importa os helpers do núcleo.
-import { _esc, h, $, state, BACKEND, tryJson, renderCanvas, opToast, opSend, confirmStrong } from "../../app.js";
+import { _esc, h, $, state, BACKEND, tryJson, renderCanvas, opToast } from "../../app.js";
 
 // Fronteira: projeto EXTERNO do Cérebro Jampa, consultado pelo Javes por registro.
 // NÃO mistura contexto com o núcleo. 100% leitura nesta fase: nenhum POST/PATCH/
@@ -17,26 +17,23 @@ const VP_TABS = [
   { id: "marketing",   label: "Marketing" },
   { id: "resultados",  label: "Resultados" },
   { id: "gates",       label: "Gates" },
-  { id: "passeios",  label: "Passeios · legado" },
-  { id: "clientes",  label: "Clientes · legado" },
-  { id: "conteudos", label: "Conteúdos · legado" },
-  { id: "pauta",     label: "Pauta · legado" },
-  { id: "agentes",   label: "Agentes" },
+  { id: "agentes",     label: "Agentes" },
 ];
+// Abas "· legado" (Passeios/Clientes/Conteúdos/Pauta) removidas em 2026-07-03 —
+// minimalismo. Forms de escrita correspondentes: ver _arquitetura/catalogo-acoes-risco.md.
 const vpBRL = (v) => { const n = Number(v); return isNaN(n) ? _esc(String(v ?? "—")) : "R$ " + n.toFixed(2).replace(".", ","); };
 const vpMask = (s) => { const t = String(s || "").trim(); if (!t) return ""; if (t.length <= 4) return "••"; return t.slice(0, 2) + "•••" + t.slice(-2); };
 
 const VP_DISPATCH = {
   resumo: vpResumo, atendimento: vpAtendimento, funil: vpFunil, reservas: vpReservas,
   voucher: vpVoucherTab, agenda: vpAgenda, posvenda: vpPosVenda, marketing: vpMarketing,
-  resultados: vpResultados, gates: vpGates,
-  passeios: vpPasseios, clientes: vpClientes, conteudos: vpConteudos, pauta: vpPauta, agentes: vpAgentes,
+  resultados: vpResultados, gates: vpGates, agentes: vpAgentes,
 };
-const VP_ONLINE_ONLY = new Set(["passeios", "clientes", "conteudos", "pauta", "agentes"]);
+const VP_ONLINE_ONLY = new Set(["agentes"]);
 
 function viewVempassear(body) {
   body.appendChild(h(`<div class="vp-boundary">🔗 <b>Projeto conectado via Cérebro Jampa.</b> O Javes consulta e organiza este projeto <b>por registro</b>, sem misturar contexto automaticamente com o núcleo. Contexto externo · somente leitura nesta fase.</div>`));
-  if (!state.online) body.appendChild(h(`<div class="banner">⚠️ Backend offline — as telas operacionais (Resumo, Atendimento, Funil, Reservas, Voucher, Agenda, Pós-venda, Marketing, Resultados, Gates) seguem com dados sintéticos. Passeios/Clientes/Conteúdos/Pauta/Agentes (legado) precisam do servidor em <code>:8000</code>.</div>`));
+  if (!state.online) body.appendChild(h(`<div class="banner">⚠️ Backend offline — as telas operacionais seguem com dados sintéticos. A aba Agentes precisa do servidor em <code>:8000</code>.</div>`));
   const chips = h(`<div class="vp-chips"></div>`);
   VP_TABS.forEach((t) => {
     const c = h(`<button class="vp-chip${t.id === _vpTab ? " active" : ""}">${_esc(t.label)}</button>`);
@@ -45,7 +42,7 @@ function viewVempassear(body) {
   });
   body.appendChild(chips);
   body.appendChild(h(`<div id="vp-content" class="vp-content"><div class="card-sub">Carregando…</div></div>`));
-  if (VP_ONLINE_ONLY.has(_vpTab) && !state.online) { $("vp-content").innerHTML = `<div class="banner">⚠️ Esta aba (legado) precisa do backend em <code>:8000</code>.</div>`; return; }
+  if (VP_ONLINE_ONLY.has(_vpTab) && !state.online) { $("vp-content").innerHTML = `<div class="banner">⚠️ Esta aba precisa do backend em <code>:8000</code>.</div>`; return; }
   (VP_DISPATCH[_vpTab] || vpResumo)();
 }
 
@@ -104,169 +101,6 @@ async function vpResumo() {
   bReservas.onclick = () => { _vpTab = "reservas"; renderCanvas(); };
   btns.append(bNovo, bAgenda, bReservas);
   host.appendChild(btns);
-}
-
-async function vpPasseios() {
-  const host = $("vp-content"); if (!host) return;
-  host.innerHTML = "";
-  const form = h(`<div class="vp-form">
-    <div class="vp-form-h">➕ Cadastrar passeio <span class="card-sub">(escrita no projeto conectado — exige confirmação forte)</span></div>
-    <div class="vp-form-row">
-      <input id="vps-tipo" class="cs-input vp-in" placeholder="tipo/nome do passeio" />
-      <input id="vps-data" class="cs-input vp-in" placeholder="data (ex: 2026-07-10)" />
-    </div>
-    <div class="vp-form-row">
-      <input id="vps-pessoas" class="cs-input vp-in" type="number" min="1" placeholder="pessoas" value="1" />
-      <input id="vps-valor" class="cs-input vp-in" type="number" min="0" step="0.01" placeholder="valor/p" value="0" />
-    </div>
-    <div style="text-align:right;margin-top:8px"><button class="op-btn studio" id="vps-add">➕ Cadastrar passeio</button></div>
-  </div>`);
-  host.appendChild(form);
-  form.querySelector("#vps-add").onclick = () => {
-    const tipo = ($("vps-tipo").value || "").trim(), data = ($("vps-data").value || "").trim();
-    const pessoas = parseInt($("vps-pessoas").value || "1", 10) || 1, valor = parseFloat($("vps-valor").value || "0") || 0;
-    if (!tipo) { opToast("Informe o tipo do passeio.", "warn"); return; }
-    confirmStrong({ title: "Cadastrar passeio (Vem Passear · projeto conectado)", endpoint: "/vp/passeios", method: "POST", target: tipo, before: "—", after: `${data || "s/data"} · ${pessoas}p · ${vpBRL(valor)}`, risk: "leve", phrase: "CONFIRMAR", onConfirm: () => vpCreatePasseio(tipo, data, pessoas, valor) });
-  };
-  const listHost = h(`<div id="vp-pas-list"></div>`); host.appendChild(listHost);
-  let passeios = [];
-  try { passeios = (await tryJson(BACKEND + "vp/passeios")).passeios || []; }
-  catch (e) { listHost.innerHTML = `<div class="card-sub">Não consegui carregar os passeios.</div>`; return; }
-  if (!passeios.length) { listHost.innerHTML = `<div class="op-empty">Nenhum passeio cadastrado.</div>`; return; }
-  passeios.forEach((p) => {
-    const card = h(`<div class="vp-item"><div class="vp-item-h"></div><div class="vp-item-meta"><span class="accent">${_esc(p.data || "s/ data")}</span> · ${_esc(String(p.pessoas ?? "?"))} pessoa(s) · ${vpBRL(p.valor)}/p</div></div>`);
-    card.querySelector(".vp-item-h").textContent = p.tipo || "(passeio)";
-    listHost.appendChild(card);
-  });
-}
-
-async function vpCreatePasseio(tipo, data, pessoas, valor) {
-  try {
-    const res = await opSend(BACKEND + "vp/passeios", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo, data, pessoas, valor }) });
-    if (res.ok && res.data.status === "ok") { opToast("Passeio cadastrado.", "ok"); vpPasseios(); }
-    else opToast(res.data.message || ("Falha (" + res.status + ")"), "warn");
-  } catch (e) { opToast("Backend offline — não cadastrei.", "err"); }
-}
-
-async function vpClientes() {
-  const host = $("vp-content"); if (!host) return;
-  host.innerHTML = "";
-  const form = h(`<div class="vp-form">
-    <div class="vp-form-h">➕ Cadastrar cliente/lead <span class="card-sub">(dado sensível — exige confirmação forte)</span></div>
-    <div class="vp-form-row">
-      <input id="vpcl-nome" class="cs-input vp-in" placeholder="nome" />
-      <input id="vpcl-contato" class="cs-input vp-in" placeholder="contato (use teste)" />
-    </div>
-    <textarea id="vpcl-obs" class="cv-task" placeholder="observação (opcional)…"></textarea>
-    <div style="text-align:right;margin-top:8px"><button class="op-btn studio" id="vpcl-add">➕ Cadastrar cliente</button></div>
-  </div>`);
-  host.appendChild(form);
-  form.querySelector("#vpcl-add").onclick = () => {
-    const nome = ($("vpcl-nome").value || "").trim(), contato = ($("vpcl-contato").value || "").trim(), obs = ($("vpcl-obs").value || "").trim();
-    if (!nome) { opToast("Informe o nome.", "warn"); return; }
-    confirmStrong({ title: "Cadastrar cliente (Vem Passear · projeto conectado)", endpoint: "/vp/clientes", method: "POST", target: nome, before: "—", after: "cria lead" + (contato ? " · " + vpMask(contato) : ""), risk: "leve", phrase: "CONFIRMAR", onConfirm: () => vpCreateCliente(nome, contato, obs) });
-  };
-  const listHost = h(`<div id="vp-cli-list"></div>`); host.appendChild(listHost);
-  let d = {};
-  try { d = await tryJson(BACKEND + "vp/clientes"); }
-  catch (e) { listHost.innerHTML = `<div class="card-sub">Não consegui carregar os clientes.</div>`; return; }
-  const leads = d.leads || [], fechados = d.fechados || [];
-  if (!leads.length && !fechados.length) { listHost.innerHTML = `<div class="op-empty">Nenhum cliente/lead ainda.</div>`; return; }
-  const block = (titulo, arr, tagClass) => {
-    listHost.appendChild(h(`<div class="section-h">${_esc(titulo)} (${arr.length})</div>`));
-    if (!arr.length) { listHost.appendChild(h(`<div class="op-empty">—</div>`)); return; }
-    arr.forEach((c) => {
-      const row = h(`<div class="vp-item"><div class="vp-item-h"><span class="vp-tag ${tagClass}"></span></div><div class="vp-item-meta">${_esc(vpMask(c.contato))}${c.obs ? " · " + _esc(c.obs) : ""}</div></div>`);
-      row.querySelector(".vp-tag").textContent = c.nome || "(cliente)";
-      listHost.appendChild(row);
-    });
-  };
-  block("Leads abertos", leads, "lead");
-  block("Fechados", fechados, "fechado");
-}
-
-async function vpCreateCliente(nome, contato, obs) {
-  try {
-    const res = await opSend(BACKEND + "vp/clientes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome, contato, obs }) });
-    if (res.ok && res.data.status === "ok") { opToast("Cliente cadastrado.", "ok"); vpClientes(); }
-    else opToast(res.data.message || ("Falha (" + res.status + ")"), "warn");
-  } catch (e) { opToast("Backend offline — não cadastrei.", "err"); }
-}
-
-async function vpConteudos() {
-  const host = $("vp-content"); if (!host) return;
-  host.innerHTML = "";
-  // Salvar conteúdo manual (escrita — confirmação forte). NÃO gera via LLM.
-  const form = h(`<div class="vp-form">
-    <div class="vp-form-h">➕ Salvar conteúdo <span class="card-sub">(texto manual; não gera via LLM — exige confirmação forte)</span></div>
-    <div class="vp-form-row"><input id="vpc-tipo" class="cs-input vp-in" placeholder="tipo (ex: legenda)" value="ideias" /></div>
-    <textarea id="vpc-texto" class="cv-task" placeholder="texto do conteúdo…"></textarea>
-    <div style="text-align:right;margin-top:8px"><button class="op-btn studio" id="vpc-add">➕ Salvar conteúdo</button></div>
-  </div>`);
-  host.appendChild(form);
-  form.querySelector("#vpc-add").onclick = () => {
-    const tipo = ($("vpc-tipo").value || "ideias").trim(), texto = ($("vpc-texto").value || "").trim();
-    if (!texto) { opToast("Escreva o texto do conteúdo.", "warn"); return; }
-    confirmStrong({ title: "Salvar conteúdo (Vem Passear · projeto conectado)", endpoint: "/vp/conteudos", method: "POST", target: tipo, before: "—", after: "salva conteúdo: " + texto.slice(0, 40), risk: "leve", phrase: "CONFIRMAR", onConfirm: () => vpCreateConteudo(tipo, texto) });
-  };
-  const listHost = h(`<div id="vp-cont-list"></div>`); host.appendChild(listHost);
-  let conteudos = [];
-  try { conteudos = (await tryJson(BACKEND + "vp/conteudos")).conteudos || []; }
-  catch (e) { listHost.innerHTML = `<div class="card-sub">Não consegui carregar os conteúdos.</div>`; return; }
-  if (!conteudos.length) { listHost.innerHTML = `<div class="op-empty">Nenhum conteúdo salvo.</div>`; return; }
-  conteudos.forEach((c) => {
-    const card = h(`<div class="vp-item"><div class="vp-item-h"><span class="accent">${_esc(c.tipo || "conteúdo")}</span></div><div class="vp-item-body"></div></div>`);
-    card.querySelector(".vp-item-body").textContent = (c.texto || "").slice(0, 400);
-    listHost.appendChild(card);
-  });
-}
-
-async function vpCreateConteudo(tipo, texto) {
-  try {
-    const res = await opSend(BACKEND + "vp/conteudos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo, texto }) });
-    if (res.ok && res.data.status === "ok") { opToast("Conteúdo salvo.", "ok"); vpConteudos(); }
-    else opToast(res.data.message || ("Falha (" + res.status + ")"), "warn");
-  } catch (e) { opToast("Backend offline — não salvei.", "err"); }
-}
-
-async function vpPauta() {
-  const host = $("vp-content"); if (!host) return;
-  host.innerHTML = "";
-  // Form de criação (escrita — protegida por confirmação forte). Projeto conectado.
-  const form = h(`<div class="vp-form">
-    <div class="vp-form-h">➕ Nova pauta <span class="card-sub">(escrita no projeto conectado — exige confirmação forte)</span></div>
-    <div class="vp-form-row">
-      <input id="vpp-data" class="cs-input vp-in" placeholder="data (ex: 2026-07-05)" />
-      <input id="vpp-canal" class="cs-input vp-in" placeholder="canal (ex: Instagram)" value="Instagram" />
-    </div>
-    <textarea id="vpp-ideia" class="cv-task" placeholder="ideia do post…"></textarea>
-    <div style="text-align:right;margin-top:8px"><button class="op-btn studio" id="vpp-add">➕ Criar pauta</button></div>
-  </div>`);
-  host.appendChild(form);
-  form.querySelector("#vpp-add").onclick = () => {
-    const data = ($("vpp-data").value || "").trim(), canal = ($("vpp-canal").value || "Instagram").trim(), ideia = ($("vpp-ideia").value || "").trim();
-    if (!ideia) { opToast("Escreva a ideia da pauta.", "warn"); return; }
-    confirmStrong({ title: "Criar pauta (Vem Passear · projeto conectado)", endpoint: "/vp/pauta", method: "POST", target: (data || "s/data") + " · " + canal, before: "—", after: "cria nova pauta: " + ideia.slice(0, 40), risk: "leve", phrase: "CONFIRMAR", onConfirm: () => vpCreatePauta(data, canal, ideia) });
-  };
-  const listHost = h(`<div id="vp-pauta-list"></div>`); host.appendChild(listHost);
-  let pauta = [];
-  try { pauta = (await tryJson(BACKEND + "vp/pauta")).pauta || []; }
-  catch (e) { listHost.innerHTML = `<div class="card-sub">Não consegui carregar a pauta.</div>`; return; }
-  if (!pauta.length) { listHost.innerHTML = `<div class="op-empty">Nenhuma pauta planejada.</div>`; return; }
-  pauta.forEach((p) => {
-    const pub = p.status === "publicado";
-    const card = h(`<div class="vp-item"><div class="vp-item-h"><span class="vp-tag ${pub ? "fechado" : "lead"}">${_esc(p.data || "")}</span> · ${_esc(p.canal || "")} <span class="opcard-st">${_esc(p.status || "")}</span></div><div class="vp-item-body"></div></div>`);
-    card.querySelector(".vp-item-body").textContent = p.ideia || "";
-    listHost.appendChild(card);
-  });
-}
-
-async function vpCreatePauta(data, canal, ideia) {
-  try {
-    const res = await opSend(BACKEND + "vp/pauta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data, canal, ideia }) });
-    if (res.ok && (res.data.status === "ok")) { opToast("Pauta criada.", "ok"); vpPauta(); }
-    else opToast(res.data.message || ("Falha (" + res.status + ")"), "warn");
-  } catch (e) { opToast("Backend offline — não criei a pauta.", "err"); }
 }
 
 async function vpAgentes() {

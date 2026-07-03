@@ -7,17 +7,15 @@ import { viewVempassear } from "./js/views/vempassear.js";
 import { viewOperacao } from "./js/views/operacao.js";
 import { viewChat } from "./js/views/chat.js";
 import { viewTreino } from "./js/views/treino.js";
-import { viewWorld } from "./js/views/world.js";
 import { viewConclave } from "./js/views/conclave.js";
 import { viewMissoes } from "./js/views/missoes.js";
 import { viewRotina } from "./js/views/rotina.js";
-import { viewAcoes } from "./js/views/acoes.js";
 import { viewTarefas } from "./js/views/tarefas.js";
 import { viewPainel } from "./js/views/painel.js";
 import { viewConfig } from "./js/views/config.js";
 import { viewExec } from "./js/views/exec.js";
 // Helpers do núcleo que as telas-módulo consomem (live bindings):
-export { _esc, h, $, state, BACKEND, tryJson, renderCanvas, setView, opToast, opSend, opEsc, confirmStrong, activeAgent, pct, sc, projName, tele };
+export { _esc, h, $, state, BACKEND, tryJson, renderCanvas, renderRightPanel, setView, opToast, opSend, opEsc, confirmStrong, activeAgent, pct, sc, projName, tele };
 
 const DATA_BASE = "../../data/";
 const BACKEND = (location.port === "8000") ? "/" : "http://localhost:8000/";
@@ -44,13 +42,11 @@ const NAV = [
   { id: "conclave",label: "Conclave", icon: ICONS.conclave },
   { id: "missoes", label: "Missões", icon: ICONS.missoes },
   { id: "exec",    label: "Execução", icon: ICONS.exec },
-  { id: "world",   label: "World",   icon: ICONS.world },
   { id: "tarefas", label: "Tarefas", icon: ICONS.tasks },
   { id: "painel",  label: "Painel",  icon: ICONS.panel },
   { id: "treino",  label: "Treino",  icon: ICONS.train },
   { id: "rotina",  label: "Rotina",  icon: ICONS.rotina },
   { id: "vempassear", label: "Vem Passear", icon: ICONS.vp },
-  { id: "acoes",   label: "Ações",   icon: ICONS.acoes },
   { id: "config",  label: "Config",  icon: ICONS.config },
 ];
 
@@ -168,7 +164,7 @@ function fillAgentGroup(boxId, list) {
 }
 
 // ---------- Tabs / view ----------
-const TITLES = { chat: "Chat", operacao: "Operação · Quadro & Aprovações", conclave: "Conclave · Debate de Agentes", missoes: "Missões", acoes: "Central de Ações Seguras", world: "Javes World", tarefas: "Orquestrador de Tarefas", painel: "Painel", treino: "Treinamento", rotina: "Rotina · Briefing, Histórico & Lembretes", vempassear: "Projeto conectado · Vem Passear Jampa", exec: "Execução em Tempo Real", config: "Configurações" };
+const TITLES = { chat: "Chat", operacao: "Operação · Quadro & Aprovações", conclave: "Conclave · Debate de Agentes", missoes: "Missões", tarefas: "Orquestrador de Tarefas", painel: "Painel", treino: "Treinamento", rotina: "Rotina · Briefing, Histórico & Lembretes", vempassear: "Projeto conectado · Vem Passear Jampa", exec: "Execução em Tempo Real", config: "Configurações" };
 function setView(v) {
   if (window._execPollTimer) { clearInterval(window._execPollTimer); window._execPollTimer = null; }
   state.view = v; renderSidebar(); renderCanvas(); renderRightPanel();
@@ -182,7 +178,7 @@ function renderCanvas() {
     return viewSearch(body);
   }
   $("canvas-title").textContent = TITLES[state.view] || "";
-  ({ chat: viewChat, operacao: viewOperacao, conclave: viewConclave, missoes: viewMissoes, acoes: viewAcoes, exec: viewExec, world: viewWorld, tarefas: viewTarefas, painel: viewPainel, treino: viewTreino, rotina: viewRotina, vempassear: viewVempassear, config: viewConfig }[state.view] || viewChat)(body);
+  ({ chat: viewChat, operacao: viewOperacao, conclave: viewConclave, missoes: viewMissoes, exec: viewExec, tarefas: viewTarefas, painel: viewPainel, treino: viewTreino, rotina: viewRotina, vempassear: viewVempassear, config: viewConfig }[state.view] || viewChat)(body);
 }
 
 function viewSearch(body) {

@@ -1,26 +1,10 @@
-// Tarefas — orquestrador de demandas — extraído de app.js em 2026-07-03. MESMO comportamento; módulo ES.
-import { h, $, state, BACKEND, tryJson, sc } from "../../app.js";
-
-const WORKFLOW_NODES = [
-  { name: "Usuário", type: "input", status: "ok" },
-  { name: "Orquestrador", type: "orquestrador", status: "ok" },
-  { name: "Classificador", type: "router", status: "ok" },
-  { name: "Projeto Ativo", type: "contexto", status: "ok" },
-  { name: "Squad", type: "squad", status: "wait" },
-  { name: "Agente", type: "agente", status: "run" },
-  { name: "Tool", type: "ferramenta", status: "wait" },
-  { name: "Aprovação", type: "gate", status: "warn" },
-  { name: "Output", type: "output", status: "wait" },
-];
-
-const WORKFLOW_LIST = [
-  { nome: "Campanha Multi-Squad", desc: "Estratégia, copywriting, design e revisão final", steps: 4 },
-  { nome: "Lançamento de Produto", desc: "Pesquisa, conteúdo, design e go-to-market", steps: 5 },
-  { nome: "Conteúdo Rápido", desc: "Planejamento, criação e revisão", steps: 3 },
-];
+// Tarefas — orquestrador de demandas — extraído de app.js em 2026-07-03; módulo ES.
+// 2026-07-03: seções demo (Workflows/Fluxo de exemplo) removidas — minimalismo.
+// Ficam as 4 ferramentas reais: demanda, agente, pulso, navegador.
+import { h, $, state, BACKEND, tryJson, renderRightPanel } from "../../app.js";
 
 function viewTarefas(body) {
-  body.appendChild(h(`<div class="card-sub" style="margin-bottom:16px">Visualização em tempo real do fluxo de execução</div>`));
+  body.appendChild(h(`<div class="card-sub" style="margin-bottom:16px">Ferramentas de execução — demanda ao orquestrador, agente especialista, pulso de mercado e navegador.</div>`));
   const dem = h(`<div class="demanda"><textarea id="dem-text" placeholder="Descreva o que você precisa..."></textarea><div style="text-align:right"><button class="btn ok" id="dem-run">⚡ Executar</button></div></div>`);
   body.appendChild(dem);
   dem.querySelector("#dem-run").onclick = async () => {
@@ -95,21 +79,6 @@ function viewTarefas(body) {
       out.innerHTML = `<div class="card-desc" style="white-space:pre-wrap">${(r.result || r.message || JSON.stringify(r)).slice(0, 1500)}</div>`;
     } catch (e) { out.querySelector(".card-sub").textContent = "Falhou: " + e.message; }
   };
-
-  // Workflows (lista)
-  body.appendChild(h(`<div class="section-h">Workflows</div>`));
-  WORKFLOW_LIST.forEach((w) => {
-    body.appendChild(h(`<div class="wf-card"><div class="wf-main"><div class="wf-name">${w.nome}</div><div class="wf-desc">${w.desc}</div><div class="wf-meta">${w.steps} steps · demo</div></div><button class="btn ok" disabled title="Workflow de exemplo — ativação em fase futura">▶ Executar (em breve)</button></div>`));
-  });
-
-  // Grafo (demo)
-  body.appendChild(h(`<div class="section-h" style="margin-top:20px">Fluxo (exemplo)</div>`));
-  const flow = h(`<div class="flow"></div>`);
-  WORKFLOW_NODES.forEach((n, i) => {
-    flow.appendChild(h(`<div class="flow-node s-${sc(n.status)}"><div class="fn-type">${n.type}</div><div class="fn-name">${n.name}</div><span class="badge ${sc(n.status)}"><span class="dot ${sc(n.status)}"></span>${n.status}</span></div>`));
-    if (i < WORKFLOW_NODES.length - 1) flow.appendChild(h(`<div class="flow-arrow">→</div>`));
-  });
-  body.appendChild(flow);
 }
 
 export { viewTarefas };
