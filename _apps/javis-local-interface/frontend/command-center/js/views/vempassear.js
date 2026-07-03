@@ -1,10 +1,11 @@
 // Vem Passear — view do projeto conectado. Extraído de app.js em 2026-07-02.
 // MESMO comportamento; agora é um módulo ES que importa os helpers do núcleo.
-import { _esc, h, $, state, BACKEND, tryJson, renderCanvas, opToast } from "../../app.js";
+import { _esc, h, $, state, BACKEND, tryJson, renderCanvas, opToast, opSend, confirmStrong } from "../../app.js";
 
 // Fronteira: projeto EXTERNO do Cérebro Jampa, consultado pelo Javes por registro.
-// NÃO mistura contexto com o núcleo. 100% leitura nesta fase: nenhum POST/PATCH/
-// DELETE, nenhuma execução de agente, nenhum envio/publicação. Tudo escapado.
+// NÃO mistura contexto com o núcleo. Escritas reais existem desde 2026-07-03
+// (lead, funil, sugestão do squad, rodar agente) e TODAS passam por confirmação
+// forte (confirmStrong). Nenhum envio/publicação automático. Tudo escapado.
 let _vpTab = "resumo";
 const VP_TABS = [
   { id: "resumo",      label: "Resumo" },
@@ -32,7 +33,7 @@ const VP_DISPATCH = {
 const VP_ONLINE_ONLY = new Set(["agentes"]);
 
 function viewVempassear(body) {
-  body.appendChild(h(`<div class="vp-boundary">🔗 <b>Projeto conectado via Cérebro Jampa.</b> O Javes consulta e organiza este projeto <b>por registro</b>, sem misturar contexto automaticamente com o núcleo. Contexto externo · somente leitura nesta fase.</div>`));
+  body.appendChild(h(`<div class="vp-boundary">🔗 <b>Projeto conectado via Cérebro Jampa.</b> O Javes consulta e organiza este projeto <b>por registro</b>, sem misturar contexto automaticamente com o núcleo. Escritas reais (lead, funil, agente) sempre passam por <b>confirmação forte</b>.</div>`));
   if (!state.online) body.appendChild(h(`<div class="banner">⚠️ Backend offline — as telas operacionais seguem com dados sintéticos. A aba Agentes precisa do servidor em <code>:8000</code>.</div>`));
   const chips = h(`<div class="vp-chips"></div>`);
   VP_TABS.forEach((t) => {
@@ -94,7 +95,7 @@ async function vpResumo() {
 
   const btns = h(`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px"></div>`);
   const bNovo = h(`<button class="op-btn studio">➕ Novo atendimento</button>`);
-  bNovo.onclick = () => vpVisualModal("➕ Novo atendimento", `<p style="font-size:13px;color:var(--text)">Abriria um novo card de lead na coluna "Lead novo" do Funil.</p>`, { warn: "Fase visual — sem gravação real." });
+  bNovo.onclick = () => vpNovoAtendimento();
   const bAgenda = h(`<button class="op-btn ghost">📅 Ver agenda</button>`);
   bAgenda.onclick = () => { _vpTab = "agenda"; renderCanvas(); };
   const bReservas = h(`<button class="op-btn ghost">📋 Ver reservas</button>`);
@@ -103,18 +104,75 @@ async function vpResumo() {
   host.appendChild(btns);
 }
 
+// Novo atendimento REAL: cria lead via POST /vp/clientes (escrita no projeto
+// conectado — exige confirmação forte). Aparece no Funil/Atendimento como 🔗.
+function vpNovoAtendimento() {
+  if (!state.online) { opToast("Backend offline — não dá pra cadastrar agora.", "err"); return; }
+  const ov = vpVisualModal("➕ Novo atendimento (lead real)", `
+    <div class="vp-form-row">
+      <input id="vpna-nome" class="cs-input vp-in" placeholder="nome do cliente" />
+      <input id="vpna-contato" class="cs-input vp-in" placeholder="contato (WhatsApp)" />
+    </div>
+    <textarea id="vpna-obs" class="cv-task" placeholder="interesse/observação (ex: Escuna sábado, 4 adultos)…"></textarea>`,
+    { extraActions: [{ label: "➕ Cadastrar lead", onClick: () => {
+      const nome = ($("vpna-nome").value || "").trim();
+      const contato = ($("vpna-contato").value || "").trim();
+      const obs = ($("vpna-obs").value || "").trim();
+      if (!nome) { opToast("Informe o nome.", "warn"); return; }
+      confirmStrong({
+        title: "Cadastrar lead (Vem Passear · projeto conectado)",
+        endpoint: "/vp/clientes", method: "POST", target: nome,
+        before: "—", after: "cria lead real" + (contato ? " · " + vpMask(contato) : ""),
+        risk: "leve", phrase: "CONFIRMAR",
+        onConfirm: async () => {
+          try {
+            const res = await opSend(BACKEND + "vp/clientes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome, contato, obs }) });
+            if (res.ok && res.data.status === "ok") { opToast("Lead cadastrado. 🔗", "ok"); ov.remove(); renderCanvas(); }
+            else opToast(res.data.message || ("Falha (" + res.status + ")"), "warn");
+          } catch (e) { opToast("Backend offline — não cadastrei.", "err"); }
+        },
+      });
+    } }] });
+}
+
 async function vpAgentes() {
   const host = $("vp-content"); if (!host) return;
   let agents = [];
   try { agents = (await tryJson(BACKEND + "vp/agents")).agents || []; }
   catch (e) { host.innerHTML = `<div class="card-sub">Não consegui carregar os agentes.</div>`; return; }
   if (!agents.length) { host.innerHTML = `<div class="op-empty">Nenhum agente VP.</div>`; return; }
-  host.innerHTML = `<div class="card-sub" style="margin-bottom:10px">Squad de marketing da Vem Passear (leitura). Execução de agente fica para fase futura, com confirmação.</div>`;
+  host.innerHTML = `<div class="card-sub" style="margin-bottom:10px">Squad da Vem Passear. Execução real via <code>/vp/agents/run</code> — sempre com confirmação forte.</div>`;
   agents.forEach((a) => {
     const ic = a.icon || "🤖";
-    const card = h(`<div class="vp-item"><div class="vp-item-h">${ic} <span class="vp-agent-nome"></span></div><div class="vp-item-meta"></div></div>`);
-    card.querySelector(".vp-agent-nome").textContent = a.nome || "(agente)";
-    card.querySelector(".vp-item-meta").textContent = a.papel || "";
+    const card = h(`<div class="vp-item">
+      <div class="vp-item-h">${ic} <span class="vp-agent-nome"></span></div>
+      <div class="vp-item-meta"></div>
+      <div class="vp-agent-run" style="margin-top:8px">
+        <textarea class="cv-task vp-agent-task" placeholder="tarefa para este agente…" style="min-height:52px"></textarea>
+        <div style="text-align:right;margin-top:6px"><button class="op-btn studio sm vp-agent-go">▶ Rodar agente</button></div>
+        <div class="vp-agent-out card-sub" style="white-space:pre-wrap"></div>
+      </div>
+    </div>`);
+    card.querySelector(".vp-agent-nome").textContent = a.name || a.nome || "(agente)";
+    card.querySelector(".vp-item-meta").textContent = a.role || a.papel || "";
+    const go = card.querySelector(".vp-agent-go"), out = card.querySelector(".vp-agent-out");
+    go.onclick = () => {
+      const task = (card.querySelector(".vp-agent-task").value || "").trim();
+      if (!task) { opToast("Escreva a tarefa do agente.", "warn"); return; }
+      confirmStrong({
+        title: "Rodar agente VP (execução real)",
+        endpoint: "/vp/agents/run", method: "POST", target: (a.name || a.id),
+        before: "—", after: "executa: " + task.slice(0, 60), risk: "alto", phrase: "CONFIRMAR",
+        onConfirm: async () => {
+          go.disabled = true; out.textContent = "⏳ Executando (pode levar um pouco)…";
+          try {
+            const r = await tryJson(BACKEND + "vp/agents/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ agent_id: a.id, task }) });
+            out.textContent = r.status === "ok" ? (r.result || "(sem saída)") : ("⚠️ " + (r.message || "falhou"));
+          } catch (e) { out.textContent = "Falhou: " + e.message; }
+          go.disabled = false;
+        },
+      });
+    };
     host.appendChild(card);
   });
 }
@@ -217,9 +275,9 @@ async function vpSyncRealLeads() {
   try {
     const d = await tryJson(BACKEND + "vp/clientes");
     _vpRealLeads = (d.leads || []).map((c, i) => ({
-      id: "real-" + i, real: true,
+      id: "real-" + i, real: true, backendId: c.id || null,
       cliente: c.nome || "(cliente)", telefone: c.contato || "",
-      status: "Lead novo", passeio: "—", prioridade: "media",
+      status: AT_FUNNEL.includes(c.status) ? c.status : "Lead novo", passeio: "—", prioridade: "media",
       ultimaMsg: c.obs || "sem observação registrada",
       proximaAcao: "Completar briefing (passeio, data, pessoas).",
       chat: [],
@@ -240,8 +298,8 @@ async function vpAtendimento() {
   host.classList.add("at-wide");
   host.innerHTML = "";
   const note = state.online
-    ? "Atendimento — demo sintética + leads reais em leitura (marcados com 🔗). Escrita real desligada nesta fase."
-    : "Atendimento — visual, dados sintéticos. Escrita real desligada nesta fase.";
+    ? "Atendimento — demo sintética + leads reais (🔗). Sugestão da IA pode ser gerada de verdade pelo squad; nada é enviado ao cliente daqui."
+    : "Atendimento — visual, dados sintéticos. Backend offline: geração real indisponível.";
   host.appendChild(h(`<div class="card-sub" style="margin-bottom:12px">${_esc(note)}</div>`));
   await vpSyncRealLeads();
   if (_vpTab !== "atendimento" || !$("vp-content")) return; // usuário trocou de aba durante o fetch
@@ -315,13 +373,27 @@ function atColCenter() {
     <div class="at-ai-text"></div>
     <div class="at-ai-actions">
       <button class="op-btn ok at-copy-btn">📋 Copiar sugestão</button>
-      <button class="op-btn ghost" disabled title="em breve">✏️ Reescrever <span class="chip">em breve</span></button>
+      <button class="op-btn studio at-gen-btn" title="Gera resposta real via POST /jampa/responder-lead (squad Hunter+LNS)">✨ Gerar com o squad</button>
     </div>
   </div>`);
   ai.querySelector(".at-ai-text").textContent = l.sugestao;
-  ai.querySelector(".at-copy-btn").onclick = async (e) => {
-    try { await navigator.clipboard.writeText(l.sugestao); opToast("Sugestão copiada.", "ok"); }
+  // Copiar copia o texto EXIBIDO (modelo pronto ou gerado pelo squad).
+  ai.querySelector(".at-copy-btn").onclick = async () => {
+    try { await navigator.clipboard.writeText(ai.querySelector(".at-ai-text").textContent); opToast("Sugestão copiada.", "ok"); }
     catch (_) { opToast("Não consegui copiar (permissão do navegador).", "warn"); }
+  };
+  // Resposta REAL do squad (leitura+geração; nada é enviado ao cliente daqui).
+  const genBtn = ai.querySelector(".at-gen-btn");
+  genBtn.onclick = async () => {
+    if (!state.online) { opToast("Backend offline — squad indisponível.", "err"); return; }
+    genBtn.disabled = true; genBtn.textContent = "⏳ Gerando…";
+    const box = ai.querySelector(".at-ai-text");
+    try {
+      const r = await tryJson(BACKEND + "jampa/responder-lead", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: l.cliente, contato: l.telefone, interesse: l.passeio !== "—" ? l.passeio : "", obs: l.ultimaMsg || "" }) });
+      if (r.mensagem) { box.textContent = r.mensagem; opToast("Resposta gerada pelo squad. Revise antes de enviar.", "ok"); }
+      else opToast("O squad não devolveu mensagem.", "warn");
+    } catch (e) { opToast("Falhou ao gerar: " + e.message, "err"); }
+    genBtn.disabled = false; genBtn.textContent = "✨ Gerar com o squad";
   };
   col.appendChild(ai);
   return col;
@@ -434,7 +506,24 @@ async function vpFunil() {
       bVer.onclick = () => { _atLeadId = l.id; _vpTab = "atendimento"; renderCanvas(); };
       actions.appendChild(bVer);
       const bNext = h(`<button class="op-btn studio sm">Próxima etapa</button>`);
-      bNext.onclick = () => vpVisualModal("➡ Próxima etapa", `<p style="font-size:13px">Moveria <b>${_esc(l.cliente)}</b> pra próxima etapa do funil.</p>`, { warn: "Fase visual — sem gravação real." });
+      if (l.real && l.backendId) {
+        // Lead REAL: grava a etapa via PATCH /vp/clientes/{id} (confirmação forte).
+        const prox = AT_FUNNEL[Math.min(atFunnelIdx(l.status) + 1, AT_FUNNEL.length - 1)];
+        bNext.onclick = () => confirmStrong({
+          title: "Mover lead no funil (Vem Passear · projeto conectado)",
+          endpoint: `/vp/clientes/${l.backendId}`, method: "PATCH", target: l.cliente,
+          before: l.status, after: prox, risk: "op", phrase: "CONFIRMAR",
+          onConfirm: async () => {
+            try {
+              const res = await opSend(BACKEND + `vp/clientes/${encodeURIComponent(l.backendId)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: prox }) });
+              if (res.ok && res.data.status === "ok") { opToast(`${l.cliente} → ${prox}.`, "ok"); vpFunil(); }
+              else opToast(res.data.status === "not_found" ? "Lead não encontrado no backend." : "Falha (" + res.status + ")", "warn");
+            } catch (e) { opToast("Backend offline — não movi.", "err"); }
+          },
+        });
+      } else {
+        bNext.onclick = () => vpVisualModal("➡ Próxima etapa", `<p style="font-size:13px">Moveria <b>${_esc(l.cliente)}</b> pra próxima etapa do funil.</p>`, { warn: "Lead de demonstração — sem gravação real." });
+      }
       actions.appendChild(bNext);
       if (l.sugestao) {
         const bCopy = h(`<button class="op-btn ok sm">Copiar resposta</button>`);

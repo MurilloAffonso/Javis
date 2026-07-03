@@ -233,26 +233,30 @@ function opToast(msg, kind) {
   setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 250); }, 3200);
 }
 
-// Confirmação FORTE reutilizável para ações de escrita. Não executa nada por si:
-// só chama opts.onConfirm() depois que o usuário digita a frase exata e clica.
-// Todo texto dinâmico é escapado. Cancelar sempre disponível.
+// Confirmação reutilizável para ações de escrita: mostra endpoint/alvo/efeito/risco
+// e executa opts.onConfirm() com UM clique em Confirmar. (2026-07-03: removida a
+// digitação da frase — decisão de UX do Murillo.) Cancelar sempre disponível.
+// opts.phrase é aceito e ignorado (compatibilidade com chamadas antigas).
+const CS_RISK = {
+  leitura: { label: "Leitura", cls: "ok" }, leve: { label: "Escrita leve", cls: "run" },
+  op: { label: "Escrita operacional", cls: "warn" }, pesado: { label: "Pesado", cls: "warn" },
+  alto: { label: "Alto risco", cls: "err" },
+};
 function confirmStrong(opts) {
-  const phrase = opts.phrase || "CONFIRMAR";
+  const risk = CS_RISK[opts.risk] || CS_RISK.op;
   const ov = h(`<div class="cs-overlay">
     <div class="cs-modal">
-      <div class="cs-h">⚠️ Confirmação forte — esta ação altera dados</div>
+      <div class="cs-h">⚠️ Confirmar — esta ação altera dados</div>
       <div class="cs-action"></div>
       <div class="cs-grid">
         <div><span class="cs-k">Endpoint</span> <code>${_esc((opts.method || "POST") + " " + (opts.endpoint || ""))}</code></div>
         <div><span class="cs-k">Alvo</span> <span class="cs-target"></span></div>
         <div><span class="cs-k">Status atual</span> <span class="cs-before"></span></div>
         <div><span class="cs-k">Efeito</span> <span class="cs-after"></span></div>
-        <div><span class="cs-k">Risco</span> ${acRiskBadge(opts.risk || "op")}</div>
+        <div><span class="cs-k">Risco</span> <span class="badge ${risk.cls}"><span class="dot ${risk.cls}"></span>${_esc(risk.label)}</span></div>
       </div>
-      <div class="cs-phrase-lbl">Para liberar, digite exatamente <b>${_esc(phrase)}</b>:</div>
-      <input class="cs-input" placeholder="${_esc(phrase)}" autocomplete="off" />
       <div class="cs-actions">
-        <button class="op-btn ok cs-go" disabled>Confirmar</button>
+        <button class="op-btn ok cs-go">✔ Confirmar</button>
         <button class="op-btn ghost cs-cancel">Cancelar</button>
       </div>
       <div class="cs-fb"></div>
@@ -262,19 +266,16 @@ function confirmStrong(opts) {
   ov.querySelector(".cs-target").textContent = opts.target || "—";
   ov.querySelector(".cs-before").textContent = opts.before || "—";
   ov.querySelector(".cs-after").textContent = opts.after || "—";
-  const input = ov.querySelector(".cs-input");
   const go = ov.querySelector(".cs-go");
   const close = () => ov.remove();
-  input.addEventListener("input", () => { go.disabled = (input.value.trim() !== phrase); });
   ov.querySelector(".cs-cancel").onclick = close;
   ov.addEventListener("click", (e) => { if (e.target === ov) close(); });
   go.onclick = async () => {
-    if (input.value.trim() !== phrase) return;
     go.disabled = true; go.textContent = "Executando…";
     try { await opts.onConfirm(); } catch (_) {} finally { close(); }
   };
   document.body.appendChild(ov);
-  setTimeout(() => input.focus(), 30);
+  setTimeout(() => go.focus(), 30);
 }
 
 // ---------- Conclave (Debate de Agentes) — POST /debate ----------
