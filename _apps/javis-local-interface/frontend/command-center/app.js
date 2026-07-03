@@ -189,8 +189,8 @@ function viewSearch(body) {
   const sk = state.skills.filter((s) => m(s.nome) || m(s.descricao));
   const scr = state.scripts.filter((s) => m(s.arquivo) || m(s.proposito));
   const total = ag.length + sq.length + sk.length + scr.length;
-  body.appendChild(h(`<div class="card-sub" style="margin-bottom:14px">${total} resultado(s) para <b>${state.q}</b></div>`));
-  if (!total) { body.appendChild(h(`<div class="empty-state">Nada encontrado.</div>`)); return; }
+  body.appendChild(h(`<div class="card-sub" style="margin-bottom:14px">${total} resultado(s) local(is) para <b>${_esc(state.q)}</b></div>`));
+  if (!total) body.appendChild(h(`<div class="card-sub">Nenhum agente/squad/skill/script bate. Buscando na base de conhecimento…</div>`));
 
   if (ag.length) {
     body.appendChild(h(`<div class="section-h">Agentes (${ag.length})</div>`));
@@ -210,6 +210,25 @@ function viewSearch(body) {
     arr.forEach((x) => box.appendChild(h(`<div class="status-row"><span class="sr-label">${fmt(x)}</span></div>`)));
     body.appendChild(box);
   });
+
+  // Busca semântica no RAG (GET /knowledge/search) — assíncrona, memórias/vaults.
+  const ragQ = state.q;
+  body.appendChild(h(`<div class="section-h">🔎 Base de conhecimento (RAG)</div>`));
+  const ragBox = h(`<div id="rag-box"><div class="card-sub">Buscando na base semântica… (pode demorar na 1ª vez — indexando)</div></div>`);
+  body.appendChild(ragBox);
+  if (!state.online) { ragBox.innerHTML = `<div class="card-sub">Backend offline — RAG indisponível.</div>`; return; }
+  tryJson(BACKEND + "knowledge/search?q=" + encodeURIComponent(ragQ)).then((d) => {
+    if (state.q !== ragQ || !document.getElementById("rag-box")) return; // usuário mudou a busca
+    const hits = (d.hits || []).filter((x) => (x.score || 0) > 0.2);
+    if (!hits.length) { ragBox.innerHTML = `<div class="op-empty">Nada relevante na base para essa busca.</div>`; return; }
+    ragBox.innerHTML = "";
+    hits.forEach((hit) => {
+      const card = h(`<div class="card" style="margin-bottom:10px"><div class="card-sub" style="margin-bottom:4px">📄 <b class="rag-path"></b> · ${Math.round((hit.score || 0) * 100)}% relevante</div><div class="card-desc rag-chunk" style="white-space:pre-wrap"></div></div>`);
+      card.querySelector(".rag-path").textContent = hit.path || "(fonte)";
+      card.querySelector(".rag-chunk").textContent = (hit.chunk || "").slice(0, 600);
+      ragBox.appendChild(card);
+    });
+  }).catch(() => { if (document.getElementById("rag-box")) ragBox.innerHTML = `<div class="card-sub">Não consegui buscar na base agora.</div>`; });
 }
 
 // ---------- Chat (por agente) ----------

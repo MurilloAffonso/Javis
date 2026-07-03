@@ -1,12 +1,13 @@
 // Missões — backlog e nodes (leitura) — extraído de app.js em 2026-07-03. MESMO comportamento; módulo ES.
-import { h, $, state, BACKEND, tryJson, _esc, pct } from "../../app.js";
+import { h, $, state, BACKEND, tryJson, _esc, pct, opSend, opToast, confirmStrong } from "../../app.js";
 
-// Read-only: lista missões (backlog do Codex) e mostra os nodes/progresso.
-// Sem ações de escrita (marcar node como done fica para fase futura, com confirmação).
+// Lista missões (backlog do Codex), mostra nodes/progresso e permite marcar/reabrir
+// tarefas REAIS via POST /missions/{id}/nodes/{node}/done (confirmação). Missões
+// calculadas (sintéticas) devolvem 404 e avisam que não são editáveis.
 let _miSel = null;
 
 function viewMissoes(body) {
-  body.appendChild(h(`<div class="card-sub" style="margin-bottom:14px">Missões reais derivadas do backlog. Somente leitura — clique numa missão para ver as tarefas (nodes) e o progresso.</div>`));
+  body.appendChild(h(`<div class="card-sub" style="margin-bottom:14px">Missões reais derivadas do backlog. Clique numa missão para ver as tarefas (nodes); tarefas reais podem ser concluídas/reabertas com confirmação.</div>`));
   if (!state.online) { body.appendChild(h(`<div class="banner">⚠️ Backend offline — conecte o servidor em <code>:8000</code> para ver as missões.</div>`)); return; }
   body.appendChild(h(`<div class="mi-wrap"><div id="mi-list" class="mi-list"><div class="card-sub">Carregando missões…</div></div><div id="mi-nodes" class="mi-nodes"><div class="op-empty">Selecione uma missão.</div></div></div>`));
   miLoadList();
@@ -44,14 +45,36 @@ async function miLoadNodes(id) {
   host.innerHTML = "";
   nodes.forEach((n) => {
     const pctv = Math.max(0, Math.min(100, Number(n.pct) || 0));
+    const done = n.status === "done" || pctv >= 100;
     const row = h(`<div class="mi-node">
       <div class="mi-node-h"><span class="mi-node-label"></span><span class="opcard-st">${_esc(n.status || "")}</span></div>
       <div class="mi-node-sub">${_esc(n.type || "")}</div>
       <div class="mi-bar"><div class="mi-fill" style="width:${pctv}%"></div></div>
+      <div class="mi-node-actions" style="margin-top:8px;text-align:right"></div>
     </div>`);
     row.querySelector(".mi-node-label").textContent = n.label || n.id || "(node)";
+    if (n.id) {
+      const btn = h(`<button class="op-btn ${done ? "ghost" : "ok"} sm">${done ? "↩ Reabrir" : "✔ Concluir"}</button>`);
+      btn.onclick = () => confirmStrong({
+        title: (done ? "Reabrir" : "Concluir") + " tarefa da missão (backlog real)",
+        endpoint: `/missions/${id}/nodes/${n.id}/done`, method: "POST", target: n.label || n.id,
+        before: n.status || "—", after: done ? "reaberta (done:false)" : "concluída (done:true)", risk: "op",
+        onConfirm: () => miSetNodeDone(id, n.id, !done),
+      });
+      row.querySelector(".mi-node-actions").appendChild(btn);
+    }
     host.appendChild(row);
   });
+}
+
+// POST /missions/{id}/nodes/{node}/done {done} — 404 = missão calculada (não editável).
+async function miSetNodeDone(missionId, nodeId, done) {
+  try {
+    const res = await opSend(BACKEND + `missions/${encodeURIComponent(missionId)}/nodes/${encodeURIComponent(nodeId)}/done`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ done }) });
+    if (res.status === 404) { opToast(res.data.message || "Missão calculada — tarefa não editável.", "warn"); return; }
+    if (res.ok && res.data.ok) { opToast(done ? "Tarefa concluída." : "Tarefa reaberta.", "ok"); miLoadNodes(missionId); miLoadList(); }
+    else opToast(res.data.message || "Não consegui atualizar.", "warn");
+  } catch (e) { opToast("Backend offline — não atualizei.", "err"); }
 }
 
 export { viewMissoes };

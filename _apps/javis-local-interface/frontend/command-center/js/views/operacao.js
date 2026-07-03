@@ -161,6 +161,11 @@ function opCard(t) {
   const jb = h(`<button class="op-btn ghost sm">Ver jornada</button>`);
   jb.onclick = () => opJourney(ext, card.querySelector(".op-journey"));
   actions.appendChild(jb);
+  if (!encerrada && ext) {
+    const cb = h(`<button class="op-btn ok sm">✅ Concluir</button>`);
+    cb.onclick = () => confirmStrong({ title: "Concluir tarefa (encerra + gera digest)", endpoint: `/tasks/${ext}/complete`, method: "POST", target: t.title || ext, before: t.status || "—", after: "completed + digest final", risk: "op", onConfirm: () => opComplete(ext) });
+    actions.appendChild(cb);
+  }
   if (t.has_digest) actions.appendChild(h(`<span class="opcard-digest" title="tem digest">📄</span>`));
   if (titleLow.startsWith("[design]") && liberada) {
     const b = h(`<button class="op-btn studio sm">🎨 Rodar Estúdio</button>`);
@@ -177,6 +182,17 @@ function opCard(t) {
     card.addEventListener("dragend", () => card.classList.remove("dragging"));
   }
   return card;
+}
+
+// Concluir tarefa: POST /tasks/{id}/complete → completed + digest (200) ou 409 se já encerrada.
+async function opComplete(extId) {
+  try {
+    const res = await opSend(BACKEND + `tasks/${encodeURIComponent(extId)}/complete`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note: "concluída no Quadro (command-center)" }) });
+    if (res.status === 409) opToast("Tarefa já estava encerrada.", "info");
+    else if (res.ok && res.data.ok) opToast("Tarefa concluída. Digest gerado.", "ok");
+    else opToast(res.data.error || "Não consegui concluir.", "warn");
+  } catch (e) { opToast("Backend offline — não concluí.", "err"); }
+  opRenderBoard();
 }
 
 async function opJourney(extId, host) {
