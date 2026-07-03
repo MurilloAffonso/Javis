@@ -22,6 +22,7 @@ AGENTS: dict[str, dict] = {
         "name": "Olheiro", "icon": "🔭", "role": "Inteligência (leve)", "group": "inteligencia",
         "input":  "semana atual + pilares da linha editorial",
         "output": "3-5 referências/tendências da semana (formatos, áudios, ganchos) pra Nova",
+        "metrica": "referências que a Nova de fato usou na pauta (meta: 2+ por semana)",
         "faz":    "capta trends/áudios de turismo que estão bombando; aponta formatos que performam; traz inspiração (não cópia)",
         "naofaz": "copiar concorrente; criar conteúdo da marca; publicar; responder cliente",
         "tools":  "Instagram/TikTok (busca), pesquisar_redes",
@@ -31,6 +32,7 @@ AGENTS: dict[str, dict] = {
         "name": "Nova", "icon": "🎨", "role": "Conteúdo (pauta + copy)", "group": "conteudo",
         "input":  "briefing do Murillo (maré, agenda, vagas, fotos) + referências do Olheiro",
         "output": "pauta-semana.md: 3+ posts com dia, pilar, formato, gancho, LEGENDA final + CTA + hashtags e material visual",
+        "metrica": "posts da semana que geraram clique/mensagem no WhatsApp (meta: maioria da pauta convertendo)",
         "faz":    "escolhe pilares (proporção da linha editorial, máx. 2 de venda a cada 10); cria gancho 3s e formato; escreve a copy no tom caloroso/local; usa os CTAs padrão (MARÉ/COMBO/SEIXAS)",
         "naofaz": "produzir a arte; publicar; inventar preço/horário/maré; prometer vaga sem o Murillo confirmar",
         "tools":  "linha-editorial.md, Claude (assinatura)",
@@ -40,6 +42,7 @@ AGENTS: dict[str, dict] = {
         "name": "Estúdio", "icon": "🖼️", "role": "Criativos", "group": "design",
         "input":  "pauta aprovada + copy + fotos de imagens/_FOTOS-AQUI/",
         "output": "peças prontas em outputs/ (carrossel/card/Reel)",
+        "metrica": "peças aprovadas no Gate 2 já na 1ª versão, sem refação",
         "faz":    "gera as artes (gerar_carrossel.py/Canva/Claude Design); adapta por formato; aplica a identidade visual da marca",
         "naofaz": "definir verba; publicar; alterar a copy aprovada",
         "tools":  "gerar_carrossel.py, gerar_card_foto.py, Canva, Claude Design",
@@ -49,6 +52,7 @@ AGENTS: dict[str, dict] = {
         "name": "Midas", "icon": "📈", "role": "Distribuição & conversão (WhatsApp)", "group": "trafego",
         "input":  "peças + copy finais aprovadas (Gate 2); mensagens recebidas no WhatsApp",
         "output": "posts publicados/agendados + marcação do que impulsionar + RASCUNHOS de resposta de WhatsApp prontos pro Murillo enviar",
+        "metrica": "rascunhos de WhatsApp aprovados sem edição do Murillo + posts que viraram reserva",
         "faz":    "agenda/publica; marca posts com potencial de anúncio e sugere segmentação; monta a resposta do WhatsApp usando os templates",
         "naofaz": "ENVIAR a resposta sozinho (o Murillo dá o envio final); inventar disponibilidade/preço; aprovar verba sozinho; criar arte/copy",
         "tools":  "Meta Business Suite, Meta Ads, templates-whatsapp.md, WhatsApp",
@@ -59,6 +63,7 @@ AGENTS: dict[str, dict] = {
         "name": "Analista", "icon": "📊", "role": "Resultado (dados)", "group": "dados",
         "input":  "métricas da semana (alcance, salvamentos, cliques no WhatsApp, reservas)",
         "output": "decisão da semana (o que repetir, o que cortar) registrada em pauta-semana.md → vira o briefing da semana seguinte",
+        "metrica": "decisões que, aplicadas, melhoraram o número (WhatsApp/reserva) na semana seguinte",
         "faz":    "lê o desempenho de cada post; aponta os 3 que mais geraram WhatsApp/reserva; recomenda o que a Nova deve repetir/variar",
         "naofaz": "inventar número; publicar; decidir a estratégia sozinho (entrega pro Murillo decidir)",
         "tools":  "Instagram Insights, planilha simples, Claude",
@@ -89,7 +94,8 @@ def list_agents() -> list[dict]:
     return [
         {"id": aid, "name": a["name"], "icon": a["icon"], "role": a["role"],
          "group": a["group"], "input": a["input"], "output": a["output"],
-         "faz": a.get("faz", ""), "naofaz": a["naofaz"], "tools": a.get("tools", "")}
+         "faz": a.get("faz", ""), "naofaz": a["naofaz"], "tools": a.get("tools", ""),
+         "metrica": a.get("metrica", "")}
         for aid, a in AGENTS.items()
     ]
 
@@ -107,6 +113,8 @@ def _system_prompt(agent_id: str) -> str:
         f"- O que você NÃO FAZ (NUNCA cruze esta linha): {a['naofaz']}\n"
         f"- Ferramentas: {a['tools']}\n"
     )
+    if a.get("metrica"):
+        sys += f"- MÉTRICA DE SUCESSO (mire nisto ao produzir): {a['metrica']}\n"
     if a.get("extra"):
         sys += f"\n{a['extra']}\n"
     grounds = [_read(g) for g in a.get("ground", [])]

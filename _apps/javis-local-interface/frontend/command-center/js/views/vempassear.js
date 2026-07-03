@@ -147,6 +147,7 @@ async function vpAgentes() {
     const card = h(`<div class="vp-item">
       <div class="vp-item-h">${ic} <span class="vp-agent-nome"></span></div>
       <div class="vp-item-meta"></div>
+      ${a.metrica ? `<div class="vp-item-meta" style="margin-top:2px">🎯 <b>Métrica:</b> ${_esc(a.metrica)}</div>` : ""}
       <div class="vp-agent-run" style="margin-top:8px">
         <textarea class="cv-task vp-agent-task" placeholder="tarefa para este agente…" style="min-height:52px"></textarea>
         <div style="text-align:right;margin-top:6px"><button class="op-btn studio sm vp-agent-go">▶ Rodar agente</button></div>
