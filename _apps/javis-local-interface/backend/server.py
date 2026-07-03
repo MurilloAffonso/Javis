@@ -946,8 +946,22 @@ async def voice_stream(req: VoiceRequest):
                 ctx = _ag._history_context(_get_history_messages(), keep_raw=2)
                 spoke = False
                 full_text = ""
-                yield f"data: {json.dumps({'type':'meta','intent':'pensar_profundo','brain':'claude'})}\n\n"
-                for sentence in _accumulate_sentences(_cb.answer_stream(clean, ctx, model=_cb._VOICE_MODEL)):
+                # Cérebro de voz: Ollama LOCAL (grátis, ~1s no 1º token) se
+                # JAVIS_VOICE_BRAIN=ollama e disponível; senão Claude assinatura de voz.
+                # Só CONVERSA chega aqui; ações já foram pro fast-path/_brain.
+                _vname = "claude"; _vstream = None
+                if os.environ.get("JAVIS_VOICE_BRAIN", "").lower() == "ollama":
+                    try:
+                        import ollama_brain as _ob
+                        if _ob.available():
+                            _vname = "ollama"
+                            _vstream = _ob.answer_stream(clean, ctx, system="Você é o Javes, assistente de voz do Murillo. Responda curto e direto, em português do Brasil, tom parceiro.")
+                    except Exception:
+                        _vstream = None
+                if _vstream is None:
+                    _vstream = _cb.answer_stream(clean, ctx, model=_cb._VOICE_MODEL)
+                yield f"data: {json.dumps({'type':'meta','intent':'pensar_profundo','brain':_vname})}\n\n"
+                for sentence in _accumulate_sentences(_vstream):
                     spoke = True
                     full_text += (" " if full_text else "") + sentence
                     if req.tts:
