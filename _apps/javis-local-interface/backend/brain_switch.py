@@ -50,12 +50,21 @@ def _audit_after_codex(pasta: str | None = None) -> None:
             pass
 
 
-def dispatch(task: str, pasta: str | None = None):
-    """Despacha a tarefa de programação pro motor ativo (com fallback pro outro)."""
+def dispatch(task: str, pasta: str | None = None, engine: str | None = None):
+    """Despacha a tarefa de programação pro motor ativo (com fallback pro outro).
+
+    Args:
+        task: descrição da tarefa
+        pasta: pasta de trabalho (opcional)
+        engine: força um motor específico ("claude" ou "codex"); se None, usa get_active()
+    """
+    if engine and engine not in ("claude", "codex"):
+        raise ValueError(f"engine deve ser 'claude' ou 'codex', recebido: {engine!r}")
+
     import claude_exec
     import code_agent
 
-    engine = get_active()
+    engine = engine or get_active()
     primary, fallback = (claude_exec, code_agent) if engine == "claude" else (code_agent, claude_exec)
 
     kwargs = {"pasta": pasta} if pasta else {}
