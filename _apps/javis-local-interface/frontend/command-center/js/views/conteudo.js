@@ -164,6 +164,8 @@ export function viewConteudo(body) {
   root.querySelector(".ct-projsel").appendChild(buildProjetoSel());
   root.querySelector(".ct-col-left").appendChild(buildCompositor());
   root.querySelector(".ct-col-right").appendChild(buildBiblioteca());
+
+  carregarBackend(); // puxa o que já foi salvo no servidor pro projeto ativo
 }
 
 // ---------- Seletor de projeto (define voz da IA + biblioteca ativa) ----------
@@ -182,6 +184,7 @@ function buildProjetoSel() {
       chips.querySelectorAll(".ct-chip").forEach((el) => el.classList.remove("active"));
       chip.classList.add("active");
       renderLibList(); // troca a biblioteca exibida
+      carregarBackend(); // e puxa os salvos desse projeto (1x)
     };
     chips.appendChild(chip);
   });
@@ -364,10 +367,37 @@ async function gerarComIA(btn) {
 function salvarItem(status) {
   const titulo = ($("ct-titulo").value || "").trim();
   if (!titulo) { opToast("Dê um título ao conteúdo antes de salvar.", "warn"); return; }
+  const corpo = ($("ct-texto") ? $("ct-texto").value : "").trim();
   const item = { id: "u" + Date.now(), titulo, canal: _canal, status, _novo: true };
   biblioteca().unshift(item);
   renderLibList();
   opToast(status === "rascunho" ? "Rascunho salvo na biblioteca. 💾" : "Conteúdo agendado na biblioteca. 📤", "ok");
+  // Persiste no backend (não bloqueia a UI; só avisa se falhar).
+  if (state.online) {
+    tryJson(BACKEND + "conteudo", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project: _projeto, channel: _canal, title: titulo, body: corpo, status }),
+    }).catch(() => opToast("Salvo aqui, mas falhou ao gravar no servidor.", "warn"));
+  }
+}
+
+// ---------- Carrega itens já salvos no backend (uma vez por projeto) ----------
+const _carregado = {};
+function carregarBackend() {
+  if (!state.online || _carregado[_projeto]) return;
+  const proj = _projeto;
+  _carregado[proj] = true;
+  tryJson(BACKEND + "conteudo?projeto=" + encodeURIComponent(proj)).then((d) => {
+    const itens = (d.itens || []).map((r) => ({
+      id: "db" + r.id, titulo: r.title || "(sem título)",
+      canal: r.channel || "instagram", status: r.status || "rascunho",
+    }));
+    if (!itens.length) return;
+    const lib = _bibliotecas[proj] || (_bibliotecas[proj] = []);
+    const existentes = new Set(lib.map((x) => x.id));
+    _bibliotecas[proj] = [...itens.filter((x) => !existentes.has(x.id)), ...lib];
+    if (_projeto === proj) renderLibList();
+  }).catch(() => {});
 }
 
 // ---------- Biblioteca (coluna direita) ----------
