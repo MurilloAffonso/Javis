@@ -166,6 +166,20 @@ async def knowledge_graph_query(q: str = "", depth: int = 1):
     return JSONResponse(await run_in_threadpool(knowledge_graph.neighbors, q, depth))
 
 
+@app.post("/knowledge/ingest")
+async def knowledge_ingest(folder: str = ""):
+    """Ingestão em LOTE: processa .txt/.md de uma pasta (default _inbox/ingestao/)
+    → DNA → RAG → grafo. Assíncrono; acompanhe em /knowledge/ingest/status."""
+    import ingest
+    return JSONResponse(ingest.start(folder))
+
+
+@app.get("/knowledge/ingest/status")
+async def knowledge_ingest_status():
+    import ingest
+    return JSONResponse(ingest.status())
+
+
 @app.get("/reminders/poll")
 async def reminders_poll():
     """Lembretes que venceram desde a última checagem (interface fala por TTS)."""
