@@ -123,6 +123,48 @@ async def knowledge_search(q: str = ""):
     return JSONResponse({"hits": hits})
 
 
+@app.get("/knowledge/eval")
+async def knowledge_eval_endpoint(k: int = 5):
+    """Avalia o RAG (recall@k / MRR) comparando híbrido × legado.
+    Usa o golden set de _memoria/rag_eval_golden.json."""
+    import knowledge_eval
+    result = await run_in_threadpool(knowledge_eval.evaluate, None, k)
+    return JSONResponse(result)
+
+
+class DnaReq(BaseModel):
+    text: str = ""
+    fonte: str = ""
+    tema: str = ""
+    fonte_tipo: str = ""    # "" | "whatsapp" | "transcricao"
+
+
+@app.post("/knowledge/dna")
+async def knowledge_dna(req: DnaReq):
+    """Extrai o DNA cognitivo de um texto (transcrição, export, material),
+    grava o dossiê em _memoria/dna/ e reindexa o RAG."""
+    import dna_extractor
+    result = await run_in_threadpool(
+        dna_extractor.extract_and_index, req.text, req.fonte, req.tema, req.fonte_tipo)
+    return JSONResponse(result)
+
+
+@app.post("/knowledge/graph/build")
+async def knowledge_graph_build():
+    """(Re)constrói o grafo de conhecimento a partir dos dossiês de DNA."""
+    import knowledge_graph
+    return JSONResponse(await run_in_threadpool(knowledge_graph.build_from_dna))
+
+
+@app.get("/knowledge/graph")
+async def knowledge_graph_query(q: str = "", depth: int = 1):
+    """Sem q → stats + conceitos centrais. Com q → vizinhança do conceito."""
+    import knowledge_graph
+    if not q:
+        return JSONResponse(await run_in_threadpool(knowledge_graph.stats))
+    return JSONResponse(await run_in_threadpool(knowledge_graph.neighbors, q, depth))
+
+
 @app.get("/reminders/poll")
 async def reminders_poll():
     """Lembretes que venceram desde a última checagem (interface fala por TTS)."""

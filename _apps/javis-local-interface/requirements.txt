@@ -7,6 +7,7 @@ requests>=2.31
 openai>=1.30
 anthropic>=0.25
 piper-tts>=1.4
+numpy>=1.26            # RAG híbrido: cosine vetorial (knowledge_hybrid.py)
 
 # dev
 pytest>=8.0

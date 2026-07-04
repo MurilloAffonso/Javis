@@ -39,6 +39,19 @@ _last_auto_check = 0.0
 _AUTO_CHECK_COOLDOWN = 60   # segundos — não verifica mudanças mais de 1x/min
 
 
+def _hybrid():
+    """Módulo de RAG híbrido (SQLite: semântico + BM25 + RRF), se habilitado e já
+    populado. Controlado por JAVIS_RAG (padrão 'hybrid'; qualquer outro valor usa
+    só o índice JSON legado). Retorna None → segue no caminho legado."""
+    if os.environ.get("JAVIS_RAG", "hybrid").strip().lower() != "hybrid":
+        return None
+    try:
+        import knowledge_hybrid as kh
+        return kh if kh.available() else None
+    except Exception:
+        return None
+
+
 def _has_external_changes(since_mtime: float) -> bool:
     """True se algum arquivo dos vaults externos foi alterado depois de since_mtime."""
     for vault in _external_vaults():
@@ -242,6 +255,14 @@ def build_index(force: bool = False) -> dict:
                 new_index.append(meta)
 
         _save_index(new_index)
+        # Alimenta também o índice híbrido (SQLite). Reaproveita os vetores
+        # recém-gravados no JSON → não gera embedding novo na migração.
+        try:
+            if os.environ.get("JAVIS_RAG", "hybrid").strip().lower() == "hybrid":
+                import knowledge_hybrid as kh
+                kh.build_index(force=force)
+        except Exception:
+            pass
         return {"status": "ok", "chunks": len(new_index), "arquivos_reindexados": files_done}
     finally:
         _building = False
@@ -259,6 +280,12 @@ def search(query: str, k: int = 5) -> list[dict]:
     query = (query or "").strip()
     if not query:
         return []
+    kh = _hybrid()
+    if kh is not None:
+        try:
+            return kh.search(query, k)
+        except Exception:
+            pass   # qualquer falha no híbrido → cai no índice JSON legado
     # Auto-sync lazy: se mudou algo nos vaults externos, dispara rebuild em
     # background (não bloqueia a busca atual, próximas já pegam o índice novo).
     try:
@@ -283,6 +310,12 @@ def search(query: str, k: int = 5) -> list[dict]:
 
 def answer_context(query: str, k: int = 5) -> str:
     """Monta um bloco de contexto com os trechos relevantes (para o agente responder)."""
+    kh = _hybrid()
+    if kh is not None:
+        try:
+            return kh.answer_context(query, k)
+        except Exception:
+            pass   # falha no híbrido → contexto pelo caminho legado
     hits = search(query, k)
     if not hits:
         return ""

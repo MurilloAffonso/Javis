@@ -1,0 +1,18 @@
+[
+  {
+    "q": "Como o Javis roteia comandos de voz sem usar LLM?",
+    "relevant": ["command_router", "JAVIS-VOICE-TO-COMMAND-ROUTER", "voice_bridge"]
+  },
+  {
+    "q": "Qual a cascata de provedores de LLM e a economia free-first?",
+    "relevant": ["agent.py", "estado-atual", "JAVIS-ARQUITETURA"]
+  },
+  {
+    "q": "Como funciona o Conclave e quais são os três papéis?",
+    "relevant": ["conclave", "specialized"]
+  },
+  {
+    "q": "Quais ações são bloqueadas por serem perigosas?",
+    "relevant": ["command_router", "actions", "commands.yaml"]
+  }
+]
