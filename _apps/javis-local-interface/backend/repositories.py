@@ -215,6 +215,24 @@ class _Memories:
         return db.count("memories")
 
 
+# ── content (Estúdio de Conteúdo) ─────────────────────────────────────────
+class _Content:
+    def add(self, project: str, channel: str, title: str, body: str,
+            status: str = "rascunho") -> int:
+        return db.execute(
+            "INSERT INTO content(project, channel, title, body, status) VALUES(?,?,?,?,?)",
+            (project, channel, title, body, status),
+        )
+
+    def list(self, project: str = "", limit: int = 100) -> list[dict]:
+        if project:
+            return db.query(
+                "SELECT * FROM content WHERE project=? ORDER BY id DESC LIMIT ?",
+                (project, limit),
+            )
+        return db.query("SELECT * FROM content ORDER BY id DESC LIMIT ?", (limit,))
+
+
 # ── task_events (Journey Log) ─────────────────────────────────────────────
 class _TaskEvents:
     def add_event(self, task_id: str, event_type: str, actor: str = "system",
@@ -251,4 +269,5 @@ agents    = _Agents()
 projects  = _Projects()
 workflows = _Workflows()
 memories  = _Memories()
+content   = _Content()
 task_events = _TaskEvents()

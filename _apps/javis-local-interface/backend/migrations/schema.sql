@@ -90,6 +90,17 @@ CREATE TABLE IF NOT EXISTS memories (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
+-- Estúdio de Conteúdo: posts/rascunhos criados no Command Center.
+CREATE TABLE IF NOT EXISTS content (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    project    TEXT,                              -- 'vempassear' | 'javes'
+    channel    TEXT,                              -- 'instagram' | 'blog' | ...
+    title      TEXT,
+    body       TEXT,
+    status     TEXT DEFAULT 'rascunho',           -- 'rascunho' | 'agendado' | 'publicado'
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
 -- Journey Log: cada tarefa vira uma entidade com timeline de eventos
 -- (nascimento → eventos → checkpoints → aprovação → avanço → conclusão).
 CREATE TABLE IF NOT EXISTS task_events (

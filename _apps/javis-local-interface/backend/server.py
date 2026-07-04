@@ -334,6 +334,36 @@ async def vp_conteudos_del(item_id: str):
     return JSONResponse({"status": "ok" if vp_store.remove_conteudo(item_id) else "not_found"})
 
 
+# ── Estúdio de Conteúdo (Command Center — unificado: vempassear | javes) ──
+class ConteudoReq(BaseModel):
+    project: str = "vempassear"
+    channel: str = ""
+    title:   str = ""
+    body:    str = ""
+    status:  str = "rascunho"
+
+
+@app.get("/conteudo")
+async def conteudo_list(projeto: str = ""):
+    import repositories as repo
+    try:
+        return JSONResponse({"itens": repo.content.list(projeto)})
+    except Exception as e:
+        return JSONResponse({"itens": [], "erro": str(e)})
+
+
+@app.post("/conteudo")
+async def conteudo_add(req: ConteudoReq):
+    import repositories as repo
+    if not (req.title.strip() or req.body.strip()):
+        return JSONResponse({"status": "vazio"}, status_code=400)
+    try:
+        cid = repo.content.add(req.project, req.channel, req.title, req.body, req.status)
+        return JSONResponse({"status": "ok", "id": cid})
+    except Exception as e:
+        return JSONResponse({"status": "erro", "erro": str(e)}, status_code=500)
+
+
 # ── Linha editorial (pauta de posts planejados) ──
 @app.get("/vp/pauta")
 async def vp_pauta_list():
