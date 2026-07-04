@@ -199,14 +199,28 @@ class Orchestrator:
             return f"Cérebro indisponível: {e}"
 
     def _run_exec(self, text: str, plano: str = "") -> tuple[str, bool]:
-        """Roteia pra Codex via brain_switch com guardrails."""
+        """Roteia pra Codex via brain_switch com guardrails.
+
+        O Codex roda em segundo plano (code_agent dispara uma thread e retorna na
+        hora). Aqui devolvemos uma mensagem LIMPA pro usuário — sem ecoar o brief
+        com o preâmbulo de guardrails — apontando pra aba Execução. Quando o Codex
+        termina, o próprio code_agent notifica (fila de lembretes + Telegram) e o
+        brain_switch dispara a auditoria do Claude.
+        """
         import delegacao
         import brain_switch
 
         brief = delegacao.montar_brief(text, plano)
-        response = brain_switch.dispatch(brief, engine="codex")
-        # Retorna resposta + flag de que Codex foi despachado
-        return response, True
+        raw = brain_switch.dispatch(brief, engine="codex")  # assíncrono
+        # Sucesso do disparo → mensagem amigável; senão (ex.: Codex indisponível,
+        # fallback) repassa a mensagem crua do motor.
+        if raw and str(raw).startswith("Codex rodando"):
+            msg = (f"🛠️ Codex assumiu a execução: **{text}**\n\n"
+                   "Está rodando em segundo plano — acompanhe ao vivo na aba "
+                   "**Execução**. Quando terminar, o Claude audita o resultado e "
+                   "eu te aviso, senhor.")
+            return msg, True
+        return (raw, True)
 
     # ── Classify ──────────────────────────────────────────────
 
