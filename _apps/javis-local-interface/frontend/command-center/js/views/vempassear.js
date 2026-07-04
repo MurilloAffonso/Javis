@@ -747,6 +747,35 @@ function vpMarketing() {
     board.appendChild(colEl);
   });
   host.appendChild(board);
+
+  // ---------- Conteúdo vindo do Estúdio (GET /conteudo?projeto=vempassear) ----------
+  // Conecta o Estúdio de Conteúdo à VP: o que você cria/publica lá aparece aqui.
+  const secao = h(`<div style="margin-top:24px">
+    <div class="section-h">✍️ Conteúdo do Estúdio</div>
+    <div class="card-sub" style="margin:-4px 0 10px">Posts criados na aba <b>Conteúdo</b> para a Vem Passear aparecem aqui.</div>
+    <div id="vp-estudio-list"><div class="op-empty">Carregando…</div></div>
+  </div>`);
+  host.appendChild(secao);
+  if (state.online) {
+    tryJson(BACKEND + "conteudo?projeto=vempassear").then((d) => {
+      const list = $("vp-estudio-list"); if (!list) return;
+      const itens = d.itens || [];
+      if (!itens.length) { list.innerHTML = `<div class="op-empty">Nenhum conteúdo ainda. Crie na aba <b>Conteúdo</b>. 👈</div>`; return; }
+      list.innerHTML = "";
+      const grid = h(`<div class="fk-cards" style="max-width:660px"></div>`);
+      const STA = { rascunho: ["Rascunho", "wait"], agendado: ["Agendado", "warn"], publicado: ["Publicado", "ok"] };
+      itens.forEach((it) => {
+        const [lbl, cls] = STA[it.status] || STA.rascunho;
+        const card = h(`<div class="fk-card"><div class="fk-card-nome"></div><div class="fk-card-meta"><span class="vp-canal"></span> · <span class="badge ${cls}"><span class="dot ${cls}"></span>${lbl}</span></div></div>`);
+        card.querySelector(".fk-card-nome").textContent = it.title || "(sem título)";
+        card.querySelector(".vp-canal").textContent = it.channel || "—";
+        grid.appendChild(card);
+      });
+      list.appendChild(grid);
+    }).catch(() => { const l = $("vp-estudio-list"); if (l) l.innerHTML = `<div class="op-empty">Não consegui carregar agora.</div>`; });
+  } else {
+    const l = $("vp-estudio-list"); if (l) l.innerHTML = `<div class="op-empty">Backend offline — sem conteúdo do Estúdio.</div>`;
+  }
 }
 
 // ---------- Resultados (dummy) ----------
