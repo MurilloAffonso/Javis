@@ -344,12 +344,19 @@ body { background:
 .sidebar { background: linear-gradient(180deg, var(--bg-2) 0%, var(--bg) 65%, #1a120b 100%); }
 
 /* Menu como grade de tiles (ícone em cima, label embaixo) */
-#nav-menu { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
-.nav-tile { display:flex; flex-direction:column; align-items:center; gap:6px; padding:11px 3px; border-radius:11px; color:var(--muted); cursor:pointer; font-size:10px; font-weight:500; text-align:center; transition:all .15s; }
-.nav-tile svg { width:18px; height:18px; }
+/* Nav em lista vertical (estilo MegaBrain): ícone + rótulo lado a lado,
+   trilho laranja no item ativo. */
+#nav-menu { display:flex; flex-direction:column; gap:2px; }
+.nav-tile { display:flex; flex-direction:row; align-items:center; justify-content:flex-start;
+  gap:11px; padding:8px 10px; border-radius:8px; color:var(--muted); cursor:pointer;
+  font-size:13px; font-weight:500; text-align:left; position:relative;
+  transition:background .12s, color .12s; }
+.nav-tile svg { width:17px; height:17px; flex:0 0 auto; }
 .nav-tile:hover { background:var(--card); color:var(--text); }
-.nav-tile.active { background:var(--accent-soft); color:#ffd9b3; }
-.nav-tile.active svg { color:var(--accent-2); }
+.nav-tile.active { background:var(--accent-soft); color:var(--text); }
+.nav-tile.active::before { content:""; position:absolute; left:-4px; top:7px; bottom:7px;
+  width:3px; border-radius:0 3px 3px 0; background:var(--accent); }
+.nav-tile.active svg { color:var(--accent); }
 
 /* Rodapé com glow avermelhado */
 .sb-footer { margin-top:20px; text-align:center; font-size:11px; font-weight:600; color:#ffb877; padding:12px; border-radius:12px;
@@ -399,7 +406,7 @@ body { background:
 .iso-node[style*="cursor"]:hover .iso-tower { transform:scale(1.08); transition:transform .15s; }
 
 /* Menu com 6 itens → 2 linhas de 3 */
-#nav-menu { grid-template-columns:repeat(3,1fr); }
+/* (nav agora é lista vertical — ver regra #nav-menu acima) */
 
 /* ═══════════════════════════════════════════════════════════════════
    ORB DE VOZ — Stage central com canvas pulsante + controles
