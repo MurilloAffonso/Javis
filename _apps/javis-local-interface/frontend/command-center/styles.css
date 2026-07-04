@@ -940,3 +940,33 @@ body { background:
 /* Área Vem Passear: operação da agência sem painel técnico do Javes */
 .app.vp-mode { grid-template-columns: 272px 1fr; }
 .app.vp-mode .rightpanel { display:none; }
+
+/* Vem Passear — identidade "laranja + toque de mar" (praia/oceano).
+   Mantém o preto quente + laranja da base, mas o acento secundário vira teal:
+   gradientes laranja→mar (pôr-do-sol) e destaques numéricos em água. */
+.app.vp-mode {
+  --accent-2:  #2bd4c4;
+  --sea:       #2bd4c4;
+  --sea-soft:  rgba(43, 212, 196, 0.14);
+}
+.app.vp-mode .canvas {
+  background:
+    radial-gradient(720px 380px at 88% -6%, rgba(43,212,196,.08), transparent 58%),
+    radial-gradient(560px 360px at 0% 108%, rgba(43,212,196,.05), transparent 60%);
+}
+.app.vp-mode .vp-boundary {
+  background:linear-gradient(135deg, rgba(255,106,26,.10), var(--sea-soft));
+  border-color:rgba(43,212,196,.35); color:#bfeee8;
+}
+.app.vp-mode .vp-stat-n,
+.app.vp-mode .at-dash-n,
+.app.vp-mode .at-lead-status { color:var(--sea); }
+.app.vp-mode .vp-chip.active,
+.app.vp-mode .at-lead-item.active,
+.app.vp-mode .at-funnel-step.current {
+  border-color:var(--sea); background:var(--sea-soft); color:#bfeee8;
+}
+.app.vp-mode .brand .logo {
+  background:linear-gradient(135deg, var(--accent), var(--sea));
+  box-shadow:0 4px 14px rgba(43,212,196,.35);
+}
