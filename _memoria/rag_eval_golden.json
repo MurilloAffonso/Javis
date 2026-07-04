@@ -1,0 +1,66 @@
+[
+  {
+    "q": "Como funciona a arquitetura atual do Javis?",
+    "relevant": ["ARQUITETURA-JAVES", "javis-arquitetura", "JAVIS-ARQUITETURA-ATUAL"]
+  },
+  {
+    "q": "Como o Javis transforma voz em comando sem usar LLM?",
+    "relevant": ["JAVIS-VOICE-TO-COMMAND-ROUTER", "voz-para-comando", "comando-de-voz-local"]
+  },
+  {
+    "q": "Quais regras o Javis nunca deve violar (dry_run, git, arquivos)?",
+    "relevant": ["javis-regras"]
+  },
+  {
+    "q": "Qual a decisão de usar o Claude da assinatura em vez de API paga?",
+    "relevant": ["claude-assinatura", "openrouter-mapa", "apis.md"]
+  },
+  {
+    "q": "O que significam os nomes Javes, Jampa, Vem Passear e Cérebro Jampa?",
+    "relevant": ["GLOSSARIO-NOMES"]
+  },
+  {
+    "q": "Como criar uma oferta irresistível nas vendas segundo o Hormozi?",
+    "relevant": ["mentores-oferta-irresistivel-hormozi"]
+  },
+  {
+    "q": "Qual a técnica para abordar clientes e gerar confiança na venda?",
+    "relevant": ["como-abordar-clientes-e-gerar-confian", "o-segredo-para-se-tornar-um-bom-vendedor"]
+  },
+  {
+    "q": "Como é o pipeline de gestão de marketing com aprovação humana?",
+    "relevant": ["pipeline-gestao-marketing", "blueprint-cohort-marketing-os", "TESTE_E2E_CAMPANHA_VP"]
+  },
+  {
+    "q": "Quais agentes formam o squad da Vem Passear e seus contratos?",
+    "relevant": ["VEM_PASSEAR_SQUAD_MAP", "agentes-contratos"]
+  },
+  {
+    "q": "Qual a recomendação de latência de ASR para o pipeline de voz?",
+    "relevant": ["JAVIS-ASR-LATENCY-RECOMENDACAO"]
+  },
+  {
+    "q": "Quais são os próximos passos e o roadmap da interface local?",
+    "relevant": ["proximos-passos", "JAVIS-LOCAL-INTERFACE-ROADMAP"]
+  },
+  {
+    "q": "O que faz o agente rootcause quando uma resposta falha?",
+    "relevant": ["agente-rootcause"]
+  },
+  {
+    "q": "Qual o papel do AIOS Master na montagem de squads?",
+    "relevant": ["agente-aios_master"]
+  },
+  {
+    "q": "O que faz o agente AEO strategist?",
+    "relevant": ["agente-aeo_strategist"]
+  },
+  {
+    "q": "Como funciona a skill de abrir sessao?",
+    "relevant": ["abrir-sessao"]
+  },
+  {
+    "q": "O que aprendi sobre o CrewAI e o Haystack no treino tecnico?",
+    "relevant": ["crewai", "haystack"]
+  }
+]
