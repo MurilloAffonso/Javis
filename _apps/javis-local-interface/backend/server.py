@@ -1552,6 +1552,20 @@ def _brain(text: str, history: list[dict], use_conclave: bool = False) -> dict:
             return {"text": f"O conclave falhou, senhor: {e}", "intent": intent,
                     "brain": "conclave", "status": "error", "tools": [], "route": route, "orch": None}
 
+    # 2.5) Delegação automática Claude→Codex — se ligada (JAVIS_AUTO_CODEX) e a
+    #      tarefa for execução pura (verbo inequívoco: programa, refatora, roda…),
+    #      passa direto pro Codex com guardrails, sem gastar o cérebro. Claude
+    #      audita depois via _audit_after_codex. Falha → cai no fluxo normal.
+    try:
+        from delegacao import enabled as _deleg_on, should_delegate as _deleg_match
+        if _deleg_on() and _deleg_match(text):
+            resp, _ = orchestrator._run_exec(text, "")
+            return {"text": resp or "Codex despachado, senhor.", "intent": intent,
+                    "brain": "exec", "status": "codex", "tools": ["codex"],
+                    "route": route, "orch": None}
+    except Exception:
+        pass  # delegação nunca deve derrubar o chat — segue pro agente
+
     import agent
 
     # 3) Cérebro AGENTE (tool-use) — caminho ÚNICO pra conversa E ação (correção

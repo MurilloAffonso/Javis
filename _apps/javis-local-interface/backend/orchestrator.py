@@ -94,8 +94,8 @@ class Orchestrator:
         result = OrchestrationResult()
 
         # Atalho determinístico: se should_delegate, roteia pro Codex sem classificar
-        from backend.delegacao import enabled, should_delegate
-        if enabled() and should_delegate(user_input):
+        import delegacao
+        if delegacao.enabled() and delegacao.should_delegate(user_input):
             response, _ = self._run_exec(user_input, "")
             result.response = response
             result.brain = "exec"
@@ -200,10 +200,10 @@ class Orchestrator:
 
     def _run_exec(self, text: str, plano: str = "") -> tuple[str, bool]:
         """Roteia pra Codex via brain_switch com guardrails."""
-        from backend.delegacao import montar_brief
-        from backend import brain_switch
+        import delegacao
+        import brain_switch
 
-        brief = montar_brief(text, plano)
+        brief = delegacao.montar_brief(text, plano)
         response = brain_switch.dispatch(brief, engine="codex")
         # Retorna resposta + flag de que Codex foi despachado
         return response, True

@@ -1,6 +1,12 @@
-import pytest
+"""Testes do módulo delegacao — política de delegação Claude→Codex."""
+import sys
 import os
-from backend.delegacao import should_delegate, montar_brief, enabled
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+
+import pytest
+from delegacao import should_delegate, montar_brief, enabled
 
 
 def test_should_delegate_programa():
