@@ -14,6 +14,8 @@ import { viewTarefas } from "./js/views/tarefas.js";
 import { viewPainel } from "./js/views/painel.js";
 import { viewConfig } from "./js/views/config.js";
 import { viewExec } from "./js/views/exec.js";
+import { viewMaquina } from "./js/views/maquina.js";
+import { viewConteudo } from "./js/views/conteudo.js";
 // Helpers do núcleo que as telas-módulo consomem (live bindings):
 export { _esc, h, $, state, BACKEND, tryJson, renderCanvas, renderRightPanel, setView, opToast, opSend, opEsc, confirmStrong, activeAgent, pct, sc, projName, tele };
 
@@ -34,10 +36,12 @@ const ICONS = {
   rotina: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
   vp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12s3-4 9-4 9 4 9 4M3 17s3-3 9-3 9 3 9 3"/><circle cx="12" cy="6" r="2"/></svg>',
   acoes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>',
+  conteudo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
 };
 
 const NAV = [
   { id: "chat",    label: "Chat",    icon: ICONS.chat },
+  { id: "maquina", label: "A Máquina", icon: ICONS.conclave },
   { id: "operacao",label: "Operação", icon: ICONS.board },
   { id: "conclave",label: "Conclave", icon: ICONS.conclave },
   { id: "missoes", label: "Missões", icon: ICONS.missoes },
@@ -46,6 +50,7 @@ const NAV = [
   { id: "painel",  label: "Painel",  icon: ICONS.panel },
   { id: "treino",  label: "Treino",  icon: ICONS.train },
   { id: "rotina",  label: "Rotina",  icon: ICONS.rotina },
+  { id: "conteudo", label: "Conteúdo", icon: ICONS.conteudo },
   { id: "vempassear", label: "Vem Passear", icon: ICONS.vp },
   { id: "config",  label: "Config",  icon: ICONS.config },
 ];
@@ -164,7 +169,7 @@ function fillAgentGroup(boxId, list) {
 }
 
 // ---------- Tabs / view ----------
-const TITLES = { chat: "Chat", operacao: "Operação · Quadro & Aprovações", conclave: "Conclave · Debate de Agentes", missoes: "Missões", tarefas: "Orquestrador de Tarefas", painel: "Painel", treino: "Treinamento", rotina: "Rotina · Briefing, Histórico & Lembretes", vempassear: "Projeto conectado · Vem Passear Jampa", exec: "Execução em Tempo Real", config: "Configurações" };
+const TITLES = { chat: "Chat", maquina: "A Máquina · Pipeline de Conhecimento", operacao: "Operação · Quadro & Aprovações", conclave: "Conclave · Debate de Agentes", missoes: "Missões", tarefas: "Orquestrador de Tarefas", painel: "Painel", treino: "Treinamento", rotina: "Rotina · Briefing, Histórico & Lembretes", conteudo: "Estúdio de Conteúdo", vempassear: "Projeto conectado · Vem Passear Jampa", exec: "Execução em Tempo Real", config: "Configurações" };
 function setView(v) {
   if (window._execPollTimer) { clearInterval(window._execPollTimer); window._execPollTimer = null; }
   state.view = v; renderSidebar(); renderCanvas(); renderRightPanel();
@@ -178,7 +183,7 @@ function renderCanvas() {
     return viewSearch(body);
   }
   $("canvas-title").textContent = TITLES[state.view] || "";
-  ({ chat: viewChat, operacao: viewOperacao, conclave: viewConclave, missoes: viewMissoes, exec: viewExec, tarefas: viewTarefas, painel: viewPainel, treino: viewTreino, rotina: viewRotina, vempassear: viewVempassear, config: viewConfig }[state.view] || viewChat)(body);
+  ({ chat: viewChat, maquina: viewMaquina, operacao: viewOperacao, conclave: viewConclave, missoes: viewMissoes, exec: viewExec, tarefas: viewTarefas, conteudo: viewConteudo, painel: viewPainel, treino: viewTreino, rotina: viewRotina, vempassear: viewVempassear, config: viewConfig }[state.view] || viewChat)(body);
 }
 
 function viewSearch(body) {
