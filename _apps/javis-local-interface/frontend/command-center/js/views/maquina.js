@@ -1,7 +1,7 @@
 // A Máquina — pipeline de conhecimento do Javis em grafo (DAG esquerda→direita).
 // Nós = etapas; arestas SVG curvas por trás; fluxo principal com tracejado animado.
 // CSS próprio, injetado de forma idempotente (não toca no styles.css global).
-import { h } from "../../app.js";
+import { h, state, BACKEND, tryJson } from "../../app.js";
 
 // ---------- Definição do grafo ----------
 // Cada nó: posição em % (centro), título, ícone, métrica (número grande), unidade,
@@ -200,6 +200,28 @@ export function viewMaquina(body) {
   </div>`));
 
   body.appendChild(wrap);
+
+  // ---------- Números ao vivo (GET /maquina/stats) ----------
+  // Injeta métricas reais do backend nos nós; se offline/erro, mantém os valores base.
+  const fmt = (n) => (n == null ? null : Number(n).toLocaleString("pt-BR"));
+  const setMetric = (key, txt, unit) => {
+    const node = wrap.querySelector("#mq-" + key);
+    if (!node) return;
+    if (txt != null) { const m = node.querySelector(".mq-metric"); if (m) m.textContent = txt; }
+    if (unit != null) { const u = node.querySelector(".mq-unit"); if (u) u.textContent = unit; }
+  };
+  if (state.online) {
+    tryJson(BACKEND + "maquina/stats").then((s) => {
+      if (!document.body.contains(wrap)) return;
+      if (s.capture != null)   setMetric("capture", fmt(s.capture), "fontes indexadas");
+      if (s.chunk != null)     setMetric("chunk",   fmt(s.chunk),   "blocos");
+      if (s.rag != null)       setMetric("rag",     fmt(s.rag),     "vetores · FTS5 + cosine · RRF");
+      if (s.grafo_nos != null) setMetric("grafo",   fmt(s.grafo_nos), "nós · " + fmt(s.grafo_arestas || 0) + " arestas");
+      if (s.dossies)           setMetric("identity", fmt(s.dossies), "dossiês · 10 dimensões DNA");
+      const hm = wrap.querySelector(".mq-head-metrics");
+      if (hm) hm.innerHTML = `<b>6</b> estágios · <b>${fmt(s.chunk || 0)}</b> chunks · <b>${fmt(s.grafo_nos || 0)}</b> conceitos · <b>1</b> agente`;
+    }).catch(() => {});
+  }
 
   // ---------- Desenho das arestas (após o DOM montar) ----------
   const centerOf = (key, wrapRect) => {

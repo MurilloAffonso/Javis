@@ -364,6 +364,41 @@ async def conteudo_add(req: ConteudoReq):
         return JSONResponse({"status": "erro", "erro": str(e)}, status_code=500)
 
 
+@app.get("/maquina/stats")
+async def maquina_stats():
+    """Números reais do pipeline de conhecimento (A Máquina). Tolerante a falha:
+    cada métrica cai em None se a tabela/arquivo não existir, e o front mantém o valor de projeto."""
+    import db
+    def _c(sql, params=()):
+        try:
+            row = db.query_one(sql, params)
+            return list(row.values())[0] if row else None
+        except Exception:
+            return None
+    def _t(table):
+        try:
+            return db.count(table)
+        except Exception:
+            return None
+    # dossiês de DNA (arquivos .json em _memoria/dna/)
+    try:
+        dna_dir = Path(__file__).resolve().parents[3] / "_memoria" / "dna"
+        dossies = len(list(dna_dir.glob("*.json"))) if dna_dir.exists() else None
+    except Exception:
+        dossies = None
+    chunks = _t("knowledge_chunks")
+    return JSONResponse({
+        "capture":       _c("SELECT COUNT(DISTINCT path) AS n FROM knowledge_chunks"),
+        "chunk":         chunks,
+        "rag":           chunks,
+        "grafo_nos":     _t("kg_nodes"),
+        "grafo_arestas": _t("kg_edges"),
+        "dossies":       dossies,
+        "mensagens":     _t("messages"),
+        "conteudos":     _t("content"),
+    })
+
+
 # ── Linha editorial (pauta de posts planejados) ──
 @app.get("/vp/pauta")
 async def vp_pauta_list():
