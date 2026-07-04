@@ -8,6 +8,7 @@ Endpoints:
   GET  /history       → chat history (last 50)
 """
 from __future__ import annotations
+import os
 import sys
 import re as _re
 import socket
