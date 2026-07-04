@@ -25,7 +25,7 @@ Analise o input e retorne SOMENTE um JSON válido (sem markdown, sem explicaçã
 {
   "intent": "<o que o usuário quer em 2-4 palavras>",
   "complexity": "simple|medium|complex",
-  "brain": "main|conclave|squad|memory",
+  "brain": "main|conclave|squad|memory|exec",
   "agents": ["<lista de agentes necessários>"],
   "plan": "<plano de ação em 1-2 frases>",
   "requires_action": true|false,
@@ -44,6 +44,7 @@ Regras de brain:
 - conclave: decisões que precisam de debate crítico (usa conclave_rounds=2 se complex)
 - squad:    tarefas que precisam de múltiplos especialistas colaborando
 - memory:   buscar histórico, preferências, decisões anteriores
+- exec:     tarefa de execução pura (programar, rodar, refatorar) → delega pro Codex
 
 Agentes disponíveis: architect, developer, analyst, qa, jarvis_soul
 
@@ -81,6 +82,7 @@ class OrchestrationResult:
     conclave_result: dict = field(default_factory=dict)
     squad_result:    dict = field(default_factory=dict)
     memory_context:  str  = ""
+    exec_running:    bool = False
     fallback:        bool = False
 
 
@@ -90,6 +92,15 @@ class Orchestrator:
 
     def process(self, user_input: str, history: list[dict] | None = None) -> OrchestrationResult:
         result = OrchestrationResult()
+
+        # Atalho determinístico: se should_delegate, roteia pro Codex sem classificar
+        from backend.delegacao import enabled, should_delegate
+        if enabled() and should_delegate(user_input):
+            response, _ = self._run_exec(user_input, "")
+            result.response = response
+            result.brain = "exec"
+            result.exec_running = True
+            return result
 
         plan = self._classify(user_input)
         if plan:
@@ -113,7 +124,10 @@ class Orchestrator:
 
         brain = result.brain
 
-        if brain == "memory":
+        if brain == "exec":
+            result.response, result.exec_running = self._run_exec(user_input, result.plan)
+
+        elif brain == "memory":
             result.response = self._memory_brain(user_input, result)
 
         elif brain == "squad" or (brain == "main" and len(result.agents_used) >= 2):
@@ -183,6 +197,16 @@ class Orchestrator:
             return call_claude(messages)
         except Exception as e:
             return f"Cérebro indisponível: {e}"
+
+    def _run_exec(self, text: str, plano: str = "") -> tuple[str, bool]:
+        """Roteia pra Codex via brain_switch com guardrails."""
+        from backend.delegacao import montar_brief
+        from backend import brain_switch
+
+        brief = montar_brief(text, plano)
+        response = brain_switch.dispatch(brief, engine="codex")
+        # Retorna resposta + flag de que Codex foi despachado
+        return response, True
 
     # ── Classify ──────────────────────────────────────────────
 
