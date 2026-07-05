@@ -34,11 +34,11 @@ def _is_relevant(path: str, relevant: list[str]) -> bool:
 
 
 def _retrieve(mode: str, query: str, k: int) -> list[dict]:
-    """Retorna os hits de um dos retrievers. 'hybrid' chama o módulo híbrido;
-    'legacy' força o índice JSON desligando a flag JAVIS_RAG temporariamente."""
-    if mode == "hybrid":
+    """Retorna os hits de um dos retrievers. 'hybrid'/'reranked' chamam o módulo
+    híbrido (rerank off/on); 'legacy' força o índice JSON via flag JAVIS_RAG."""
+    if mode in ("hybrid", "reranked"):
         import knowledge_hybrid as kh
-        return kh.search(query, k)
+        return kh.search(query, k, rerank=(mode == "reranked"))
     import knowledge
     old = os.environ.get("JAVIS_RAG")
     os.environ["JAVIS_RAG"] = "legacy"

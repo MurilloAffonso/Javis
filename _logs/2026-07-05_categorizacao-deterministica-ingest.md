@@ -68,6 +68,36 @@ Verificado ao vivo no DB real:
   Passear" liberam).
 - Suíte: 23/25 arquivos OK (as 2 falhas seguem pré-existentes).
 
+## Fase 3 — Rerank (medido e descartado) + portão de relevância apertado
+
+### Rerank: medido, PIORA, mantido off
+Implementado `_rerank` (fusão de scores normalizados sem/kw) + flag `rerank=` em
+`search`/`answer_context` + modo `reranked` em `knowledge_eval`.
+
+**Armadilha pega no meio do caminho:** os scripts standalone não carregavam o `.env`,
+então rodavam SEM `OPENAI_API_KEY` → semântico morto → tudo BM25 (todo `sem=0.000`).
+A 1ª medição ("rerank é no-op") era inválida. Re-medido carregando o `.env`:
+
+| métrica (k=5) | RRF puro | reranked |
+|---|---|---|
+| hit_rate | 1.000 | 1.000 |
+| mrr | **0.958** | 0.828 (−0.13) |
+
+O RRF+híbrido já é quase perfeito (relevante no topo); o rerank por fusão só
+desarruma. **Fica off.** Código mantido como estágio togglável p/ medir cross-encoder
+futuro (onnxruntime já instalado; sentence-transformers/torch não).
+
+### Portão de relevância do answer_context (apertado com guard)
+Golden com embeddings: chunks RELEVANTES têm sem>=0.47 (mediana 0.62); kw-only com
+sem~0 é ruído (5/5 não-relevantes). O gate antigo (`sem>=0.15 OU kw`) deixava esse
+ruído passar. Novo gate: `sem>=0.35 OU (kw E sem>=0.25)`, com **guard**: se o
+embedding estiver morto (sem key em runtime, todo sem=0), volta ao gate legado pra
+NÃO zerar o grounding (evita reabrir o bug de alucinação).
+
+Verificado: retenção do relevante **16/16** com embeddings, **zero contexto vazio**;
+degradado sem key também mantém grounding (BM25). Suíte 23/25 (2 falhas pré-existentes).
+
 ## Próximo passo
-Melhorias 2 e 3 do roadmap de RAG: **rerank** (precisão pós-RRF) e **grafo
-LazyGraphRAG**. Ambas se apoiam nesta categorização.
+Item 3 do roadmap: **grafo LazyGraphRAG** sobre `knowledge_graph.py`. Ou curar um
+golden set mais ambíguo p/ reavaliar cross-encoder ONNX. Retriever atual já é forte
+(mrr 0.958), então o teto de ganho em ordenação é baixo — o grafo é a aposta maior.

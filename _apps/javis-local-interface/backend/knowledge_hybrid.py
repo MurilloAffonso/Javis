@@ -29,7 +29,13 @@ import db
 import knowledge as _k   # reuso: _iter_files, _external_vaults, _embed_batch, _chunks, _load_index, JAVIS_ROOT
 
 _RRF_K = 60                 # constante clássica do Reciprocal Rank Fusion
-_SEM_MIN = 0.15            # similaridade mínima p/ um hit puramente semântico virar contexto
+_SEM_MIN = 0.15            # piso legado (usado no modo degradado, sem embeddings)
+# Portão de relevância do answer_context (com embeddings vivos). Medido no golden
+# 2026-07-05: chunks RELEVANTES têm sem>=0.47 (mediana 0.62); o casamento kw-only
+# com sem~0 é ruído (5/5 não-relevantes). Estes cortes mantêm retenção 100% e
+# eliminam o ruído "match fraco só por palavra".
+_SEM_KEEP = 0.35           # piso p/ um chunk entrar no contexto por conta própria
+_SEM_KW_FLOOR = 0.25       # piso menor p/ um casamento BM25 ainda contar (guarda exato-termo)
 
 _lock = threading.Lock()
 _building = False
@@ -273,6 +279,37 @@ def _rrf(sem: list[tuple[int, float]], kw: list[tuple[int, int]], k: int):
     return ordered
 
 
+# Peso da MAGNITUDE semântica no rerank (vs. posição BM25). O RRF puro ordena só
+# por rank e joga fora quão forte é o casamento semântico; o rerank recupera isso.
+_RERANK_ALPHA = 0.7
+
+
+def _rerank(cand_ids: list[int], sem_by_id: dict[int, float],
+            kw_rank_by_id: dict[int, int], rrf_by_id: dict[int, float],
+            alpha: float = _RERANK_ALPHA) -> list[tuple[int, float]]:
+    """Reordena o pool de candidatos por FUSÃO DE SCORES normalizados: mistura a
+    magnitude do cosseno (min-max no pool) com o sinal BM25 (1/(1+rank)). O RRF
+    entra só como desempate. Sem modelo, sem latência. Retorna [(id, score)] desc."""
+    sems = [max(sem_by_id.get(c, 0.0), 0.0) for c in cand_ids]
+    smax = max(sems) if sems else 0.0
+    smin = min(sems) if sems else 0.0
+    span = smax - smin
+
+    def sn(c: int) -> float:                      # semântico normalizado [0,1]
+        v = max(sem_by_id.get(c, 0.0), 0.0)
+        if span > 1e-9:
+            return (v - smin) / span
+        return 1.0 if v > 0 else 0.0
+
+    def kn(c: int) -> float:                       # keyword: melhor rank BM25 → mais perto de 1
+        r = kw_rank_by_id.get(c)
+        return 1.0 / (1.0 + r) if r is not None else 0.0
+
+    scored = [(c, alpha * sn(c) + (1.0 - alpha) * kn(c)) for c in cand_ids]
+    scored.sort(key=lambda x: (x[1], rrf_by_id.get(x[0], 0.0)), reverse=True)
+    return scored
+
+
 def _ids_no_escopo(escopo) -> set[int] | None:
     """Conjunto de ids de chunk permitidos pelo escopo (categoria). None = sem
     filtro. `escopo` pode ser uma str ('vp') ou lista (['projeto','pessoal'])."""
@@ -288,9 +325,13 @@ def _ids_no_escopo(escopo) -> set[int] | None:
     return {int(r["id"]) for r in rows}
 
 
-def search(query: str, k: int = 5, escopo=None) -> list[dict]:
+def search(query: str, k: int = 5, escopo=None, rerank: bool = False) -> list[dict]:
     """Busca híbrida. Retorna [{path, chunk, score, sem, kw}] mais relevantes.
-    `escopo` (str|list) filtra por categoria: 'pessoal' | 'projeto' | 'vp'."""
+    `escopo` (str|list) filtra por categoria: 'pessoal' | 'projeto' | 'vp'.
+    `rerank`: reordena o pool fundido por magnitude de score. Default OFF —
+    medido no golden set COM embeddings (2026-07-05): PIORA o RRF (mrr 0.958→0.83,
+    −0.13), pois desarruma um ranking já quase perfeito. Mantido só como estágio
+    togglável p/ medir rerankers futuros; ganho real exigiria cross-encoder."""
     query = (query or "").strip()
     if not query:
         return []
@@ -312,7 +353,13 @@ def search(query: str, k: int = 5, escopo=None) -> list[dict]:
 
     sem_by_id = {cid: s for cid, s in sem}
     kw_ids = {cid for cid, _ in kw}
-    ordered = _rrf(sem, kw, k)
+    if rerank:
+        kw_rank_by_id = {cid: r for cid, r in kw}
+        cand = list(dict.fromkeys([c for c, _ in sem] + [c for c, _ in kw]))  # união, dedup ordem-preservada
+        rrf_by_id = dict(_rrf(sem, kw, len(cand)))                            # desempate
+        ordered = _rerank(cand, sem_by_id, kw_rank_by_id, rrf_by_id)[:k]
+    else:
+        ordered = _rrf(sem, kw, k)
     ids = [cid for cid, _ in ordered]
     if not ids:
         return []
@@ -335,16 +382,25 @@ def search(query: str, k: int = 5, escopo=None) -> list[dict]:
     return out
 
 
-def answer_context(query: str, k: int = 5, escopo=None) -> str:
+def answer_context(query: str, k: int = 5, escopo=None, rerank: bool = False) -> str:
     """Monta o bloco de contexto (para o agente responder). `escopo` (str|list)
-    restringe a categoria: 'pessoal' | 'projeto' | 'vp'."""
-    hits = search(query, k, escopo=escopo)
+    restringe a categoria: 'pessoal' | 'projeto' | 'vp'. `rerank`: default OFF
+    (sem ganho medido sobre o RRF; ver search())."""
+    hits = search(query, k, escopo=escopo, rerank=rerank)
     if not hits:
         return ""
+    # Guard: se o embedding estiver morto (sem OPENAI_API_KEY em runtime), TODO sem
+    # vem 0 → cai no gate legado (kw OU sem>=_SEM_MIN) pra NÃO zerar o grounding.
+    sem_vivo = any(h["sem"] > 0 for h in hits)
     blocos = []
     for h in hits:
-        # mantém se tem semelhança semântica decente OU casou por palavra-chave (BM25)
-        if h["sem"] < _SEM_MIN and not h["kw"]:
+        if sem_vivo:
+            # embedding vivo: piso semântico firme; kw só conta se ainda houver
+            # alguma afinidade semântica (mata "match fraco só por palavra").
+            keep = h["sem"] >= _SEM_KEEP or (h["kw"] and h["sem"] >= _SEM_KW_FLOOR)
+        else:
+            keep = h["kw"] or h["sem"] >= _SEM_MIN     # modo degradado (legado)
+        if not keep:
             continue
         blocos.append(f"[{h['path']}]\n{h['chunk']}")
     return "\n\n---\n\n".join(blocos)
