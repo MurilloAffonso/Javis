@@ -1,0 +1,186 @@
+{
+  "status": "ok",
+  "fonte": "megabrain-blueprint-thiago-finch.md",
+  "tema": "megabrain-blueprint-thiago-finch",
+  "gerado_em": "2026-07-05T04:07:14",
+  "resumo": "Thiago Finch destila sua tese de que na onda da IA o dinheiro migra de quem apenas usa para quem orquestra, e apresenta o Megabrain como a 'máquina' que recebe prompts com coordenação/harness — deslocando o founder da operação-gargalo para o estratégico.",
+  "fidelidade": 82,
+  "dna": {
+    "filosofias": [
+      {
+        "ideia": "Em toda onda tecnológica o dinheiro troca de mão: sai de quem só consome a ferramenta e entra em quem a orquestra.",
+        "evidencia": "em toda onda o dinheiro troca de mão, sai do bolso de quem só usa IA, entra no bolso de quem orquestra"
+      },
+      {
+        "ideia": "A IA é uma janela de oportunidade análoga ao Bitcoin, porém mais certa: quem ousar se posicionar e usar as ferramentas certas vence.",
+        "evidencia": "A janela abriu de novo e essa janela se chama inteligência artificial... Vai dar certo, se você ousar se posicionar"
+      },
+      {
+        "ideia": "Coordenação vale mais que execução — quem coordena a IA ganha.",
+        "evidencia": "Primeiro segredo pessoal é coordenação, isso vale mais do que execução, quem coordena a IA ganha"
+      },
+      {
+        "ideia": "As regras clássicas do marketing/digital continuam valendo com ou sem IA; a IA não dispensa a estrutura de negócio.",
+        "evidencia": "obedecer regras clássicas e que vão continuar funcionando, quer a IA esteja aqui ou não"
+      }
+    ],
+    "modelos_mentais": [
+      {
+        "ideia": "O foco não é o prompt, é a máquina que recebe o prompt — construir o sistema em vez de otimizar pedidos isolados.",
+        "evidencia": "eu não me preocupo com prompt, eu me preocupo com a máquina que está recebendo esse prompt"
+      },
+      {
+        "ideia": "Toda tarefa aparentemente simples esconde dezenas de microtarefas; 'criar uma landing page' são 55 microtarefas.",
+        "evidencia": "Você sabe quantas microtarefas existem na frase criar uma landing page?... 55 microtarefas"
+      },
+      {
+        "ideia": "O founder que domina o chão de fábrica é insubstituível porque tem um raciocínio que ninguém contratado tem.",
+        "evidencia": "ela não tem o teu raciocínio, ela não passou pelo chão de fábrica como você"
+      },
+      {
+        "ideia": "O empreendedor vira o gargalo do próprio negócio quando é drenado pela operação em vez do estratégico.",
+        "evidencia": "você virou o gargalo do seu negócio... o quanto você é drenado pela operação, ao invés de estar no estratégico"
+      },
+      {
+        "ideia": "A IA precisa de um 'harness' — trilhos por onde percorrer — senão entrega genérico apoiada só na inteligência da LLM.",
+        "evidencia": "você não tem harness para a IA, você está contando com a inteligência que ela tem... vai ficar uma bosta"
+      }
+    ],
+    "frameworks": [
+      {
+        "ideia": "Megabrain: uma máquina/estrutura persistente que recebe os prompts, em oposição a prompts avulsos.",
+        "evidencia": "é por isso que eu construí uma máquina, eu construí algo que literalmente... e aí nasceu o Megabrain"
+      },
+      {
+        "ideia": "Mapear o processo em microtarefas antes de delegar à IA, identificando quais ela já executa (hoje ~75% das antes humanas).",
+        "evidencia": "a inteligência artificial faz 75% dessas atividades, que antes eram humanas"
+      },
+      {
+        "ideia": "Sequência de decisão antes de construir uma página: definir produto → narrativa → funil/etapa → design → modelo (ex.: webinário).",
+        "evidencia": "eu tenho que saber que produto eu vou vender, eu tenho que saber a narrativa... para qual funil ela é, em que etapa ela está"
+      }
+    ],
+    "heuristicas": [
+      {
+        "ideia": "Buscar velocidade, não mais horas na mesa — o gargalo se resolve com sistema, não com esforço bruto.",
+        "evidencia": "eu vi que eu precisava de mais velocidade, não de mais horas na mesa"
+      },
+      {
+        "ideia": "Antes de pedir à IA, pergunte 'quantas microtarefas existem nessa frase?' para dimensionar a coordenação necessária.",
+        "evidencia": "Quantas microtarefas existem realmente por trás disso, até você falar, ok, pode proar"
+      },
+      {
+        "ideia": "Uma frase simples resolve o dilema técnico (security/back-end) que a internet levanta contra apps feitos por IA.",
+        "evidencia": "você só tem que entender uma frase muito simples que resolve qualquer dilema que a internet está colocando hoje"
+      }
+    ],
+    "valores": [
+      {
+        "ideia": "Prefere investir nos próprios negócios a apostar em modas externas (ex.: não toca em Bitcoin/cripto).",
+        "evidencia": "Hoje eu nem toco nisso... eu prefiro investir nos meus negócios"
+      },
+      {
+        "ideia": "Resiliência absoluta: não parar nunca, mesmo diante do caos e do risco de burnout.",
+        "evidencia": "eu não vou parar, nunca, nunca"
+      },
+      {
+        "ideia": "Software e recorrência valem mais que ticket alto de lançamento, pela matemática do modelo.",
+        "evidencia": "consegui colocar literalmente mais de 55 mil pessoas assinando um software, o que para a matemática é muito mais valioso"
+      },
+      {
+        "ideia": "Padrão de exigência alto: não aceita output medíocre, quer design que impressione todo mundo.",
+        "evidencia": "para mim não é só página, é um design muito bem construído, que tem que impressionar todo mundo"
+      }
+    ],
+    "voz_tom": [
+      {
+        "ideia": "Oral, direto e provocativo, com palavrões e bordão 'Força Total' para gerar energia e urgência.",
+        "evidencia": "Ladies and gentlemen, Força Total, essa é uma live interessante"
+      },
+      {
+        "ideia": "Autodepreciação estratégica e franqueza para criar cumplicidade com a audiência.",
+        "evidencia": "eu, desculpa a expressão, caguei pra isso, caguei, meu negócio é outro"
+      },
+      {
+        "ideia": "Postura de autoridade que já viveu o que ensina, marcando distância temporal do público.",
+        "evidencia": "Você descobriu isso agora, eu já vi isso há anos"
+      }
+    ],
+    "objecoes_respostas": [
+      {
+        "ideia": "Objeção 'sou founder/CEO, não tenho tempo' → resposta: o Vale do Silício e o Y Combinator ditam que o founder terá que colocar a mão no teclado.",
+        "evidencia": "Finch, eu sou founder... eu não tenho tempo... você founder vai ter que conseguir colocar as mãos no teclado"
+      },
+      {
+        "ideia": "Objeção 'não é só pedir pra IA fazer?' → resposta: existem 55 microtarefas por trás.",
+        "evidencia": "Pô, mas espera aí, não é só pedir para IA fazer? Não! Quantas microtarefas existem"
+      },
+      {
+        "ideia": "Objeção 'IA não dá conta de security/back-end' → resposta: com a frase/estrutura certa ela entrega aplicação funcional.",
+        "evidencia": "não tem security, não tem... o back-end, a IA não consegue chegar... mas ela vai te entregar uma aplicação mais ou menos funcionando"
+      },
+      {
+        "ideia": "Objeção 'IA não substitui um bom copy/designer' → ele mesmo era cético até aprender a fazer a IA impressioná-lo.",
+        "evidencia": "está me dizendo que uma IA vai conseguir substituir um corpo writer... Não, não veio com essa não, até eu entender de fato"
+      }
+    ],
+    "gatilhos_decisao": [
+      {
+        "ideia": "Quando a empresa virou um caos ingerenciável, decidiu pausar o operacional e mergulhar na IA.",
+        "evidencia": "a minha empresa acabou virando um caos... eu vou parar o que eu estou fazendo... e eu vou emergir nisso aqui"
+      },
+      {
+        "ideia": "Reconhecer a janela aberta (como quem entrou no Bitcoin na hora certa) como gatilho para agir agora.",
+        "evidencia": "não era gênio, estava na hora certa, no momento certo, tomando a decisão certa"
+      },
+      {
+        "ideia": "Perceber-se como gargalo é o sinal para migrar da operação ao estratégico.",
+        "evidencia": "o fato de você estar na operação, que é onde você vira gargalo do seu negócio"
+      }
+    ],
+    "vocabulario": [
+      {
+        "ideia": "Orquestração — palavra-chave central, oposta a programação e vibe coding.",
+        "evidencia": "Orquestração para mim é uma das palavras-chave aqui, não é programação, não é vibe coding"
+      },
+      {
+        "ideia": "Harness — trilho/estrutura que guia a IA.",
+        "evidencia": "você não tem harness para a IA"
+      },
+      {
+        "ideia": "Megabrain — a máquina que recebe os prompts.",
+        "evidencia": "e aí nasceu o Megabrain"
+      },
+      {
+        "ideia": "Força Total — bordão de mobilização de energia/foco.",
+        "evidencia": "invocando a força total do meu cérebro, não do mega brain"
+      },
+      {
+        "ideia": "Moat competitivo — diferencial defensável do negócio.",
+        "evidencia": "qual vai ser o seu moat competitivo, ou seja, qual que é o seu diferencial"
+      },
+      {
+        "ideia": "Microtarefas — unidade de decomposição do trabalho.",
+        "evidencia": "eu identifiquei, caramba, 55 microtarefas"
+      }
+    ],
+    "anti_padroes": [
+      {
+        "ideia": "Só usar a IA / improvisar pedidos sem estrutura por trás.",
+        "evidencia": "todo mundo quer vender, quase ninguém tem estrutura... ou você está só improvisando? Muita gente está só improvisando"
+      },
+      {
+        "ideia": "Contar com a inteligência bruta da LLM sem coordenação — resultado ruim.",
+        "evidencia": "você não colocou coordenação nenhuma... você está contando com a inteligência que ela tem... vai ficar uma bosta"
+      },
+      {
+        "ideia": "Levantar preconceito contra a IA por leiguice, esperando pouco e sabotando o resultado.",
+        "evidencia": "as pessoas estão habituadas a levantarem preconceito, como eu falei, pela leiguice delas"
+      },
+      {
+        "ideia": "Permanecer preso na operação apertando botões em vez de ir ao estratégico.",
+        "evidencia": "apertando o botão todo santo dia, tendo que fazer página... e onde está a parte estratégica do seu negócio?"
+      }
+    ]
+  }
+}

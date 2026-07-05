@@ -21,7 +21,7 @@
 # este Quadro Kanban = o "Monday" da agência; cada raia passa por conferência antes de avançar;
 # reprovado volta pra correção, não pula etapa. Raias: Conteúdo → Design → Copy → Distribuição.
 - [x] [Conteúdo] Planejar a pauta da semana: revisar `_projetos/cerebro-jampa/linha-editorial.md` e `_projetos/cerebro-jampa/posts/post-catamara-piscinas-2026-06-16.md`, definir os próximos 3 posts (tema, formato, fotos necessárias) e salvar em `_projetos/cerebro-jampa/posts/pauta-semana.md`.
-- [ ] [Gate 1 — aprovação Murillo] Conferir `pauta-semana.md` e aprovar (só o Murillo marca). Reprovado = ajustar a pauta e refazer antes de seguir pro Design.
+- [x] [Gate 1 — aprovação Murillo] Conferir `pauta-semana.md` e aprovar (só o Murillo marca). Reprovado = ajustar a pauta e refazer antes de seguir pro Design.
 - [ ] [Design] Produzir os criativos da pauta aprovada: rodar `_projetos/cerebro-jampa/gerar_carrossel.py` com as fotos em `_projetos/cerebro-jampa/imagens/_FOTOS-AQUI/`, gerando as peças em `_projetos/cerebro-jampa/outputs/`.
 - [ ] [Conferência interna — Design] Revisar as peças em `_projetos/cerebro-jampa/outputs/`: consistência de marca (cores/Design System). Reprovado = corrigir a arte e voltar, sem avançar pra Copy.
 - [ ] [Copy] Escrever as legendas/copy dos posts aprovados seguindo o tom da `linha-editorial.md`, e anexar cada copy ao seu post em `_projetos/cerebro-jampa/posts/pauta-semana.md`.

@@ -1,0 +1,154 @@
+{
+  "status": "ok",
+  "fonte": "mentores-oferta-irresistivel-hormozi.md",
+  "tema": "mentores-oferta-irresistivel-hormozi",
+  "gerado_em": "2026-07-04T04:25:18",
+  "resumo": "Playbook do Hormozi ($100M Offers) destilado para o agente de vendas do Javis: montar ofertas irresistíveis via Equação de Valor, empilhamento (Grand Slam), reversão de risco e escassez verdadeira, aplicado à Vem Passear Jampa.",
+  "fidelidade": 92,
+  "dna": {
+    "filosofias": [
+      {
+        "ideia": "Vender o resultado/transformação, não o produto ou a commodity",
+        "evidencia": "↑ Resultado dos sonhos: 'as melhores fotos e o melhor dia da sua viagem', não 'um passeio de barco'"
+      },
+      {
+        "ideia": "Valor não é uma coisa fixa, é uma equação com alavancas manipuláveis nos dois lados",
+        "evidencia": "Valor = (Resultado dos Sonhos × Probabilidade Percebida) ÷ (Tempo de Espera × Esforço e Sacrifício)"
+      },
+      {
+        "ideia": "Preço se torna irrelevante quando o valor percebido é alto o bastante; competir por valor, não por desconto",
+        "evidencia": "Garantia forte aumenta conversão mais do que desconto"
+      }
+    ],
+    "modelos_mentais": [
+      {
+        "ideia": "Equação de Valor: quatro alavancas — subir sonho e probabilidade, baixar tempo e esforço",
+        "evidencia": "Para aumentar valor: ↑ sonho, ↑ probabilidade percebida, ↓ tempo, ↓ esforço"
+      },
+      {
+        "ideia": "Ancoragem: o cérebro julga preço por comparação, então crie a referência alta antes de revelar o preço",
+        "evidencia": "Ancoragem: some o valor 'se comprasse separado' (passeio + fotógrafo + transfer) e mostre o preço único menor"
+      },
+      {
+        "ideia": "Probabilidade percebida > probabilidade real — prova social e credenciais convertem a crença",
+        "evidencia": "provas — avaliações Google, fotos reais de clientes, Cadastur, 'saída garantida'"
+      }
+    ],
+    "frameworks": [
+      {
+        "ideia": "Grand Slam Offer: empilhar núcleo + bônus que matam objeções + ancoragem",
+        "evidencia": "1. Núcleo: o passeio. 2. Bônus que matam objeções: transfer, foto, remarcação. 3. Ancoragem. 4. Faça o preço parecer pequeno"
+      },
+      {
+        "ideia": "Roteiro de fechamento de 5 passos: Entender → Sonho → Oferta+Ancoragem → Reversão de risco → CTA único",
+        "evidencia": "1. Entender (1 pergunta). 2. Resultado dos sonhos. 3. Oferta empilhada + ancoragem. 4. Reversão de risco. 5. CTA único e fácil"
+      },
+      {
+        "ideia": "Reversão de risco: transferir o medo do cliente para o vendedor via garantia",
+        "evidencia": "Tire o medo do cliente: 'Se não fizer o pôr do sol por causa do tempo, remarcamos ou devolvemos'"
+      }
+    ],
+    "heuristicas": [
+      {
+        "ideia": "Cada bônus deve matar uma objeção específica, não ser enfeite",
+        "evidencia": "Bônus que matam objeções: transfer do hotel, foto profissional inclusa, água/drink, remarcação grátis se chover"
+      },
+      {
+        "ideia": "Garantia converte mais que desconto — prefira reversão de risco a baixar preço",
+        "evidencia": "Garantia forte aumenta conversão mais do que desconto"
+      },
+      {
+        "ideia": "Use apenas escassez e urgência verdadeiras — falso destrói a marca",
+        "evidencia": "Use só o que for verdade — falso queima a marca"
+      },
+      {
+        "ideia": "Baixe atrito ao máximo: o cliente só aparece, você cuida do resto",
+        "evidencia": "↓ Esforço: 'a gente cuida de tudo: transporte, horário, roteiro'. Cliente só aparece"
+      }
+    ],
+    "valores": [
+      {
+        "ideia": "Honestidade na persuasão — escassez/urgência só se reais",
+        "evidencia": "Escassez e urgência (verdadeiras, nunca falsas)... falso queima a marca"
+      },
+      {
+        "ideia": "Proteger a marca no longo prazo acima do fechamento imediato",
+        "evidencia": "Use só o que for verdade — falso queima a marca"
+      }
+    ],
+    "voz_tom": [
+      {
+        "ideia": "Linguagem sensorial e cinematográfica que pinta a cena para o cliente",
+        "evidencia": "Resultado dos sonhos (pinta a cena do pôr do sol)"
+      },
+      {
+        "ideia": "Direto, concreto e conversacional no canal do cliente (WhatsApp)",
+        "evidencia": "CTA único e fácil ('te mando o link da reserva agora?')"
+      }
+    ],
+    "objecoes_respostas": [
+      {
+        "ideia": "Objeção 'e se chover / não rolar?' → remarcação ou devolução",
+        "evidencia": "'Se não fizer o pôr do sol por causa do tempo, remarcamos ou devolvemos'"
+      },
+      {
+        "ideia": "Objeção 'é caro' → ancoragem contra a soma das partes e contra o valor das férias",
+        "evidencia": "Faça o preço parecer pequeno perto do resultado (férias dos sonhos não podem ter furo)"
+      },
+      {
+        "ideia": "Objeção 'dá trabalho / logística' → oferta full-service",
+        "evidencia": "'a gente cuida de tudo: transporte, horário, roteiro'"
+      }
+    ],
+    "gatilhos_decisao": [
+      {
+        "ideia": "Escassez de vagas reais aciona decisão",
+        "evidencia": "Escassez real: vagas por barco/horário ('só 12 lugares no catamarã das 16h')"
+      },
+      {
+        "ideia": "Urgência natural (maré, pôr do sol, alta temporada) força o agora",
+        "evidencia": "Urgência real: maré/pôr do sol têm horário; alta temporada lota"
+      },
+      {
+        "ideia": "Facilitar a ação com CTA de fricção mínima fecha",
+        "evidencia": "'reserva em 2 min no WhatsApp'"
+      }
+    ],
+    "vocabulario": [
+      {
+        "ideia": "'Resultado dos sonhos'",
+        "evidencia": "↑ Resultado dos sonhos: 'as melhores fotos e o melhor dia da sua viagem'"
+      },
+      {
+        "ideia": "'Probabilidade percebida'",
+        "evidencia": "↑ Probabilidade percebida: provas"
+      },
+      {
+        "ideia": "'Ancoragem' / 'empilhar valor'",
+        "evidencia": "Grand Slam Offer (empilhar valor)... Ancoragem"
+      },
+      {
+        "ideia": "'Reversão de risco'",
+        "evidencia": "Reversão de risco (garantia)"
+      },
+      {
+        "ideia": "'Bônus que matam objeções'",
+        "evidencia": "Bônus que matam objeções: transfer do hotel"
+      }
+    ],
+    "anti_padroes": [
+      {
+        "ideia": "Não vender por preço/commodity ('passeio por R$X')",
+        "evidencia": "Não venda 'passeio por R$X'. Empilhe e ancore"
+      },
+      {
+        "ideia": "Não usar escassez ou urgência falsas",
+        "evidencia": "(verdadeiras, nunca falsas)... falso queima a marca"
+      },
+      {
+        "ideia": "Não descrever a entrega como a feature crua em vez do resultado",
+        "evidencia": "'as melhores fotos e o melhor dia da sua viagem', não 'um passeio de barco'"
+      }
+    ]
+  }
+}
