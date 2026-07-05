@@ -132,6 +132,7 @@ CREATE TABLE IF NOT EXISTS knowledge_chunks (
     content     TEXT NOT NULL,
     vec         BLOB,                              -- numpy float32 bytes (NULL = só BM25)
     dim         INTEGER,
+    categoria   TEXT,                              -- escopo determinístico: pessoal | projeto | vp (categoria.py)
     created_at  TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_kchunks_path ON knowledge_chunks(path);

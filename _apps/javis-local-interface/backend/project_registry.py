@@ -19,6 +19,7 @@ REGISTRY = {
         "manifest_file": "project-manifest.json",
         "skills_manifest": "skills/manifest.json",
         "fonte_da_verdade": "FONTE-DA-VERDADE.md",
+        "categoria": "vp",   # escopo do RAG (categoria.py): Vem Passear Jampa = externo por registro
     },
 }
 

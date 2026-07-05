@@ -24,6 +24,7 @@ import threading
 
 import numpy as np
 
+import categoria as _cat
 import db
 import knowledge as _k   # reuso: _iter_files, _external_vaults, _embed_batch, _chunks, _load_index, JAVIS_ROOT
 
@@ -107,6 +108,25 @@ def _load_json_vec_cache() -> dict:
     return cache
 
 
+def backfill_categoria() -> int:
+    """Preenche `categoria` (determinística, por path) nos chunks que ainda estão
+    NULL — DBs populados antes da coluna existir. Custo ZERO de embeddings: só um
+    UPDATE por path. Idempotente. Retorna quantos paths foram rotulados."""
+    rows = db.query("SELECT DISTINCT path FROM knowledge_chunks WHERE categoria IS NULL")
+    if not rows:
+        return 0
+    conn = db.get_conn()
+    try:
+        for r in rows:
+            conn.execute(
+                "UPDATE knowledge_chunks SET categoria = ? WHERE path = ? AND categoria IS NULL",
+                (_cat.de_path(r["path"]), r["path"]))
+        conn.commit()
+    finally:
+        conn.close()
+    return len(rows)
+
+
 def build_index(force: bool = False) -> dict:
     """Indexa (incremental) os arquivos do vault no SQLite. Reaproveita vetores do
     JSON legado quando o chunk é idêntico; só embeda o que sobra."""
@@ -117,6 +137,7 @@ def build_index(force: bool = False) -> dict:
         _building = True
     try:
         db.init_db()
+        backfill_categoria()
         json_cache = {} if force else _load_json_vec_cache()
         ext_roots = _k._external_vaults()
 
@@ -142,9 +163,10 @@ def build_index(force: bool = False) -> dict:
                     continue
                 chunks = _chunks_overlap(text) if force else _k._chunks(text)
                 changed_paths.add(rel)
+                cat = _cat.de_path(rel)
                 for ci, ch in enumerate(chunks):
                     vec = json_cache.get((rel, ch))
-                    staged.append([rel, mtime, ci, ch, vec])
+                    staged.append([rel, mtime, ci, ch, vec, cat])
                     if vec is None:
                         pending_idx.append(len(staged) - 1)
 
@@ -164,12 +186,13 @@ def build_index(force: bool = False) -> dict:
 
             rows = [(r[0], r[1], r[2], r[3],
                      _vec_to_blob(r[4]) if r[4] is not None else None,
-                     len(r[4]) if r[4] is not None else None)
+                     len(r[4]) if r[4] is not None else None,
+                     r[5])
                     for r in staged]
             if rows:
                 conn.executemany(
-                    "INSERT INTO knowledge_chunks(path, mtime, chunk_index, content, vec, dim) "
-                    "VALUES (?, ?, ?, ?, ?, ?)", rows)
+                    "INSERT INTO knowledge_chunks(path, mtime, chunk_index, content, vec, dim, categoria) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)", rows)
             conn.commit()
             total = conn.execute("SELECT COUNT(*) FROM knowledge_chunks").fetchone()[0]
         finally:
@@ -250,8 +273,24 @@ def _rrf(sem: list[tuple[int, float]], kw: list[tuple[int, int]], k: int):
     return ordered
 
 
-def search(query: str, k: int = 5) -> list[dict]:
-    """Busca híbrida. Retorna [{path, chunk, score, sem, kw}] mais relevantes."""
+def _ids_no_escopo(escopo) -> set[int] | None:
+    """Conjunto de ids de chunk permitidos pelo escopo (categoria). None = sem
+    filtro. `escopo` pode ser uma str ('vp') ou lista (['projeto','pessoal'])."""
+    if not escopo:
+        return None
+    cats = [escopo] if isinstance(escopo, str) else list(escopo)
+    cats = [c for c in cats if c]
+    if not cats:
+        return None
+    ph = ",".join("?" * len(cats))
+    rows = db.query(
+        f"SELECT id FROM knowledge_chunks WHERE categoria IN ({ph})", tuple(cats))
+    return {int(r["id"]) for r in rows}
+
+
+def search(query: str, k: int = 5, escopo=None) -> list[dict]:
+    """Busca híbrida. Retorna [{path, chunk, score, sem, kw}] mais relevantes.
+    `escopo` (str|list) filtra por categoria: 'pessoal' | 'projeto' | 'vp'."""
     query = (query or "").strip()
     if not query:
         return []
@@ -260,9 +299,14 @@ def search(query: str, k: int = 5) -> list[dict]:
     except Exception:
         qvec = None
 
-    pool = max(k * 4, 20)
+    allowed = _ids_no_escopo(escopo)
+    # Com escopo, puxa um pool maior porque o filtro pós-retrieval descarta chunks.
+    pool = max(k * 8, 40) if allowed is not None else max(k * 4, 20)
     sem = _semantic(qvec, pool) if qvec is not None else []
     kw = _keyword(query, pool)
+    if allowed is not None:
+        sem = [(cid, s) for cid, s in sem if cid in allowed]
+        kw = [(cid, r) for cid, r in kw if cid in allowed]
     if not sem and not kw:
         return []
 
@@ -291,9 +335,10 @@ def search(query: str, k: int = 5) -> list[dict]:
     return out
 
 
-def answer_context(query: str, k: int = 5) -> str:
-    """Monta o bloco de contexto (para o agente responder)."""
-    hits = search(query, k)
+def answer_context(query: str, k: int = 5, escopo=None) -> str:
+    """Monta o bloco de contexto (para o agente responder). `escopo` (str|list)
+    restringe a categoria: 'pessoal' | 'projeto' | 'vp'."""
+    hits = search(query, k, escopo=escopo)
     if not hits:
         return ""
     blocos = []
