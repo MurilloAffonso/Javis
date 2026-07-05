@@ -1061,11 +1061,14 @@ async def voice_stream(req: VoiceRequest):
             except Exception:
                 _cb = None
             if _cb and _cb.available():
-                # Voz = Haiku + contexto enxuto (decisão Murillo 18/06: velocidade e
-                # leveza em 1º lugar). Sem o estado do projeto (briefing) aqui — pesa
-                # o prompt sem ajudar o bate-papo falado; histórico cortado pra 2
-                # trocas em vez de 4.
+                # Voz = Haiku + contexto enxuto (decisão Murillo 18/06). ATUALIZAÇÃO
+                # 2026-07-05: com o cérebro de voz agora no OpenRouter free (rápido)
+                # ficamos grounded — a persona sozinha alucinava ("rodando no Chainlit"
+                # etc). Injeta: histórico + estado do projeto (se pergunta é sobre o
+                # projeto) + trechos do RAG (se pergunta parece factual). Cada peça
+                # entra best-effort e nunca segura a resposta.
                 ctx = _ag._history_context(_get_history_messages(), keep_raw=2)
+                ctx = _add_voice_grounding(clean, ctx)
                 spoke = False
                 full_text = ""
                 # Cérebro de voz — cascata configurável por JAVIS_VOICE_BRAIN:
@@ -1478,6 +1481,62 @@ def _likely_council(text: str) -> bool:
     """Heurística leve: o pedido provavelmente acionará o raciocínio pesado?"""
     t = text.lower()
     return any(h in t for h in _DEEP_HINTS)
+
+
+# Palavras que indicam que a pergunta é sobre o PROJETO/estado (não conversa fiada).
+# Se bater, injeta o estado atual + busca no RAG antes de responder por voz.
+# Conservador: só injeta quando faz sentido, pra não pesar toda saudação.
+_PROJECT_HINTS = (
+    "projeto", "javis", "javes", "vem passear", "cérebro", "cerebro", "orquestra",
+    "codex", "codigo", "código", "backend", "frontend", "agente", "squad",
+    "grafo", "dna", "ingest", "rag", "conclave", "delegac", "voz do jav",
+    "megabrain", "mega brain", "outlier", "hub.ai", "hub ai",
+    "o que a gente", "o que voce fez", "o que você fez", "o que fizemos",
+    "o que ta rodando", "o que está rodando", "como está", "como esta",
+    "o que rolou", "onde estamos", "estado atual", "próximos passos",
+    "roadmap", "backlog", "commit",
+)
+
+
+def _is_project_question(text: str) -> bool:
+    t = (text or "").lower()
+    return any(h in t for h in _PROJECT_HINTS)
+
+
+def _add_voice_grounding(pergunta: str, ctx: str) -> str:
+    """Adiciona estado do projeto + trechos do RAG ao contexto de voz — só quando
+    faz sentido (pergunta sobre o projeto ou factual). Nunca segura a resposta:
+    cada peça é best-effort com timeout curto. Sem essa injeção, o cérebro de voz
+    alucina sobre o projeto (persona sozinha inventa "Chainlit", "17 agentes" etc).
+    """
+    if not _is_project_question(pergunta):
+        return ctx  # conversa fiada: mantém enxuto pra não pesar
+    parts = [ctx] if ctx else []
+
+    # 1) Estado do projeto (fonte-da-verdade) — o mesmo que o chat usa
+    try:
+        import briefing
+        estado = briefing.estado_resumido()
+        if estado:
+            parts.append(
+                "## Estado atual do projeto Javis (use isto para responder o que "
+                "está rodando/pendente; NÃO invente nada fora disto):\n" + estado
+            )
+    except Exception:
+        pass
+
+    # 2) Trechos do RAG relevantes à pergunta (memória viva do vault)
+    try:
+        import knowledge
+        trechos = knowledge.answer_context(pergunta, k=3)
+        if trechos and trechos.strip():
+            parts.append(
+                "## Trechos relevantes do seu vault (base semântica):\n" + trechos
+            )
+    except Exception:
+        pass
+
+    return "\n\n".join(parts)
 
 
 _SENT_SPLIT = _re.compile(r'(?<=[.!?…])\s+')
