@@ -14,13 +14,16 @@ import os
 
 # IDs free conhecidos (ordem = prioridade). Modelo free do OpenRouter expira em
 # dias/semanas — reconfira via OPENROUTER_FREE_MODELS se todos falharem.
-# Atualizado 2026-07-05 (testados vivos): 'openrouter/free' auto-roteia pra
-# qualquer free disponível (não expira), os outros são fallback nomeado.
+# Atualizado 2026-07-05 após bateria de teste real (extração JSON estruturada):
+# - openrouter/free: auto-roteia, NÃO expira, best cobertura (5 itens no teste).
+# - nemotron 3 Ultra 550B (1M ctx) / Super 120B: sólidos, respondem sem 429.
+# - qwen3-coder, gemma-4, gpt-oss caíram em 429 na hora do teste → não usar
+#   como fallback primário (podem voltar; ficam de reserva se editar via env).
 _DEFAULT_FREE = [
     "openrouter/free",
+    "nvidia/nemotron-3-ultra-550b-a55b:free",
     "nvidia/nemotron-3-super-120b-a12b:free",
     "google/gemma-4-31b-it:free",
-    "google/gemma-4-26b-a4b-it:free",
 ]
 
 _URL = "https://openrouter.ai/api/v1/chat/completions"
