@@ -1068,11 +1068,22 @@ async def voice_stream(req: VoiceRequest):
                 ctx = _ag._history_context(_get_history_messages(), keep_raw=2)
                 spoke = False
                 full_text = ""
-                # Cérebro de voz: Ollama LOCAL (grátis, ~1s no 1º token) se
-                # JAVIS_VOICE_BRAIN=ollama e disponível; senão Claude assinatura de voz.
+                # Cérebro de voz — cascata configurável por JAVIS_VOICE_BRAIN:
+                #   'openrouter' → OpenRouter FREE (0.7-2s, pt-BR limpo, "senhor"). Melhor default.
+                #   'ollama'     → Ollama LOCAL (grátis, ~1s).
+                #   (vazio)      → Claude assinatura (~20s — lento, só se nada mais).
                 # Só CONVERSA chega aqui; ações já foram pro fast-path/_brain.
                 _vname = "claude"; _vstream = None
-                if os.environ.get("JAVIS_VOICE_BRAIN", "").lower() == "ollama":
+                _brain_pref = os.environ.get("JAVIS_VOICE_BRAIN", "").lower()
+                if _brain_pref == "openrouter":
+                    try:
+                        import openrouter_voice as _ov
+                        if _ov.available():
+                            _vname = "openrouter"
+                            _vstream = _ov.answer_stream(clean, ctx)
+                    except Exception:
+                        _vstream = None
+                elif _brain_pref == "ollama":
                     try:
                         import ollama_brain as _ob
                         if _ob.available():
