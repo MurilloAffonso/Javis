@@ -59,6 +59,20 @@ _SYSTEM = (
 # LLM + parsing robusto de JSON
 # ---------------------------------------------------------------------------
 def _llm(system: str, user: str) -> str:
+    # Extração de DNA é PESADA (texto grande → JSON grande de 10 dimensões).
+    # Prefere Gemini (grátis, gemini-2.0-flash) pra economizar a cota do Claude — a
+    # decisão de custo do Thiago Finch ("paga um Gemini que é baratinho"). Se o
+    # Gemini não estiver configurado, falhar, ou não devolver JSON válido, cai no
+    # Claude (assinatura). Sem chave GEMINI_API_KEY, o comportamento é o de antes.
+    try:
+        import gemini_brain
+        if gemini_brain.available():
+            out = gemini_brain.answer(user, system=system, timeout=120,
+                                      max_tokens=8192, temperature=0.2)
+            if out and _parse_json(out) is not None:
+                return out
+    except Exception:
+        pass
     from llm_providers import call_claude
     return call_claude(
         [{"role": "system", "content": system}, {"role": "user", "content": user}],

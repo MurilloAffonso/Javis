@@ -35,8 +35,12 @@ def available() -> bool:
 
 
 def answer(question: str, context: str = "", system: str | None = None,
-           timeout: int | None = None, model: str | None = None) -> str:
-    """Responde via Gemini Flash. Retorna texto (ou string de erro amigável, nunca lança)."""
+           timeout: int | None = None, model: str | None = None,
+           max_tokens: int = 800, temperature: float = 0.6) -> str:
+    """Responde via Gemini Flash. Retorna texto (ou string de erro amigável, nunca lança).
+
+    `max_tokens`/`temperature` são ajustáveis (extração de DNA precisa de saída
+    grande e temperatura baixa; o chat de voz usa o default curto)."""
     key = _key()
     if not key:
         return "Gemini não configurado (falta GEMINI_API_KEY), senhor."
@@ -46,7 +50,7 @@ def answer(question: str, context: str = "", system: str | None = None,
     user = (f"{context}\n\n{q}" if context else q)
     body = {
         "contents": [{"role": "user", "parts": [{"text": user}]}],
-        "generationConfig": {"temperature": 0.6, "maxOutputTokens": 800},
+        "generationConfig": {"temperature": temperature, "maxOutputTokens": max_tokens},
     }
     if system:
         body["systemInstruction"] = {"parts": [{"text": system}]}
