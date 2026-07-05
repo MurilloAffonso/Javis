@@ -60,10 +60,22 @@ _SYSTEM = (
 # ---------------------------------------------------------------------------
 def _llm(system: str, user: str) -> str:
     # Extração de DNA é PESADA (texto grande → JSON grande de 10 dimensões).
-    # Prefere Gemini (grátis, gemini-2.0-flash) pra economizar a cota do Claude — a
-    # decisão de custo do Thiago Finch ("paga um Gemini que é baratinho"). Se o
-    # Gemini não estiver configurado, falhar, ou não devolver JSON válido, cai no
-    # Claude (assinatura). Sem chave GEMINI_API_KEY, o comportamento é o de antes.
+    # Cascata de custo (decisão MegaBrain: "paga um Gemini que é baratinho"):
+    #   1) OpenRouter free — a chave já funciona; grátis.
+    #   2) Gemini direto — se GEMINI_API_KEY for válida (Google, grátis).
+    #   3) Claude (assinatura) — rede de segurança.
+    # Em cada nível só aceita se devolver JSON parseável; senão desce um degrau.
+    msgs = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+
+    try:
+        import openrouter_fallback as orf
+        if orf.available():
+            out = orf.call(msgs, temperature=0.2, max_tokens=8192, timeout=120)
+            if out and _parse_json(out) is not None:
+                return out
+    except Exception:
+        pass
+
     try:
         import gemini_brain
         if gemini_brain.available():
@@ -73,11 +85,9 @@ def _llm(system: str, user: str) -> str:
                 return out
     except Exception:
         pass
+
     from llm_providers import call_claude
-    return call_claude(
-        [{"role": "system", "content": system}, {"role": "user", "content": user}],
-        temperature=0.2,
-    )
+    return call_claude(msgs, temperature=0.2)
 
 
 def _parse_json(raw: str) -> dict | None:

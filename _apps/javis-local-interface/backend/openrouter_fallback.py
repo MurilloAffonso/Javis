@@ -12,13 +12,15 @@ Configurável por env:
 from __future__ import annotations
 import os
 
-# IDs free conhecidos (ordem = prioridade). gpt-oss-120b:free foi aprovado 3/3
-# no teste de 23/06 (memória). Ajuste via OPENROUTER_FREE_MODELS se expirarem.
+# IDs free conhecidos (ordem = prioridade). Modelo free do OpenRouter expira em
+# dias/semanas — reconfira via OPENROUTER_FREE_MODELS se todos falharem.
+# Atualizado 2026-07-05 (testados vivos): 'openrouter/free' auto-roteia pra
+# qualquer free disponível (não expira), os outros são fallback nomeado.
 _DEFAULT_FREE = [
-    "openai/gpt-oss-120b:free",
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "google/gemini-2.0-flash-exp:free",
-    "qwen/qwen-2.5-72b-instruct:free",
+    "openrouter/free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "google/gemma-4-31b-it:free",
+    "google/gemma-4-26b-a4b-it:free",
 ]
 
 _URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -35,8 +37,11 @@ def _models() -> list[str]:
     return _DEFAULT_FREE
 
 
-def call(messages: list[dict], temperature: float = 0.7) -> str | None:
-    """Tenta os modelos free em ordem; devolve o 1º texto válido, ou None."""
+def call(messages: list[dict], temperature: float = 0.7,
+         max_tokens: int | None = None, timeout: int = 45) -> str | None:
+    """Tenta os modelos free em ordem; devolve o 1º texto válido, ou None.
+
+    `max_tokens` opcional — extração de DNA pede saída grande; o chat deixa None."""
     key = os.environ.get("OPENROUTER_API_KEY", "")
     if not key:
         return None
@@ -52,9 +57,10 @@ def call(messages: list[dict], temperature: float = 0.7) -> str | None:
     }
     for model in _models():
         try:
-            r = requests.post(_URL, headers=headers, timeout=45, json={
-                "model": model, "messages": messages, "temperature": temperature,
-            })
+            body = {"model": model, "messages": messages, "temperature": temperature}
+            if max_tokens:
+                body["max_tokens"] = max_tokens
+            r = requests.post(_URL, headers=headers, timeout=timeout, json=body)
             if r.status_code != 200:
                 continue
             data = r.json()
