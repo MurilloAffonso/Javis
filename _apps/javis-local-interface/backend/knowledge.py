@@ -308,21 +308,31 @@ def search(query: str, k: int = 5) -> list[dict]:
     return scored[:k]
 
 
-def answer_context(query: str, k: int = 5) -> str:
-    """Monta um bloco de contexto com os trechos relevantes (para o agente responder)."""
+def answer_context(query: str, k: int = 5, escopo=None) -> str:
+    """Monta um bloco de contexto com os trechos relevantes (para o agente responder).
+    `escopo` (str|list) restringe a categoria: 'pessoal' | 'projeto' | 'vp'."""
     kh = _hybrid()
     if kh is not None:
         try:
-            return kh.answer_context(query, k)
+            return kh.answer_context(query, k, escopo=escopo)
         except Exception:
             pass   # falha no híbrido → contexto pelo caminho legado
     hits = search(query, k)
     if not hits:
         return ""
+    # Fallback legado (índice JSON, sem coluna de categoria): filtra por escopo
+    # via path — best-effort, mas mantém a fronteira mesmo sem o híbrido.
+    cats = None
+    if escopo:
+        cats = {escopo} if isinstance(escopo, str) else set(escopo)
     blocos = []
     for h in hits:
         if h["score"] < 0.25:
             continue
+        if cats is not None:
+            import categoria as _cat
+            if _cat.de_path(h["path"]) not in cats:
+                continue
         blocos.append(f"[{h['path']}]\n{h['chunk']}")
     return "\n\n---\n\n".join(blocos)
 

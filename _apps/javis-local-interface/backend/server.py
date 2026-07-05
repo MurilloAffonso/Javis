@@ -1503,6 +1503,22 @@ def _is_project_question(text: str) -> bool:
     return any(h in t for h in _PROJECT_HINTS)
 
 
+# Vem Passear Jampa é projeto EXTERNO (fronteira do CLAUDE.md). Por padrão o Javes
+# NÃO puxa contexto de VP no RAG da voz — senão "vira" a empresa (bug de identidade).
+# Só quando a pergunta nomeia VP explicitamente é que o escopo vp é liberado.
+_VP_RE = _re.compile(r"\b(vem\s*passear|vp|jampa)\b", _re.IGNORECASE)
+
+
+def _menciona_vp(text: str) -> bool:
+    return bool(_VP_RE.search(text or ""))
+
+
+def _escopo_voz(pergunta: str):
+    """Escopo do RAG para a voz: exclui 'vp' a menos que a pergunta cite VP.
+    Retorna None (sem filtro = tudo) só quando VP é explicitamente mencionada."""
+    return None if _menciona_vp(pergunta) else ["projeto", "pessoal"]
+
+
 def _add_voice_grounding(pergunta: str, ctx: str) -> str:
     """Adiciona estado do projeto + trechos do RAG ao contexto de voz — só quando
     faz sentido (pergunta sobre o projeto ou factual). Nunca segura a resposta:
@@ -1525,10 +1541,12 @@ def _add_voice_grounding(pergunta: str, ctx: str) -> str:
     except Exception:
         pass
 
-    # 2) Trechos do RAG relevantes à pergunta (memória viva do vault)
+    # 2) Trechos do RAG relevantes à pergunta (memória viva do vault).
+    # Escopo: o Javes, falando como si mesmo, não puxa contexto de VP — só quando
+    # a pergunta cita VP explicitamente (fronteira "por registro" do CLAUDE.md).
     try:
         import knowledge
-        trechos = knowledge.answer_context(pergunta, k=3)
+        trechos = knowledge.answer_context(pergunta, k=3, escopo=_escopo_voz(pergunta))
         if trechos and trechos.strip():
             parts.append(
                 "## Trechos relevantes do seu vault (base semântica):\n" + trechos
