@@ -10,16 +10,30 @@ import threading
 import time as _time
 from pathlib import Path
 
+import safe_config
+
 JAVIS_ROOT = Path(__file__).resolve().parents[3]
 
 
 def available() -> bool:
-    return shutil.which("codex") is not None
+    return safe_config.codex_exec_enabled() and shutil.which("codex") is not None
 
 
 def _run(task: str, pasta: str | None = None) -> None:
     """Codex com streaming linha a linha pra _exec_state (compartilhado com claude_exec)."""
     import claude_exec  # acessa _exec_state global
+
+    if not safe_config.codex_exec_enabled():
+        with claude_exec._exec_lock:
+            claude_exec._exec_state.update({
+                "running": False, "task": task, "pasta": pasta,
+                "started_at": None, "exit_code": None,
+                "lines": [safe_config.disabled_message(
+                    "codex_exec",
+                    f"{safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS}+{safe_config.JAVIS_ENABLE_CODEX_EXEC}",
+                )],
+            })
+        return
 
     work_dir = Path(pasta) if pasta else JAVIS_ROOT
     if not work_dir.is_dir():
@@ -78,6 +92,11 @@ def dispatch(task: str, pasta: str | None = None) -> str:
     task = (task or "").strip()
     if not task:
         return "O que devo programar, senhor?"
+    if not safe_config.codex_exec_enabled():
+        return safe_config.disabled_message(
+            "codex_exec",
+            f"{safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS}+{safe_config.JAVIS_ENABLE_CODEX_EXEC}",
+        )
     if not available():
         return ("Codex não está instalado. Instale: npm install -g @openai/codex "
                 "e faça login com: codex login")

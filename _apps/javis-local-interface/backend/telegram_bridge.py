@@ -11,6 +11,8 @@ import time
 import threading
 import requests
 
+import safe_config
+
 _API = "https://api.telegram.org/bot{token}/{method}"
 _TIMEOUT = 40
 _started = False
@@ -96,6 +98,8 @@ def _run_polling(token: str) -> None:
 def start_background() -> bool:
     """Inicia o polling num thread daemon se houver token. Retorna True se iniciou."""
     global _started
+    if not safe_config.telegram_enabled():
+        return False
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     if not token or _started:
         return False

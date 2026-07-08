@@ -11,6 +11,8 @@ import os
 import json
 from pathlib import Path
 
+import safe_config
+
 _CFG = Path(__file__).resolve().parents[1] / "data" / "mcp_servers.json"
 
 
@@ -37,6 +39,8 @@ async def _connect(cfg):
 
 
 async def list_tools(server_id: str) -> dict:
+    if not safe_config.mcp_enabled():
+        return safe_config.disabled_response("mcp", safe_config.JAVIS_ENABLE_MCP)
     cfg = _servers().get(server_id)
     if not cfg:
         return {"server": server_id, "error": "servidor desconhecido"}
@@ -54,6 +58,8 @@ async def list_tools(server_id: str) -> dict:
 
 
 async def call_tool(server_id: str, tool: str, arguments: dict | None = None) -> dict:
+    if not safe_config.mcp_enabled():
+        return safe_config.disabled_response("mcp", safe_config.JAVIS_ENABLE_MCP)
     cfg = _servers().get(server_id)
     if not cfg:
         return {"status": "error", "message": "servidor desconhecido"}

@@ -13,8 +13,12 @@ providers (inclui Oracle 'oci', que não temos) e quebra — então NÃO usar
 from __future__ import annotations
 import os
 
+import safe_config
+
 
 def available() -> bool:
+    if not safe_config.browser_enabled():
+        return False
     if not os.environ.get("OPENROUTER_API_KEY"):
         return False
     try:
@@ -43,6 +47,8 @@ async def run_task(task: str, max_steps: int = 12) -> dict:
     """Executa uma tarefa no navegador e devolve o resultado. Async."""
     if not (task or "").strip():
         return {"status": "error", "message": "Tarefa vazia."}
+    if not safe_config.browser_enabled():
+        return safe_config.disabled_response("browser", safe_config.JAVIS_ENABLE_BROWSER)
     if not available():
         return {"status": "error",
                 "message": "Operação de navegador indisponível: precisa de OPENROUTER_API_KEY "

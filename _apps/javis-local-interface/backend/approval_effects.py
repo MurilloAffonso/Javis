@@ -13,6 +13,8 @@ NÃO chama Nova, NÃO gera criativo, NÃO toca integração externa.
 """
 from __future__ import annotations
 
+import safe_config
+
 _MISSION      = "pipeline-marketing-vem-passear-jampa"
 _PAUTA_TASK   = _MISSION + "-t0"   # âncora da jornada (a pauta)
 _GATE_TASK    = _MISSION + "-t1"   # [Gate 1 — aprovação Murillo]
@@ -65,6 +67,14 @@ def _log(intent: str, message: str, agent: str = "", status: str = "ok", approve
 
 def on_decided(approval: dict, approved: bool, note: str = "") -> dict:
     """Roda após a decisão já estar persistida. Retorna resumo pro endpoint/UI."""
+    if not safe_config.vp_effects_enabled():
+        return {
+            **safe_config.disabled_response(
+                "vp_effects",
+                safe_config.JAVIS_ENABLE_VP_EFFECTS,
+            ),
+            "advanced": False,
+        }
     if is_gate1_pauta_vp(approval):
         return _advance(approval) if approved else _reject(approval)
     if is_gate2_criativos(approval):

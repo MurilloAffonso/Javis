@@ -37,6 +37,7 @@ import command_router
 import actions
 import logger
 import history_store
+import safe_config
 import tts_local
 from orchestrator import Orchestrator
 
@@ -45,7 +46,19 @@ HISTORY_FILE = Path(__file__).resolve().parent.parent / "logs" / "chat_history.j
 HISTORY_FILE.parent.mkdir(exist_ok=True)
 
 app = FastAPI(title="Javis v2", version="2.0.0")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=safe_config.cors_origins(),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+def _disabled_json(capability: str, flag_hint: str = "", status_code: int = 403):
+    return JSONResponse(
+        safe_config.disabled_response(capability, flag_hint),
+        status_code=status_code,
+    )
 
 # Interface legada "Central de Comando" (/central) ARQUIVADA em UI-4B
 # (movida para _arquivo/interfaces-legadas/). Mount removido.
@@ -77,8 +90,10 @@ async def _start_integrations():
         print(f"  SQLite: bootstrap falhou ({e})")
     try:
         import telegram_bridge
-        if telegram_bridge.start_background():
+        if safe_config.telegram_enabled() and telegram_bridge.start_background():
             print("  Telegram: conectado [ok]")
+        elif not safe_config.telegram_enabled():
+            print("  Telegram: disabled_by_default (requires_explicit_enable)")
     except Exception as e:
         print(f"  Telegram: nao iniciado ({e})")
     try:
@@ -96,6 +111,9 @@ async def _start_integrations():
     # Pré-aquece o cache de TTS dos acks falados — assim o 1º pedido já sai
     # instantâneo (sem o ~4s de síntese no primeiro uso após o boot).
     try:
+        if not safe_config.external_adapters_enabled():
+            print("  Acks de voz: disabled_by_default (requires_explicit_enable)")
+            return
         import threading
         def _warm_acks():
             for phrase in ("Certo, senhor.", "Deixa eu pensar nisso com calma, senhor. Um instante."):
@@ -263,6 +281,8 @@ class VPPasseioRequest(BaseModel):
 
 @app.post("/vp/passeios")
 async def vp_passeios_add(req: VPPasseioRequest):
+    if not safe_config.vp_effects_enabled():
+        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
     import vp_store
     item = vp_store.add_passeio(req.tipo, req.data, req.pessoas, req.valor)
     return JSONResponse({"status": "ok", "item": item})
@@ -270,6 +290,8 @@ async def vp_passeios_add(req: VPPasseioRequest):
 
 @app.delete("/vp/passeios/{item_id}")
 async def vp_passeios_del(item_id: str):
+    if not safe_config.vp_effects_enabled():
+        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
     import vp_store
     return JSONResponse({"status": "ok" if vp_store.remove_passeio(item_id) else "not_found"})
 
@@ -289,6 +311,8 @@ class VPClienteRequest(BaseModel):
 
 @app.post("/vp/clientes")
 async def vp_clientes_add(req: VPClienteRequest):
+    if not safe_config.vp_effects_enabled():
+        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
     import vp_store
     item = vp_store.add_cliente(req.nome, req.contato, req.obs)
     return JSONResponse({"status": "ok", "item": item})
@@ -300,12 +324,16 @@ class VPStatusRequest(BaseModel):
 
 @app.patch("/vp/clientes/{item_id}")
 async def vp_clientes_status(item_id: str, req: VPStatusRequest):
+    if not safe_config.vp_effects_enabled():
+        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
     import vp_store
     return JSONResponse({"status": "ok" if vp_store.set_status(item_id, req.status) else "not_found"})
 
 
 @app.delete("/vp/clientes/{item_id}")
 async def vp_clientes_del(item_id: str):
+    if not safe_config.vp_effects_enabled():
+        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
     import vp_store
     return JSONResponse({"status": "ok" if vp_store.remove_cliente(item_id) else "not_found"})
 
@@ -318,6 +346,8 @@ class VPConteudoRequest(BaseModel):
 
 @app.post("/vp/conteudo")
 async def vp_conteudo(req: VPConteudoRequest):
+    if not safe_config.external_adapters_enabled():
+        return _disabled_json("external_adapters", safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS)
     texto = _gerar_conteudo_vp(req.tipo, req.tema)
     return JSONResponse({"status": "ok", "texto": texto})
 
@@ -336,6 +366,8 @@ async def vp_conteudos_list():
 
 @app.post("/vp/conteudos")
 async def vp_conteudos_add(req: VPSalvarConteudo):
+    if not safe_config.vp_effects_enabled():
+        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
     import vp_store
     if not req.texto.strip():
         return JSONResponse({"status": "vazio"}, status_code=400)
@@ -344,6 +376,8 @@ async def vp_conteudos_add(req: VPSalvarConteudo):
 
 @app.delete("/vp/conteudos/{item_id}")
 async def vp_conteudos_del(item_id: str):
+    if not safe_config.vp_effects_enabled():
+        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
     import vp_store
     return JSONResponse({"status": "ok" if vp_store.remove_conteudo(item_id) else "not_found"})
 
@@ -368,6 +402,8 @@ async def conteudo_list(projeto: str = ""):
 
 @app.post("/conteudo")
 async def conteudo_add(req: ConteudoReq):
+    if not safe_config.vp_effects_enabled():
+        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
     import repositories as repo
     if not (req.title.strip() or req.body.strip()):
         return JSONResponse({"status": "vazio"}, status_code=400)
@@ -428,6 +464,8 @@ class VPPautaRequest(BaseModel):
 
 @app.post("/vp/pauta")
 async def vp_pauta_add(req: VPPautaRequest):
+    if not safe_config.vp_effects_enabled():
+        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
     import vp_store
     return JSONResponse({"status": "ok", "item": vp_store.add_pauta(req.data, req.canal, req.ideia)})
 
@@ -438,12 +476,16 @@ class VPPautaStatus(BaseModel):
 
 @app.patch("/vp/pauta/{item_id}")
 async def vp_pauta_status(item_id: str, req: VPPautaStatus):
+    if not safe_config.vp_effects_enabled():
+        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
     import vp_store
     return JSONResponse({"status": "ok" if vp_store.set_pauta_status(item_id, req.status) else "not_found"})
 
 
 @app.delete("/vp/pauta/{item_id}")
 async def vp_pauta_del(item_id: str):
+    if not safe_config.vp_effects_enabled():
+        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
     import vp_store
     return JSONResponse({"status": "ok" if vp_store.remove_pauta(item_id) else "not_found"})
 
@@ -476,6 +518,10 @@ class JampaSquadRequest(BaseModel):
 @app.post("/jampa/squad")
 async def jampa_squad_run(req: JampaSquadRequest):
     """Aciona o squad: Orion escolhe o agente (ou força um) e executa, aterrado."""
+    if not safe_config.vp_effects_enabled():
+        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
+    if not safe_config.external_adapters_enabled():
+        return _disabled_json("external_adapters", safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS)
     import jampa_squad
     if not req.tarefa.strip():
         return JSONResponse({"status": "error", "message": "Tarefa vazia"}, status_code=400)
@@ -496,6 +542,10 @@ class JampaLeadRequest(BaseModel):
 @app.post("/jampa/responder-lead")
 async def jampa_responder_lead(req: JampaLeadRequest):
     """Fluxo-dinheiro: gera a resposta de WhatsApp pronta pro lead (aterrada)."""
+    if not safe_config.vp_effects_enabled():
+        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
+    if not safe_config.external_adapters_enabled():
+        return _disabled_json("external_adapters", safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS)
     import jampa_squad
     out = await run_in_threadpool(
         jampa_squad.responder_lead, req.nome, req.contato, req.interesse, req.obs)
@@ -510,6 +560,10 @@ class JampaForjarRequest(BaseModel):
 @app.post("/jampa/forjar-skill")
 async def jampa_forjar_skill(req: JampaForjarRequest):
     """Pipeline Nero: transcrição de expert → skill .md (rascunho p/ Murillo revisar)."""
+    if not safe_config.vp_effects_enabled():
+        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
+    if not safe_config.external_adapters_enabled():
+        return _disabled_json("external_adapters", safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS)
     import skill_forge
     out = await run_in_threadpool(skill_forge.forge, req.transcricao, req.tema)
     return JSONResponse(out)
@@ -571,6 +625,8 @@ class DebateRequest(BaseModel):
 @app.post("/debate")
 async def debate(req: DebateRequest):
     """Debate autônomo de squad — agentes debatem entre si sem intervenção do usuário."""
+    if not safe_config.external_adapters_enabled():
+        return _disabled_json("external_adapters", safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS)
     from agents.squad import Squad
     from agents.memory_bridge import MemoryBridge
 
@@ -617,6 +673,8 @@ class BrainActiveRequest(BaseModel):
 
 @app.post("/brain/active")
 async def brain_active_set(req: BrainActiveRequest):
+    if not safe_config.local_actions_enabled():
+        return _disabled_json("local_actions", safe_config.JAVIS_ENABLE_LOCAL_ACTIONS)
     import brain_switch
     try:
         engine = brain_switch.set_active(req.engine)
@@ -887,6 +945,8 @@ class AgentRunRequest(BaseModel):
 @app.post("/agents/run")
 async def agents_run(req: AgentRunRequest):
     """Executa um agente com skill + RAG + cérebro forte (Claude/assinatura)."""
+    if not safe_config.claude_exec_enabled():
+        return _disabled_json("claude_exec", safe_config.JAVIS_ENABLE_CLAUDE_EXEC)
     import agent_runner
     out = await run_in_threadpool(agent_runner.run_agent, req.agent_id, req.task)
     return JSONResponse(out)
@@ -908,6 +968,10 @@ class VPRunRequest(BaseModel):
 @app.post("/vp/agents/run")
 async def vp_agents_run(req: VPRunRequest):
     """Executa um agente do squad da Vem Passear (contrato como system prompt, na assinatura)."""
+    if not safe_config.vp_effects_enabled():
+        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
+    if not safe_config.claude_exec_enabled():
+        return _disabled_json("claude_exec", safe_config.JAVIS_ENABLE_CLAUDE_EXEC)
     import vp_squad
     out = await run_in_threadpool(vp_squad.run, req.agent_id, req.task, req.context)
     return JSONResponse(out)
@@ -1054,7 +1118,9 @@ async def voice_stream(req: VoiceRequest):
         # vai DIRETO ao Claude em streaming; ações com ferramenta (lembrete, abrir,
         # programar) já foram tratadas no fast-path ou caem no _brain abaixo. Se o
         # Claude estiver indisponível ou devolver vazio, cai no _brain (fallback).
-        if not req.use_conclave and (_likely_council(clean) or intent in ("conversa", "desconhecido")):
+        if (not req.use_conclave
+                and safe_config.claude_exec_enabled()
+                and (_likely_council(clean) or intent in ("conversa", "desconhecido"))):
             try:
                 import claude_brain as _cb
                 import agent as _ag
@@ -1165,6 +1231,8 @@ class RootcauseRequest(BaseModel):
 @app.post("/rootcause")
 async def rootcause(req: RootcauseRequest):
     """Rootcause diagnostica uma resposta ruim e aprende para não repetir."""
+    if not safe_config.external_adapters_enabled():
+        return _disabled_json("external_adapters", safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS)
     from agents.meta import Rootcause
     rc = Rootcause(model=req.model)
     result = rc.diagnose(req.task, req.failed_response, req.agents_used)
@@ -1271,6 +1339,8 @@ async def transcribe_audio(file: UploadFile = File(...)):
     (Jampa, Vem Passear, Murillo...), reduzindo o embolamento que estraga o
     raciocínio do cérebro. Modelo configurável via JAVIS_TRANSCRIBE_MODEL.
     """
+    if not safe_config.external_adapters_enabled():
+        return _disabled_json("external_adapters", safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS)
     import os
     api_key = os.environ.get("OPENAI_API_KEY", "")
     if not api_key:
@@ -1583,6 +1653,8 @@ def _accumulate_sentences(tokens):
 
 
 def _tts_sentence(text: str) -> bytes | None:
+    if not safe_config.external_adapters_enabled():
+        return None
     import os
     api_key = os.environ.get("OPENAI_API_KEY", "")
     if not api_key or not text.strip():
@@ -1651,6 +1723,8 @@ _VP_PEDIDOS = {
 
 def _gerar_conteudo_vp(tipo: str, tema: str = "") -> str:
     """Gera conteúdo de marketing VP via OpenAI. Fallback templado se não houver API."""
+    if not safe_config.external_adapters_enabled():
+        return safe_config.disabled_message("external_adapters", safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS)
     import os
     pedido = _VP_PEDIDOS.get(tipo, _VP_PEDIDOS["ideias"])
     if tema.strip():
@@ -1709,6 +1783,14 @@ def _brain(text: str, history: list[dict], use_conclave: bool = False) -> dict:
                 "brain": "main", "status": res.get("status", "ok"),
                 "tools": [intent], "route": route, "orch": None}
 
+    if not safe_config.external_adapters_enabled():
+        return {"text": safe_config.disabled_message(
+                    "external_adapters",
+                    safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS),
+                "intent": intent, "brain": "disabled",
+                "status": "disabled_by_default", "tools": [],
+                "route": route, "orch": None}
+
     # 2) Conclave — só quando o senhor ativa o debate
     if use_conclave:
         try:
@@ -1726,7 +1808,7 @@ def _brain(text: str, history: list[dict], use_conclave: bool = False) -> dict:
     #      audita depois via _audit_after_codex. Falha → cai no fluxo normal.
     try:
         from delegacao import enabled as _deleg_on, should_delegate as _deleg_match
-        if _deleg_on() and _deleg_match(text):
+        if _deleg_on() and _deleg_match(text) and safe_config.codex_exec_enabled():
             resp, _ = orchestrator._run_exec(text, "")
             return {"text": resp or "Codex despachado, senhor.", "intent": intent,
                     "brain": "exec", "status": "codex", "tools": ["codex"],
@@ -1859,6 +1941,24 @@ async def openai_compat(req: OAIRequest):
         })
     _last_wake_ts = now
     clean_text = _vb._strip_wake_word(user_text) or user_text
+
+    if not safe_config.external_adapters_enabled():
+        reply = safe_config.disabled_message(
+            "external_adapters",
+            safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS,
+        )
+        return JSONResponse({
+            "id": f"chatcmpl-{uuid.uuid4().hex[:12]}",
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": req.model,
+            "choices": [{
+                "index": 0,
+                "message": {"role": "assistant", "content": reply},
+                "finish_reason": "stop",
+            }],
+            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        })
 
     # Cérebro = Claude pela assinatura (decisão 18/06, tira a API paga do caminho
     # de voz também). Haiku + contexto enxuto (decisão 18/06: velocidade/leveza
@@ -1993,6 +2093,8 @@ def _save_training_doc(agent_id: str, title: str, text: str, url: str) -> str:
 @app.post("/train/youtube")
 async def train_youtube(req: TrainRequest):
     """Extrai transcrição de um vídeo YouTube e salva na base de conhecimento do agente."""
+    if not safe_config.external_adapters_enabled():
+        return _disabled_json("external_adapters", safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS)
     if not req.url.strip():
         return JSONResponse({"error": "URL obrigatória"}, status_code=400)
     try:
@@ -2048,6 +2150,8 @@ async def treinamento_scout_all():
 async def treinamento_resumir(area: str):
     """Resume com o Claude (assinatura) os arquivos pendentes de _entrada → _resumos
     e reindexa o RAG. Fecha o ciclo de treino sem NotebookLM manual."""
+    if not safe_config.claude_exec_enabled():
+        return _disabled_json("claude_exec", safe_config.JAVIS_ENABLE_CLAUDE_EXEC)
     import resumir_treino
     out = await run_in_threadpool(resumir_treino.resumir_area, area)
     return JSONResponse(out)
@@ -2061,6 +2165,8 @@ class PulsoRequest(BaseModel):
 async def pulso_mercado_route(req: PulsoRequest):
     """Pulso de mercado: o que estão falando sobre o tópico (Reddit/YouTube/HN/GitHub)
     sintetizado pelo Claude. Fontes grátis, sem API paga."""
+    if not safe_config.external_adapters_enabled():
+        return _disabled_json("external_adapters", safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS)
     import pulso_mercado
     out = await run_in_threadpool(pulso_mercado.pulso, req.topico)
     return JSONResponse(out)
@@ -2082,6 +2188,8 @@ async def browser_run(req: BrowserRequest):
     """Opera o navegador (browser-use) para realizar a tarefa. Ação em site real =
     risco — o caller deve usar com aprovação. Precisa de modelo com VISÃO
     (BROWSER_USE_MODEL) + OPENROUTER_API_KEY."""
+    if not safe_config.browser_enabled():
+        return _disabled_json("browser", safe_config.JAVIS_ENABLE_BROWSER)
     import browser_agent
     out = await browser_agent.run_task(req.task)
     return JSONResponse(out)
@@ -2172,6 +2280,8 @@ async def ui_mcp():
 @app.get("/mcp/{server_id}/tools")
 async def mcp_tools(server_id: str):
     """Conecta no servidor MCP e lista as tools dele."""
+    if not safe_config.mcp_enabled():
+        return _disabled_json("mcp", safe_config.JAVIS_ENABLE_MCP)
     import mcp_client
     return JSONResponse(await mcp_client.list_tools(server_id))
 
@@ -2184,6 +2294,8 @@ class MCPCallRequest(BaseModel):
 @app.post("/mcp/{server_id}/call")
 async def mcp_call(server_id: str, req: MCPCallRequest):
     """Chama uma tool de um servidor MCP."""
+    if not safe_config.mcp_enabled():
+        return _disabled_json("mcp", safe_config.JAVIS_ENABLE_MCP)
     import mcp_client
     return JSONResponse(await mcp_client.call_tool(server_id, req.tool, req.arguments))
 
@@ -2218,4 +2330,4 @@ async def ui_telemetry():
 if __name__ == "__main__":
     import uvicorn
     print("\n  Javis v2 — http://localhost:8000\n")
-    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("server:app", host="127.0.0.1", port=8000, reload=False)
