@@ -9,6 +9,7 @@ os arquivos JSON/Markdown seguem como fonte viva.
 """
 from __future__ import annotations
 import json as _json
+from datetime import datetime, timedelta, timezone
 import db
 
 
@@ -101,6 +102,32 @@ class _Tasks:
 
 # ── approvals ─────────────────────────────────────────────────────────────
 class _Approvals:
+    def _ttl_minutes(self) -> int:
+        import os
+        raw = (os.environ.get("JAVES_APPROVAL_TTL_MIN") or os.environ.get("JAVIS_APPROVAL_TTL_MIN") or "").strip()
+        if not raw:
+            return 60
+        try:
+            return max(1, int(raw))
+        except Exception:
+            return 60
+
+    def _parse_ts(self, value: str | None) -> datetime | None:
+        raw = (value or "").strip()
+        if not raw:
+            return None
+        try:
+            parsed = datetime.fromisoformat(raw.replace(" ", "T"))
+            return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
+        except Exception:
+            return None
+
+    def _is_expired(self, approval: dict) -> bool:
+        anchor = self._parse_ts(approval.get("decided_at")) or self._parse_ts(approval.get("updated_at"))
+        if not anchor:
+            return False
+        return datetime.now(timezone.utc) - anchor > timedelta(minutes=self._ttl_minutes())
+
     def add(self, subject: str, kind: str = "gate", agent: str = "",
             detail: str = "", task_id: str = "", project_id: str = "",
             action: str = "", route: str = "", risk_level: str = "",
@@ -128,6 +155,13 @@ class _Approvals:
             ("approved" if approved else "rejected", note, approved_by, approval_id),
         )
 
+    def consume(self, approval_id: int) -> int:
+        return db.execute(
+            "UPDATE approvals SET consumed_at=datetime('now'), updated_at=datetime('now') "
+            "WHERE id=? AND consumed_at IS NULL",
+            (approval_id,),
+        )
+
     def find_pending_action(self, action: str, route: str = "", project_id: str = "") -> dict | None:
         return db.query_one(
             "SELECT * FROM approvals WHERE status='pending' "
@@ -139,6 +173,18 @@ class _Approvals:
     def valid_for_action(self, approval: dict | None, action: str,
                          route: str = "", project_id: str = "") -> bool:
         if not approval or approval.get("status") != "approved":
+            return False
+        if approval.get("consumed_at"):
+            return False
+        if self._is_expired(approval):
+            try:
+                db.execute(
+                    "UPDATE approvals SET status='expired', updated_at=datetime('now') WHERE id=? AND status='approved'",
+                    (approval["id"],),
+                )
+            except Exception:
+                pass
+            approval["status"] = "expired"
             return False
         saved_action = approval.get("action") or ""
         if saved_action and saved_action != action:

@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS approvals (
     requested_by TEXT,
     approved_by TEXT,
     approval_token_id TEXT,
+    consumed_at TEXT,
     reason     TEXT,
     metadata_json TEXT,
     created_at TEXT DEFAULT (datetime('now')),

@@ -52,6 +52,7 @@ def init_db() -> None:
                 "ALTER TABLE approvals ADD COLUMN requested_by TEXT",
                 "ALTER TABLE approvals ADD COLUMN approved_by TEXT",
                 "ALTER TABLE approvals ADD COLUMN approval_token_id TEXT",
+                "ALTER TABLE approvals ADD COLUMN consumed_at TEXT",
                 "ALTER TABLE approvals ADD COLUMN reason TEXT",
                 "ALTER TABLE approvals ADD COLUMN metadata_json TEXT",
                 "ALTER TABLE approvals ADD COLUMN updated_at TEXT",

@@ -122,8 +122,15 @@ def require_persisted_approval(
     if approval_id:
         approval = repo.approvals.get(approval_id)
         if repo.approvals.valid_for_action(approval, action, route=route, project_id=project_id):
-            return None
-        status = approval.get("status") if approval else "missing"
+            if repo.approvals.consume(approval_id) == 1:
+                return None
+            approval = repo.approvals.get(approval_id)
+            status = "consumed"
+        else:
+            if approval and approval.get("consumed_at"):
+                status = "consumed"
+            else:
+                status = approval.get("status") if approval else "missing"
         return approval_required(
             action,
             approval_id=approval_id,
