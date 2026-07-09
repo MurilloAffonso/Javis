@@ -85,6 +85,18 @@ def execute(sql: str, params: tuple = ()) -> int:
         conn.close()
 
 
+def execute_rowcount(sql: str, params: tuple = ()) -> int:
+    """INSERT/UPDATE/DELETE — retorna somente rowcount."""
+    init_db()
+    conn = get_conn()
+    try:
+        cur = conn.execute(sql, params)
+        conn.commit()
+        return cur.rowcount
+    finally:
+        conn.close()
+
+
 def query(sql: str, params: tuple = ()) -> list[dict]:
     """SELECT — lista de dicts."""
     init_db()

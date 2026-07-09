@@ -1,5 +1,6 @@
 # Python
 __pycache__/
+**/__pycache__/
 *.pyc
 *.pyo
 *.pyd
@@ -98,3 +99,5 @@ _logs/dumps/
 
 # Dados reais da Vem Passear (clientes/leads/passeios/pauta) — local-only, não versionar
 _apps/**/_data/vp_*.json
+
+_tmp/

@@ -1,13 +1,19 @@
 """Knowledge — RAG sobre os arquivos do senhor (Obsidian + projeto).
 
-Indexa os .md/.txt do vault com embeddings (OpenAI text-embedding-3-small),
-e busca por similaridade semântica. Tudo local — nada sai do PC além do
-texto enviado para gerar embeddings.
+Indexa os .md/.txt do vault com embeddings e busca por similaridade semântica.
+O provedor de embeddings é selecionado por `JAVIS_RAG_EMBEDDER`:
+
+- `openai` — caminho atual, preservado por padrão.
+- `local` — embedder puro-Python, offline e determinístico.
+
+TODO: plugar um modelo local real (Ollama/nomic) atrás da mesma interface.
 """
 from __future__ import annotations
 import json
 import math
 import os
+import hashlib
+import re
 import threading
 from pathlib import Path
 
@@ -33,6 +39,7 @@ _SKIP_DIRS = {
 _EXTS = {".md", ".txt"}
 _CHUNK = 800        # tamanho alvo do trecho (chars)
 _MODEL = "text-embedding-3-small"
+_LOCAL_EMBED_DIM = 256
 _MAX_FILES = 800    # trava de segurança contra indexar demais
 
 _lock = threading.Lock()
@@ -107,6 +114,62 @@ def _external_vaults() -> list[Path]:
     # R1: o RAG global do Javis core nao carrega projetos externos implicitamente.
     # Project-scoped RAG com project_id explicito fica para R2.
     return []
+
+
+def scope_for_project(project_id: str | None) -> str | list[str]:
+    """Mapeia project_id para o escopo de RAG permitido."""
+    pid = (project_id or "").strip()
+    if pid == gate.CEREBRO_JAMPA_SCOPE:
+        return "vp"
+    if pid == gate.CORE_SCOPE or not pid:
+        return ["pessoal", "projeto"]
+    return ["projeto"]
+
+
+def _embedder_name() -> str:
+    return (os.environ.get("JAVIS_RAG_EMBEDDER") or "openai").strip().lower() or "openai"
+
+
+class _BaseEmbedder:
+    name = "base"
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        raise NotImplementedError
+
+
+class _OpenAIEmbedder(_BaseEmbedder):
+    name = "openai"
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        return _embed_batch(texts)
+
+
+class _LocalEmbedder(_BaseEmbedder):
+    name = "local"
+
+    @staticmethod
+    def _vector(text: str) -> list[float]:
+        tokens = re.findall(r"[0-9A-Za-zÀ-ÿ]+", (text or "").lower())
+        vec = [0.0] * _LOCAL_EMBED_DIM
+        if not tokens:
+            return vec
+        for token in tokens:
+            digest = hashlib.blake2b(token.encode("utf-8"), digest_size=8).digest()
+            idx = int.from_bytes(digest, "big") % _LOCAL_EMBED_DIM
+            vec[idx] += 1.0
+        norm = math.sqrt(sum(v * v for v in vec))
+        if not norm:
+            return vec
+        return [v / norm for v in vec]
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        return [self._vector(text) for text in texts]
+
+
+def _selected_embedder() -> _BaseEmbedder:
+    if _embedder_name() == "local":
+        return _LocalEmbedder()
+    return _OpenAIEmbedder()
 
 
 def _iter_files():
@@ -201,7 +264,8 @@ def build_index(force: bool = False) -> dict:
     blocked = gate.require_external_adapters("knowledge.build_index")
     if blocked:
         return blocked
-    if not os.environ.get("OPENAI_API_KEY", "").strip():
+    embedder = _selected_embedder()
+    if embedder.name == "openai" and not os.environ.get("OPENAI_API_KEY", "").strip():
         return {"status": "error", "message": "Sem OPENAI_API_KEY para gerar embeddings."}
     with _lock:
         if _building:
@@ -251,7 +315,7 @@ def build_index(force: bool = False) -> dict:
             files_done += 1
 
         if pending_texts:
-            vecs = _embed_batch(pending_texts)
+            vecs = embedder.embed(pending_texts)
             for meta, vec in zip(pending_meta, vecs):
                 meta["vec"] = vec
                 new_index.append(meta)
@@ -296,6 +360,7 @@ def search(query: str, k: int = 5) -> list[dict]:
         maybe_auto_sync()
     except Exception:
         pass
+    embedder = _selected_embedder()
     index = _load_index()
     if not index:
         build_index()
@@ -303,7 +368,7 @@ def search(query: str, k: int = 5) -> list[dict]:
     if not index:
         return []
     try:
-        qvec = _embed_batch([query])[0]
+        qvec = embedder.embed([query])[0]
     except Exception:
         return []
     scored = [{"path": it["path"], "chunk": it["chunk"], "score": _cosine(qvec, it["vec"])}

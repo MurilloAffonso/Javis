@@ -1,7 +1,7 @@
 // Tarefas — orquestrador de demandas — extraído de app.js em 2026-07-03; módulo ES.
 // 2026-07-03: seções demo (Workflows/Fluxo de exemplo) removidas — minimalismo.
 // Ficam as 4 ferramentas reais: demanda, agente, pulso, navegador.
-import { h, $, state, BACKEND, tryJson, renderRightPanel } from "../../app.js";
+import { h, $, state, BACKEND, CORE_PROJECT_ID, tryJson, opSend, renderRightPanel } from "../../app.js";
 
 function viewTarefas(body) {
   body.appendChild(h(`<div class="card-sub" style="margin-bottom:16px">Ferramentas de execução — demanda ao orquestrador, agente especialista, pulso de mercado e navegador.</div>`));
@@ -13,7 +13,7 @@ function viewTarefas(body) {
     body.insertBefore(log, body.children[2]);
     if (!state.online) { log.querySelector(".card-sub").textContent = "Backend offline."; return; }
     try {
-      const out = await tryJson(BACKEND + "chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: t, model: "claude-3-5-sonnet" }) });
+      const out = await tryJson(BACKEND + "chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: t, project_id: CORE_PROJECT_ID, model: "claude-3-5-sonnet" }) });
       log.innerHTML = `<div class="meta-row"><span class="k">Intent</span><span class="v">${out.intent}</span></div><div class="meta-row"><span class="k">Brain</span><span class="v">${out.brain}</span></div><div class="card-desc" style="margin-top:10px">${out.response || ""}</div>`;
       try { state.telemetry = await tryJson(BACKEND + "ui/telemetry"); renderRightPanel(); } catch (_) {}
     } catch (e) { log.querySelector(".card-sub").textContent = "Falhou: " + e.message; }
@@ -36,8 +36,13 @@ function viewTarefas(body) {
       rb.after(out);
       if (!state.online) { out.querySelector(".card-sub").textContent = "Backend offline."; return; }
       try {
-        const r = await tryJson(BACKEND + "agents/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ agent_id, task }) });
-        out.innerHTML = `<div class="card-title" style="font-size:14px">${agent_id}</div><div class="card-desc" style="margin-top:8px;white-space:pre-wrap">${(r.message || r.response || JSON.stringify(r)).slice(0, 1200)}</div>`;
+        const r = await opSend(BACKEND + "agents/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ agent_id, task, project_id: CORE_PROJECT_ID }) });
+        if (!r.ok && r.data && r.data.status === "approval_required") {
+          out.innerHTML = `<div class="card-title" style="font-size:14px">${agent_id}</div><div class="card-desc" style="margin-top:8px;white-space:pre-wrap">Aprovação necessária: ${r.data.approval_id || "—"}</div>`;
+          return;
+        }
+        if (!r.ok) throw new Error(r.status);
+        out.innerHTML = `<div class="card-title" style="font-size:14px">${agent_id}</div><div class="card-desc" style="margin-top:8px;white-space:pre-wrap">${(r.data.message || r.data.response || JSON.stringify(r.data)).slice(0, 1200)}</div>`;
       } catch (e) { out.querySelector(".card-sub").textContent = "Falhou: " + e.message; }
     };
   }
@@ -75,8 +80,13 @@ function viewTarefas(body) {
     nav.after(out);
     if (!state.online) { out.querySelector(".card-sub").textContent = "Backend offline."; return; }
     try {
-      const r = await tryJson(BACKEND + "browser/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ task: t }) });
-      out.innerHTML = `<div class="card-desc" style="white-space:pre-wrap">${(r.result || r.message || JSON.stringify(r)).slice(0, 1500)}</div>`;
+      const r = await opSend(BACKEND + "browser/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ task: t, project_id: CORE_PROJECT_ID }) });
+      if (!r.ok && r.data && r.data.status === "approval_required") {
+        out.innerHTML = `<div class="card-desc" style="white-space:pre-wrap">Aprovação necessária: ${r.data.approval_id || "—"}</div>`;
+        return;
+      }
+      if (!r.ok) throw new Error(r.status);
+      out.innerHTML = `<div class="card-desc" style="white-space:pre-wrap">${(r.data.result || r.data.message || JSON.stringify(r.data)).slice(0, 1500)}</div>`;
     } catch (e) { out.querySelector(".card-sub").textContent = "Falhou: " + e.message; }
   };
 

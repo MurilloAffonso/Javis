@@ -3,7 +3,7 @@
    Trazido do classic, adaptado pro Command Center.
    Extraído de app.js em 2026-07-02. MESMO comportamento; agora módulo ES.
    ═══════════════════════════════════════════════════════════════════ */
-import { h, state, BACKEND, tryJson, _esc, activeAgent } from "../app.js";
+import { h, state, BACKEND, CORE_PROJECT_ID, tryJson, withLocalAuth, _esc, activeAgent } from "../app.js";
 
 let _orbInst = null;
 let _whisper = null;
@@ -331,10 +331,10 @@ async function sendVoiceMessage(text) {
   if (!state.online) { if (typing) typing.textContent = "Backend offline."; _orbInst?.setState("idle"); return; }
 
   try {
-    const res = await fetch(BACKEND + "voice/stream", {
+    const res = await fetch(BACKEND + "voice/stream", withLocalAuth({
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ transcript: text, model: "", use_conclave: state.useConclave, tts: state.useTts }),
-    });
+      body: JSON.stringify({ transcript: text, project_id: CORE_PROJECT_ID, model: "", use_conclave: state.useConclave, tts: state.useTts }),
+    }));
     if (!res.ok) { if (typing) typing.textContent = "Falha: " + res.status; _orbInst?.setState("idle"); return; }
     const reader = res.body.getReader(); const dec = new TextDecoder();
     let buf = "", fullText = "", done = false;
@@ -445,4 +445,3 @@ function initVoiceStage() {
 }
 
 export { initVoiceStage };
-

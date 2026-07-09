@@ -330,6 +330,7 @@ SERVICES = {
 
 class ChatRequest(BaseModel):
     message: str
+    project_id: str = ""
     use_conclave: bool = False
     model: str = "claude"
 
@@ -801,8 +802,18 @@ async def get_integrations():
 
 
 @app.post("/chat")
-async def chat(req: ChatRequest):
+async def chat(
+    req: ChatRequest,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     start = datetime.now()
+    blocked = _local_auth_gate(x_javes_local_token, "chat")
+    if blocked:
+        return _gate_json(blocked)
+    blocked = gate.require_project_scope(req.project_id, scope=[gate.CORE_SCOPE, gate.CEREBRO_JAMPA_SCOPE])
+    if blocked:
+        return _gate_json(blocked)
+
     text  = req.message.strip()
     if not text:
         return JSONResponse({"error": "Mensagem vazia"}, status_code=400)
@@ -812,12 +823,13 @@ async def chat(req: ChatRequest):
 
     # Ações críticas bloqueadas imediatamente
     if route["risk_level"] == "critical":
-        entry = _make_entry("blocked", text, route, {"status": "blocked"}, start)
+        payload = gate.blocked("critical_action", action="chat")
+        entry = _make_entry("blocked", text, route, payload, start)
         _save(entry)
-        return JSONResponse(entry)
+        return JSONResponse({**entry, **payload})
 
     # Núcleo único (threadpool evita bloquear o event loop)
-    out = await run_in_threadpool(_brain, text, _get_history_messages(), req.use_conclave)
+    out = await run_in_threadpool(_brain, text, _get_history_messages(), req.use_conclave, req.project_id)
     entry = _entry_from_brain(text, out, start)
     _save(entry)
     history_store.append("user", text)
@@ -1195,13 +1207,35 @@ async def agents_list():
 class AgentRunRequest(BaseModel):
     agent_id: str
     task: str
+    project_id: str = ""
+    approved: bool = False
+    approval_id: int | None = None
 
 
 @app.post("/agents/run")
-async def agents_run(req: AgentRunRequest):
+async def agents_run(
+    req: AgentRunRequest,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Executa um agente com skill + RAG + cérebro forte (Claude/assinatura)."""
+    blocked = _local_auth_gate(x_javes_local_token, "agents.run")
+    if blocked:
+        return _gate_json(blocked)
+    blocked = gate.require_project_scope(req.project_id, scope=gate.CORE_SCOPE)
+    if blocked:
+        return _gate_json(blocked)
     if not safe_config.claude_exec_enabled():
         return _disabled_json("claude_exec", safe_config.JAVIS_ENABLE_CLAUDE_EXEC)
+    blocked = gate.require_persisted_approval(
+        "agents.run",
+        approval_id=req.approval_id,
+        route="/agents/run",
+        project_id=req.project_id,
+        risk_level="high",
+        approved=req.approved,
+    )
+    if blocked:
+        return _gate_json(blocked)
     import agent_runner
     out = await run_in_threadpool(agent_runner.run_agent, req.agent_id, req.task)
     return JSONResponse(out)
@@ -1239,14 +1273,24 @@ async def vp_agents_run(
 
 class VoiceRequest(BaseModel):
     transcript: str
+    project_id: str = ""
     model:       str  = "claude"
     use_conclave: bool = False
     tts:         bool = True
 
 
 @app.post("/voice")
-async def voice_input(req: VoiceRequest):
+async def voice_input(
+    req: VoiceRequest,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Processa transcrição de voz pelo pipeline completo — wake word strip, hallucination filter, orquestrador."""
+    blocked = _local_auth_gate(x_javes_local_token, "voice")
+    if blocked:
+        return _gate_json(blocked)
+    blocked = gate.require_project_scope(req.project_id, scope=gate.CORE_SCOPE)
+    if blocked:
+        return _gate_json(blocked)
     from voice_bridge import classify_voice, _strip_wake_word
 
     transcript = req.transcript.strip()
@@ -1269,13 +1313,14 @@ async def voice_input(req: VoiceRequest):
 
     route = command_router.route(clean)
     if route["risk_level"] == "critical":
-        entry = _make_entry("blocked", clean, route, {"status": "blocked"}, start)
+        payload = gate.blocked("critical_action", action="voice")
+        entry = _make_entry("blocked", clean, route, payload, start)
         entry["source"] = "voice"
         _save(entry)
-        return JSONResponse({**entry, "response": "Ação bloqueada.", "tts": True})
+        return JSONResponse({**entry, **payload, "response": "Ação bloqueada.", "tts": True})
 
     # Núcleo único — mesmo cérebro do chat
-    out = await run_in_threadpool(_brain, clean, _get_history_messages(), req.use_conclave)
+    out = await run_in_threadpool(_brain, clean, _get_history_messages(), req.use_conclave, req.project_id)
     entry = _entry_from_brain(clean, out, start)
     entry["source"]              = "voice"
     entry["original_transcript"] = transcript
@@ -1295,11 +1340,21 @@ async def voice_input(req: VoiceRequest):
 
 
 @app.post("/voice/stream")
-async def voice_stream(req: VoiceRequest):
+async def voice_stream(
+    req: VoiceRequest,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Voice com TTS incremental — começa a falar assim que a 1ª frase fica pronta (SSE)."""
     from voice_bridge import classify_voice, _strip_wake_word
 
     _SSE = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+
+    blocked = _local_auth_gate(x_javes_local_token, "voice.stream")
+    if blocked:
+        return _gate_json(blocked)
+    blocked = gate.require_project_scope(req.project_id, scope=gate.CORE_SCOPE)
+    if blocked:
+        return _gate_json(blocked)
 
     transcript = req.transcript.strip()
     if not transcript:
@@ -1319,10 +1374,7 @@ async def voice_stream(req: VoiceRequest):
     route = command_router.route(clean)
 
     if route["risk_level"] == "critical":
-        def _crit():
-            yield f"data: {json.dumps({'type':'tts_text','text':'Ação bloqueada.'})}\n\n"
-            yield "data: [DONE]\n\n"
-        return StreamingResponse(_crit(), media_type="text/event-stream", headers=_SSE)
+        return _gate_json(gate.blocked("critical_action", action="voice.stream"))
 
     intent = route.get("intent", "conversa")
 
@@ -1445,7 +1497,7 @@ async def voice_stream(req: VoiceRequest):
         # CÉREBRO COMPLETO com tool-use — stream_text não passa ferramentas
         # ao GPT, que então inventa que executou sem chamar nada (falso positivo).
         # Voz usa _brain direto; TTS é feito frase a frase após a resposta.
-        out = _brain(clean, _get_history_messages(), req.use_conclave)
+        out = _brain(clean, _get_history_messages(), req.use_conclave, req.project_id)
         full_text = out["text"] or "Pronto, senhor."
         yield f"data: {json.dumps({'type':'meta','intent':out['intent'],'brain':out['brain'],'text':full_text})}\n\n"
         if req.tts:
@@ -1538,9 +1590,19 @@ async def clear_history(
 # ── Streaming chat ────────────────────────────────────────
 
 @app.post("/chat/stream")
-async def chat_stream(req: ChatRequest):
+async def chat_stream(
+    req: ChatRequest,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Chat com streaming token-a-token (SSE)."""
     import json as _j
+
+    blocked = _local_auth_gate(x_javes_local_token, "chat.stream")
+    if blocked:
+        return _gate_json(blocked)
+    blocked = gate.require_project_scope(req.project_id, scope=[gate.CORE_SCOPE, gate.CEREBRO_JAMPA_SCOPE])
+    if blocked:
+        return _gate_json(blocked)
 
     text = req.message.strip()
     if not text:
@@ -1550,11 +1612,7 @@ async def chat_stream(req: ChatRequest):
     route  = command_router.route(text)
 
     if route["risk_level"] == "critical":
-        def _blocked():
-            yield f"data: {_j.dumps({'type':'done','text':'Ação bloqueada.','brain':'main','status':'blocked'})}\n\n"
-            yield "data: [DONE]\n\n"
-        return StreamingResponse(_blocked(), media_type="text/event-stream",
-                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+        return _gate_json(gate.blocked("critical_action", action="chat.stream"))
 
     intent0 = route.get("intent", "conversa")
     brain0  = "conclave" if req.use_conclave else "main"
@@ -1587,7 +1645,7 @@ async def chat_stream(req: ChatRequest):
             # 2) Conversa OU ação → cérebro com FERRAMENTAS (raciocínio real:
             #    busca nas notas, lembra fatos, encadeia ações), depois fake-stream.
             #    O padding acima já deu feedback instantâneo — não perdemos UX.
-            out = _brain(text, _get_history_messages(), req.use_conclave)
+            out = _brain(text, _get_history_messages(), req.use_conclave, req.project_id)
             for word in (out["text"] or "Pronto, senhor.").split(" "):
                 yield f"data: {_j.dumps({'type':'token','text':word + ' '})}\n\n"
             entry = _entry_from_brain(text, out, start)
@@ -2123,7 +2181,12 @@ def _vp_fallback(tipo: str) -> str:
             "5. Bastidor — o catamarã saindo, clima bom")
 
 
-def _brain(text: str, history: list[dict], use_conclave: bool = False) -> dict:
+def _brain(
+    text: str,
+    history: list[dict],
+    use_conclave: bool = False,
+    project_id: str = gate.CORE_SCOPE,
+) -> dict:
     """Núcleo ÚNICO de decisão do Jamba (usado por /chat, /chat/stream e /voice).
 
     Cascata: atalho local → conclave (se pedido) → agente tool-use → cérebro
@@ -2183,7 +2246,7 @@ def _brain(text: str, history: list[dict], use_conclave: bool = False) -> dict:
     #    age: chama `programar` (→ executor), `buscar_conhecimento`, `pensar_profundo`
     #    (raciocínio fundo quando precisa), `lembrar_fato`, ou só conversa. O estado
     #    do projeto já entra via agent._system() (injeta briefing.estado_resumido()).
-    ag = agent.respond(text, history)
+    ag = agent.respond(text, history, project_id=project_id)
     if ag is not None:
         used = ag["tools"][0] if ag.get("tools") else intent
         return {"text": ag["text"] or "Pronto, senhor.", "intent": used,
@@ -2385,6 +2448,9 @@ async def oai_models():
 class TrainRequest(BaseModel):
     url: str
     agent: str = "khan"
+    project_id: str = ""
+    approved: bool = False
+    approval_id: int | None = None
 
 
 def _extract_yt_transcript(url: str) -> dict:
@@ -2448,10 +2514,30 @@ def _save_training_doc(agent_id: str, title: str, text: str, url: str) -> str:
 
 
 @app.post("/train/youtube")
-async def train_youtube(req: TrainRequest):
+async def train_youtube(
+    req: TrainRequest,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Extrai transcrição de um vídeo YouTube e salva na base de conhecimento do agente."""
+    blocked = _local_auth_gate(x_javes_local_token, "train.youtube")
+    if blocked:
+        return _gate_json(blocked)
+    blocked = gate.require_project_scope(req.project_id, scope=gate.CORE_SCOPE)
+    if blocked:
+        return _gate_json(blocked)
     if not safe_config.external_adapters_enabled():
         return _disabled_json("external_adapters", safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS)
+    blocked = gate.require_persisted_approval(
+        "train.youtube",
+        approval_id=req.approval_id,
+        route="/train/youtube",
+        project_id=req.project_id,
+        risk_level="high",
+        approved=req.approved,
+        metadata={"agent": req.agent, "url": req.url},
+    )
+    if blocked:
+        return _gate_json(blocked)
     if not req.url.strip():
         return JSONResponse({"error": "URL obrigatória"}, status_code=400)
     try:
@@ -2538,15 +2624,38 @@ async def browser_status():
 
 class BrowserRequest(BaseModel):
     task: str
+    project_id: str = ""
+    approved: bool = False
+    approval_id: int | None = None
 
 
 @app.post("/browser/run")
-async def browser_run(req: BrowserRequest):
+async def browser_run(
+    req: BrowserRequest,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Opera o navegador (browser-use) para realizar a tarefa. Ação em site real =
     risco — o caller deve usar com aprovação. Precisa de modelo com VISÃO
     (BROWSER_USE_MODEL) + OPENROUTER_API_KEY."""
+    blocked = _local_auth_gate(x_javes_local_token, "browser.run")
+    if blocked:
+        return _gate_json(blocked)
+    blocked = gate.require_project_scope(req.project_id, scope=gate.CORE_SCOPE)
+    if blocked:
+        return _gate_json(blocked)
     if not safe_config.browser_enabled():
         return _disabled_json("browser", safe_config.JAVIS_ENABLE_BROWSER)
+    blocked = gate.require_persisted_approval(
+        "browser.run",
+        approval_id=req.approval_id,
+        route="/browser/run",
+        project_id=req.project_id,
+        risk_level="high",
+        approved=req.approved,
+        metadata={"task": req.task},
+    )
+    if blocked:
+        return _gate_json(blocked)
     import browser_agent
     out = await browser_agent.run_task(req.task)
     return JSONResponse(out)

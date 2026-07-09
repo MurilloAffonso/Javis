@@ -156,7 +156,7 @@ class _Approvals:
         )
 
     def consume(self, approval_id: int) -> int:
-        return db.execute(
+        return db.execute_rowcount(
             "UPDATE approvals SET consumed_at=datetime('now'), updated_at=datetime('now') "
             "WHERE id=? AND consumed_at IS NULL",
             (approval_id,),

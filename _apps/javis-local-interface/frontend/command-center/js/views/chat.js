@@ -1,6 +1,6 @@
 // Chat — conversa com os agentes (texto, upload, voz). Extraído de app.js em
 // 2026-07-02. MESMO comportamento; agora módulo ES.
-import { h, $, state, BACKEND, tryJson, _esc, activeAgent, pct } from "../../app.js";
+import { h, $, state, BACKEND, CORE_PROJECT_ID, tryJson, withLocalAuth, _esc, activeAgent, pct } from "../../app.js";
 import { initVoiceStage } from "../voice.js";
 
 const CMD_SUGGEST = [
@@ -144,10 +144,11 @@ async function sendChat(a, explicitMsg, speak) {
 
   let full = "", meta = {};
   try {
-    const res = await fetch(BACKEND + "chat/stream", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: msg, use_conclave: !!state.useConclave, model: "claude" }),
-    });
+    const res = await fetch(BACKEND + "chat/stream", withLocalAuth({
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: msg, project_id: CORE_PROJECT_ID, use_conclave: !!state.useConclave, model: "claude" }),
+    }));
     if (!res.ok || !res.body) {
       const err = await res.json().catch(() => ({}));
       bot.classList.remove("streaming");

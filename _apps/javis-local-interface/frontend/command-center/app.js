@@ -18,10 +18,11 @@ import { viewMaquina } from "./js/views/maquina.js";
 import { viewConteudo } from "./js/views/conteudo.js";
 import { viewIngestao } from "./js/views/ingestao.js";
 // Helpers do núcleo que as telas-módulo consomem (live bindings):
-export { _esc, h, $, state, BACKEND, VP_PROJECT_ID, tryJson, withProjectId, withLocalAuth, renderCanvas, renderRightPanel, setView, opToast, opSend, opEsc, confirmStrong, activeAgent, pct, sc, projName, tele };
+export { _esc, h, $, state, BACKEND, CORE_PROJECT_ID, VP_PROJECT_ID, tryJson, withProjectId, withLocalAuth, renderCanvas, renderRightPanel, setView, opToast, opSend, opEsc, confirmStrong, activeAgent, pct, sc, projName, tele };
 
 const DATA_BASE = "../../data/";
 const BACKEND = (location.port === "8000") ? "/" : "http://localhost:8000/";
+const CORE_PROJECT_ID = "javes-core";
 const VP_PROJECT_ID = "project:cerebro-jampa";
 const LOCAL_TOKEN_KEY = "javes.localToken";
 const LOCAL_TOKEN_HEADER = "X-Javes-Local-Token";

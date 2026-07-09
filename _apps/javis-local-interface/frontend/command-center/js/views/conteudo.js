@@ -7,7 +7,7 @@
 // A ÚNICA escrita real é a geração com IA via POST /chat. Salvar/Publicar apenas
 // adicionam um card à biblioteca local (sem endpoint). Todo texto do usuário é
 // escapado com _esc antes de ir pro HTML. CSS injetado de forma idempotente.
-import { h, $, state, BACKEND, tryJson, withProjectId, _esc, opToast } from "../../app.js";
+import { h, $, state, BACKEND, CORE_PROJECT_ID, VP_PROJECT_ID, tryJson, withProjectId, _esc, opToast } from "../../app.js";
 
 // ---------- Estado local (só em memória, reseta ao recarregar) ----------
 let _projeto = "vempassear"; // default: Vem Passear
@@ -343,10 +343,11 @@ async function gerarComIA(btn) {
   btn.disabled = true;
   btn.textContent = "✨ gerando…";
   try {
-    const data = await tryJson(BACKEND + "chat", {
+    const projectId = _projeto === "vempassear" ? VP_PROJECT_ID : CORE_PROJECT_ID;
+    const data = await tryJson(withProjectId(BACKEND + "chat", projectId), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: prompt }),
+      body: JSON.stringify({ message: prompt, project_id: projectId }),
     });
     const texto = (data && (data.response ?? data.text)) || "";
     if (texto && String(texto).trim()) {

@@ -556,7 +556,7 @@ def _exec_tool(name: str, inp: dict, history: list[dict] | None = None) -> str:
         return integrations.whatsapp_send(inp.get("numero") or "", inp.get("mensagem") or "").get("message", "Feito, senhor.")
     if name == "buscar_conhecimento":
         import knowledge
-        ctx = knowledge.answer_context(inp.get("pergunta") or "")
+        ctx = knowledge.answer_context(inp.get("pergunta") or "", escopo=knowledge.scope_for_project(project_id))
         return ctx or "Não encontrei nada nos seus arquivos sobre isso, senhor."
     if name == "pesquisar_redes":
         import social_reader
@@ -1159,7 +1159,12 @@ def _is_heavy_request(text: str) -> bool:
     return any(h in t for h in _HEAVY_HINTS)
 
 
-def respond(user_text: str, history: list[dict] | None = None, max_rounds: int = 5) -> dict | None:
+def respond(
+    user_text: str,
+    history: list[dict] | None = None,
+    max_rounds: int = 5,
+    project_id: str = "",
+) -> dict | None:
     """Loop de tool-use. Cascata: [Gemini rápido p/ conversa leve] → Claude
     (assinatura) → OpenAI → Claude API → Gemini → OpenRouter.
     Decisão Murillo 18/06: a assinatura é o cérebro principal. Ajuste 23/06: pra

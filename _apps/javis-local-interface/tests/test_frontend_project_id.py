@@ -12,6 +12,7 @@ def _read(rel: str) -> str:
 def test_command_center_exports_project_scope_and_local_auth_header():
     app = _read("command-center/app.js")
 
+    assert 'const CORE_PROJECT_ID = "javes-core"' in app
     assert 'const VP_PROJECT_ID = "project:cerebro-jampa"' in app
     assert 'const LOCAL_TOKEN_HEADER = "X-Javes-Local-Token"' in app
     assert "function withProjectId" in app
@@ -42,7 +43,15 @@ def test_vempassear_views_scope_vp_jampa_calls():
 def test_content_and_wa_views_send_project_scope():
     conteudo = _read("command-center/js/views/conteudo.js")
     treino = _read("command-center/js/views/treino.js")
+    chat = _read("command-center/js/views/chat.js")
+    voice = _read("command-center/js/voice.js")
+    tarefas = _read("command-center/js/views/tarefas.js")
 
-    assert "withProjectId(BACKEND + \"conteudo\")" in conteudo
+    assert 'project_id: projectId' in conteudo
+    assert 'const projectId = _projeto === "vempassear" ? VP_PROJECT_ID : CORE_PROJECT_ID' in conteudo
+    assert 'project_id: CORE_PROJECT_ID' in chat
+    assert 'project_id: CORE_PROJECT_ID' in voice
+    assert 'project_id: CORE_PROJECT_ID' in tarefas
+    assert 'project_id: CORE_PROJECT_ID' in treino
     assert "withProjectId(BACKEND + \"wa/analyze\")" in treino
     assert "withProjectId(BACKEND + \"wa/save-voice\")" in treino

@@ -10,6 +10,7 @@ import safe_config
 
 JAVIS_ROOT = Path(__file__).resolve().parents[3]
 CEREBRO_JAMPA_SCOPE = "project:cerebro-jampa"
+CORE_SCOPE = "javes-core"
 INGEST_DEFAULT_DIR = JAVIS_ROOT / "_inbox" / "ingestao"
 UPLOAD_TMP_DIR = JAVIS_ROOT / "_apps" / "javis-local-interface" / "_tmp" / "uploads"
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -122,7 +123,21 @@ def require_persisted_approval(
     if approval_id:
         approval = repo.approvals.get(approval_id)
         if repo.approvals.valid_for_action(approval, action, route=route, project_id=project_id):
-            if repo.approvals.consume(approval_id) == 1:
+            if repo.approvals.consume(approval_id) >= 1:
+                try:
+                    repo.logs.add(
+                        source="gate",
+                        intent=action,
+                        agent=approval.get("requested_by", "") if approval else "",
+                        message=(
+                            f"approval_id={approval_id} route={route or ''} "
+                            f"project_id={project_id or ''} result=approved"
+                        ),
+                        status="approved",
+                        approved=True,
+                    )
+                except Exception:
+                    pass
                 return None
             approval = repo.approvals.get(approval_id)
             status = "consumed"
@@ -200,12 +215,16 @@ def require_vp_effects(action: str) -> dict | None:
 
 def require_project_scope(
     project_id: str | None,
-    scope: str = CEREBRO_JAMPA_SCOPE,
+    scope: str | list[str] | tuple[str, ...] | set[str] = CEREBRO_JAMPA_SCOPE,
 ) -> dict | None:
     normalized = (project_id or "").strip()
     if not normalized:
         return project_id_required(scope)
-    if normalized != scope:
+    if isinstance(scope, (list, tuple, set)):
+        allowed = {str(item).strip() for item in scope if str(item).strip()}
+        if normalized not in allowed:
+            return project_id_mismatch(normalized, sorted(allowed))
+    elif normalized != scope:
         return project_id_mismatch(normalized, scope)
     return None
 

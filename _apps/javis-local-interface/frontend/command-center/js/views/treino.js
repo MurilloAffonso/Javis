@@ -1,5 +1,5 @@
 // Treino — status de treinamento por área — extraído de app.js em 2026-07-03. MESMO comportamento; módulo ES.
-import { h, state, BACKEND, tryJson, withProjectId, renderCanvas } from "../../app.js";
+import { h, state, BACKEND, CORE_PROJECT_ID, tryJson, opSend, withProjectId, renderCanvas } from "../../app.js";
 
 function viewTreino(body) {
   body.appendChild(h(`<div class="card-sub" style="margin-bottom:16px">Pipeline: <b>_entrada</b> (vídeos/repos/PDFs, coletados ou manuais) → resumo no <b>NotebookLM</b> → <b>_resumos</b> entra na base RAG do Javes.</div>`));
@@ -20,9 +20,16 @@ function viewTreino(body) {
     if (!state.online) { out.textContent = "Backend offline."; return; }
     const btn = yt.querySelector("#yt-run"); btn.disabled = true; out.textContent = "Extraindo transcrição e indexando (pode levar ~30s)…";
     try {
-      const r = await tryJson(BACKEND + "train/youtube", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) });
-      if (r.error) out.textContent = "⚠️ " + r.error;
-      else out.textContent = `✅ "${r.title}" (${r.channel || "canal"}) · ${r.chars} chars → ${r.file}. Reindexando o RAG.`;
+      const r = await opSend(BACKEND + "train/youtube", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url, project_id: CORE_PROJECT_ID }) });
+      if (!r.ok && r.data && r.data.status === "approval_required") {
+        out.textContent = `Aprovação necessária: ${r.data.approval_id || "—"}`;
+      } else if (!r.ok) {
+        out.textContent = "Falhou: " + r.status;
+      } else if (r.data.error) {
+        out.textContent = "⚠️ " + r.data.error;
+      } else {
+        out.textContent = `✅ "${r.data.title}" (${r.data.channel || "canal"}) · ${r.data.chars} chars → ${r.data.file}. Reindexando o RAG.`;
+      }
     } catch (e) { out.textContent = "Falhou: " + e.message; }
     btn.disabled = false;
   };
