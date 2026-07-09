@@ -5,8 +5,7 @@ O provedor de embeddings é selecionado por `JAVIS_RAG_EMBEDDER`:
 
 - `openai` — caminho atual, preservado por padrão.
 - `local` — embedder puro-Python, offline e determinístico.
-
-TODO: plugar um modelo local real (Ollama/nomic) atrás da mesma interface.
+- `ollama` — embedder local real via Ollama, opt-in e atrás de external_adapters.
 """
 from __future__ import annotations
 import json
@@ -15,6 +14,8 @@ import os
 import hashlib
 import re
 import threading
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 import gate
@@ -40,6 +41,9 @@ _EXTS = {".md", ".txt"}
 _CHUNK = 800        # tamanho alvo do trecho (chars)
 _MODEL = "text-embedding-3-small"
 _LOCAL_EMBED_DIM = 256
+_OLLAMA_DEFAULT_BASE_URL = "http://127.0.0.1:11434"
+_OLLAMA_DEFAULT_MODEL = "nomic-embed-text"
+_OLLAMA_EMBED_BATCH = 32
 _MAX_FILES = 800    # trava de segurança contra indexar demais
 
 _lock = threading.Lock()
@@ -137,6 +141,12 @@ class _BaseEmbedder:
         raise NotImplementedError
 
 
+class _OllamaHTTPError(RuntimeError):
+    def __init__(self, message: str, status: int):
+        super().__init__(message)
+        self.status = status
+
+
 class _OpenAIEmbedder(_BaseEmbedder):
     name = "openai"
 
@@ -153,10 +163,21 @@ class _LocalEmbedder(_BaseEmbedder):
         vec = [0.0] * _LOCAL_EMBED_DIM
         if not tokens:
             return vec
-        for token in tokens:
-            digest = hashlib.blake2b(token.encode("utf-8"), digest_size=8).digest()
+
+        def add(feature: str, weight: float) -> None:
+            digest = hashlib.blake2b(feature.encode("utf-8"), digest_size=8).digest()
             idx = int.from_bytes(digest, "big") % _LOCAL_EMBED_DIM
-            vec[idx] += 1.0
+            vec[idx] += weight
+
+        for token in tokens:
+            add(f"w:{token}", 1.0)
+
+        normalized = " ".join(tokens)
+        padded = f" {normalized} "
+        if len(padded) >= 3:
+            for i in range(len(padded) - 2):
+                add(f"c3:{padded[i:i + 3]}", 0.45)
+
         norm = math.sqrt(sum(v * v for v in vec))
         if not norm:
             return vec
@@ -166,9 +187,100 @@ class _LocalEmbedder(_BaseEmbedder):
         return [self._vector(text) for text in texts]
 
 
+class _OllamaEmbedder(_BaseEmbedder):
+    name = "ollama"
+
+    def __init__(self):
+        self.model = (os.environ.get("JAVIS_OLLAMA_EMBED_MODEL") or _OLLAMA_DEFAULT_MODEL).strip()
+        self.base_url = (
+            os.environ.get("JAVIS_OLLAMA_BASE_URL") or _OLLAMA_DEFAULT_BASE_URL
+        ).strip().rstrip("/")
+        raw_timeout = (os.environ.get("JAVIS_OLLAMA_TIMEOUT") or "20").strip()
+        try:
+            self.timeout = max(float(raw_timeout), 1.0)
+        except ValueError:
+            self.timeout = 20.0
+
+    def _require_enabled(self) -> None:
+        blocked = gate.require_external_adapters("knowledge.ollama_embed")
+        if blocked:
+            flag = blocked.get("flag", "JAVIS_ENABLE_EXTERNAL_ADAPTERS")
+            raise RuntimeError(
+                f"Ollama embedder desabilitado: habilite {flag} para usar processo externo local."
+            )
+
+    def _post_json(self, path: str, payload: dict) -> dict:
+        url = f"{self.base_url}{path}"
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                raw = resp.read().decode("utf-8")
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")[:300]
+            message = f"Ollama embeddings falhou ({exc.code}) em {url}: {detail}"
+            raise _OllamaHTTPError(message, exc.code) from exc
+        except urllib.error.URLError as exc:
+            reason = getattr(exc, "reason", exc)
+            raise RuntimeError(
+                f"Ollama embeddings indisponivel em {self.base_url}: {reason}"
+            ) from exc
+        except TimeoutError as exc:
+            raise RuntimeError(
+                f"Ollama embeddings excedeu timeout de {self.timeout:.1f}s em {self.base_url}"
+            ) from exc
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"Ollama embeddings retornou JSON invalido em {url}") from exc
+
+    @staticmethod
+    def _coerce_embeddings(value, expected: int) -> list[list[float]]:
+        if not isinstance(value, list) or len(value) != expected:
+            raise RuntimeError(
+                f"Ollama embeddings retornou {len(value) if isinstance(value, list) else 0} vetores; esperado {expected}."
+            )
+        try:
+            return [[float(x) for x in vec] for vec in value]
+        except (TypeError, ValueError) as exc:
+            raise RuntimeError("Ollama embeddings retornou vetor invalido.") from exc
+
+    def _embed_batch_api(self, texts: list[str]) -> list[list[float]]:
+        data = self._post_json("/api/embed", {"model": self.model, "input": texts})
+        return self._coerce_embeddings(data.get("embeddings"), len(texts))
+
+    def _embed_legacy_api(self, text: str) -> list[float]:
+        data = self._post_json("/api/embeddings", {"model": self.model, "prompt": text})
+        vectors = self._coerce_embeddings([data.get("embedding")], 1)
+        return vectors[0]
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        self._require_enabled()
+        if not texts:
+            return []
+        out: list[list[float]] = []
+        for i in range(0, len(texts), _OLLAMA_EMBED_BATCH):
+            batch = texts[i:i + _OLLAMA_EMBED_BATCH]
+            try:
+                out.extend(self._embed_batch_api(batch))
+            except _OllamaHTTPError as exc:
+                if exc.status != 404:
+                    raise
+                out.extend(self._embed_legacy_api(text) for text in batch)
+        return out
+
+
 def _selected_embedder() -> _BaseEmbedder:
-    if _embedder_name() == "local":
+    name = _embedder_name()
+    if name == "local":
         return _LocalEmbedder()
+    if name == "ollama":
+        return _OllamaEmbedder()
     return _OpenAIEmbedder()
 
 
@@ -315,7 +427,14 @@ def build_index(force: bool = False) -> dict:
             files_done += 1
 
         if pending_texts:
-            vecs = embedder.embed(pending_texts)
+            try:
+                vecs = embedder.embed(pending_texts)
+            except Exception as exc:
+                return {
+                    "status": "error",
+                    "message": f"Falha no embedder {embedder.name}: {exc}",
+                    "embedder": embedder.name,
+                }
             for meta, vec in zip(pending_meta, vecs):
                 meta["vec"] = vec
                 new_index.append(meta)
@@ -369,7 +488,9 @@ def search(query: str, k: int = 5) -> list[dict]:
         return []
     try:
         qvec = embedder.embed([query])[0]
-    except Exception:
+    except Exception as exc:
+        if embedder.name == "ollama":
+            raise RuntimeError(f"Falha no embedder ollama: {exc}") from exc
         return []
     scored = [{"path": it["path"], "chunk": it["chunk"], "score": _cosine(qvec, it["vec"])}
               for it in index if it.get("vec")]

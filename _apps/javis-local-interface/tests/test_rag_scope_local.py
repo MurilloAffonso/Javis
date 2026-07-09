@@ -4,15 +4,17 @@ import importlib
 import sys
 from pathlib import Path
 
+import pytest
+
 BACKEND = Path(__file__).resolve().parents[1] / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 
-def _knowledge(monkeypatch, tmp_path):
+def _knowledge(monkeypatch, tmp_path, embedder: str):
     monkeypatch.setenv("JAVIS_SKIP_DOTENV", "1")
     monkeypatch.setenv("JAVIS_ENABLE_EXTERNAL_ADAPTERS", "true")
-    monkeypatch.setenv("JAVIS_RAG_EMBEDDER", "local")
+    monkeypatch.setenv("JAVIS_RAG_EMBEDDER", embedder)
     monkeypatch.setenv("JAVIS_RAG", "legacy")
     sys.modules.pop("knowledge", None)
     knowledge = importlib.import_module("knowledge")
@@ -22,8 +24,9 @@ def _knowledge(monkeypatch, tmp_path):
     return knowledge
 
 
-def test_local_rag_scope_keeps_core_and_vp_isolated(monkeypatch, tmp_path):
-    knowledge = _knowledge(monkeypatch, tmp_path)
+@pytest.mark.parametrize("embedder", ["openai", "local", "ollama"])
+def test_rag_scope_keeps_core_and_vp_isolated_for_each_embedder(monkeypatch, tmp_path, embedder):
+    knowledge = _knowledge(monkeypatch, tmp_path, embedder)
 
     hits = [
         {"path": "_memoria/dna/core.md", "chunk": "core chunk", "score": 0.91},
@@ -32,6 +35,8 @@ def test_local_rag_scope_keeps_core_and_vp_isolated(monkeypatch, tmp_path):
 
     monkeypatch.setattr(knowledge, "search", lambda query, k=5: hits)
     monkeypatch.setattr("categoria.de_path", lambda path: "vp" if path.startswith("[") else "projeto")
+
+    assert knowledge._selected_embedder().name == embedder
 
     core = knowledge.answer_context("x", escopo=knowledge.scope_for_project("javes-core"))
     vp = knowledge.answer_context("x", escopo=knowledge.scope_for_project("project:cerebro-jampa"))
