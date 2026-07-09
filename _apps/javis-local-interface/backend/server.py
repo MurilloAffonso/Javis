@@ -19,12 +19,14 @@ from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-# Carrega variáveis de ambiente do .env na raiz do projeto
-try:
-    from dotenv import load_dotenv
-    load_dotenv(Path(__file__).resolve().parents[3] / ".env")
-except ImportError:
-    pass
+# Carrega variáveis de ambiente do .env na raiz do projeto.
+# Testes de hardening usam JAVIS_SKIP_DOTENV=1 para nao ler segredos locais.
+if not os.environ.get("JAVIS_SKIP_DOTENV"):
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(Path(__file__).resolve().parents[3] / ".env")
+    except ImportError:
+        pass
 
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse, RedirectResponse
@@ -37,6 +39,7 @@ import command_router
 import actions
 import logger
 import history_store
+import gate
 import safe_config
 import tts_local
 from orchestrator import Orchestrator
@@ -59,6 +62,22 @@ def _disabled_json(capability: str, flag_hint: str = "", status_code: int = 403)
         safe_config.disabled_response(capability, flag_hint),
         status_code=status_code,
     )
+
+
+def _gate_json(payload: dict, status_code: int = 403):
+    return JSONResponse(payload, status_code=status_code)
+
+
+def _vp_project_gate(action: str, project_id: str, external_adapters: bool = False) -> dict | None:
+    blocked = gate.require_project_scope(project_id)
+    if blocked:
+        return blocked
+    blocked = gate.require_vp_effects(action)
+    if blocked:
+        return blocked
+    if external_adapters:
+        return gate.require_external_adapters(action)
+    return None
 
 # Interface legada "Central de Comando" (/central) ARQUIVADA em UI-4B
 # (movida para _arquivo/interfaces-legadas/). Mount removido.
@@ -104,8 +123,10 @@ async def _start_integrations():
         print(f"  Lembretes: nao iniciado ({e})")
     try:
         import knowledge
-        knowledge.start_background_index()
-        print("  Conhecimento: indexando vault em segundo plano [ok]")
+        if knowledge.start_background_index():
+            print("  Conhecimento: indexando vault em segundo plano [ok]")
+        else:
+            print("  Conhecimento: disabled_by_default (requires_explicit_enable)")
     except Exception as e:
         print(f"  Conhecimento: nao iniciado ({e})")
     # Pré-aquece o cache de TTS dos acks falados — assim o 1º pedido já sai
@@ -130,6 +151,9 @@ async def _start_integrations():
 @app.post("/knowledge/reindex")
 async def knowledge_reindex():
     """Reindexa os arquivos do vault (incremental)."""
+    blocked = gate.require_external_adapters("knowledge.reindex")
+    if blocked:
+        return _gate_json(blocked)
     import knowledge
     result = await run_in_threadpool(knowledge.build_index, False)
     return JSONResponse(result)
@@ -137,6 +161,9 @@ async def knowledge_reindex():
 
 @app.get("/knowledge/search")
 async def knowledge_search(q: str = ""):
+    blocked = gate.require_external_adapters("knowledge.search")
+    if blocked:
+        return _gate_json(blocked)
     import knowledge
     hits = await run_in_threadpool(knowledge.search, q, 5)
     return JSONResponse({"hits": hits})
@@ -159,9 +186,15 @@ class DnaReq(BaseModel):
 
 
 @app.post("/knowledge/dna")
-async def knowledge_dna(req: DnaReq):
+async def knowledge_dna(req: DnaReq, approved: bool = False):
     """Extrai o DNA cognitivo de um texto (transcrição, export, material),
     grava o dossiê em _memoria/dna/ e reindexa o RAG."""
+    blocked = gate.require_external_adapters("knowledge.dna")
+    if blocked:
+        return _gate_json(blocked)
+    blocked = gate.require_approval("knowledge.dna", approved)
+    if blocked:
+        return _gate_json(blocked)
     import dna_extractor
     result = await run_in_threadpool(
         dna_extractor.extract_and_index, req.text, req.fonte, req.tema, req.fonte_tipo)
@@ -171,6 +204,9 @@ async def knowledge_dna(req: DnaReq):
 @app.post("/knowledge/graph/build")
 async def knowledge_graph_build():
     """(Re)constrói o grafo de conhecimento a partir dos dossiês de DNA."""
+    blocked = gate.require_local_actions("knowledge.graph.build")
+    if blocked:
+        return _gate_json(blocked)
     import knowledge_graph
     return JSONResponse(await run_in_threadpool(knowledge_graph.build_from_dna))
 
@@ -185,11 +221,20 @@ async def knowledge_graph_query(q: str = "", depth: int = 1):
 
 
 @app.post("/knowledge/ingest")
-async def knowledge_ingest(folder: str = ""):
+async def knowledge_ingest(folder: str = "", approved: bool = False):
     """Ingestão em LOTE: processa .txt/.md de uma pasta (default _inbox/ingestao/)
     → DNA → RAG → grafo. Assíncrono; acompanhe em /knowledge/ingest/status."""
+    safe_folder, blocked = gate.validate_ingest_folder(folder)
+    if blocked:
+        return _gate_json(blocked)
+    blocked = gate.require_external_adapters("knowledge.ingest")
+    if blocked:
+        return _gate_json(blocked)
+    blocked = gate.require_approval("knowledge.ingest", approved)
+    if blocked:
+        return _gate_json(blocked)
     import ingest
-    return JSONResponse(ingest.start(folder))
+    return JSONResponse(ingest.start(str(safe_folder)))
 
 
 @app.get("/knowledge/ingest/status")
@@ -280,18 +325,20 @@ class VPPasseioRequest(BaseModel):
 
 
 @app.post("/vp/passeios")
-async def vp_passeios_add(req: VPPasseioRequest):
-    if not safe_config.vp_effects_enabled():
-        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
+async def vp_passeios_add(req: VPPasseioRequest, project_id: str = ""):
+    blocked = _vp_project_gate("vp.passeios.add", project_id)
+    if blocked:
+        return _gate_json(blocked)
     import vp_store
     item = vp_store.add_passeio(req.tipo, req.data, req.pessoas, req.valor)
     return JSONResponse({"status": "ok", "item": item})
 
 
 @app.delete("/vp/passeios/{item_id}")
-async def vp_passeios_del(item_id: str):
-    if not safe_config.vp_effects_enabled():
-        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
+async def vp_passeios_del(item_id: str, project_id: str = ""):
+    blocked = _vp_project_gate("vp.passeios.delete", project_id)
+    if blocked:
+        return _gate_json(blocked)
     import vp_store
     return JSONResponse({"status": "ok" if vp_store.remove_passeio(item_id) else "not_found"})
 
@@ -310,9 +357,10 @@ class VPClienteRequest(BaseModel):
 
 
 @app.post("/vp/clientes")
-async def vp_clientes_add(req: VPClienteRequest):
-    if not safe_config.vp_effects_enabled():
-        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
+async def vp_clientes_add(req: VPClienteRequest, project_id: str = ""):
+    blocked = _vp_project_gate("vp.clientes.add", project_id)
+    if blocked:
+        return _gate_json(blocked)
     import vp_store
     item = vp_store.add_cliente(req.nome, req.contato, req.obs)
     return JSONResponse({"status": "ok", "item": item})
@@ -323,17 +371,19 @@ class VPStatusRequest(BaseModel):
 
 
 @app.patch("/vp/clientes/{item_id}")
-async def vp_clientes_status(item_id: str, req: VPStatusRequest):
-    if not safe_config.vp_effects_enabled():
-        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
+async def vp_clientes_status(item_id: str, req: VPStatusRequest, project_id: str = ""):
+    blocked = _vp_project_gate("vp.clientes.status", project_id)
+    if blocked:
+        return _gate_json(blocked)
     import vp_store
     return JSONResponse({"status": "ok" if vp_store.set_status(item_id, req.status) else "not_found"})
 
 
 @app.delete("/vp/clientes/{item_id}")
-async def vp_clientes_del(item_id: str):
-    if not safe_config.vp_effects_enabled():
-        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
+async def vp_clientes_del(item_id: str, project_id: str = ""):
+    blocked = _vp_project_gate("vp.clientes.delete", project_id)
+    if blocked:
+        return _gate_json(blocked)
     import vp_store
     return JSONResponse({"status": "ok" if vp_store.remove_cliente(item_id) else "not_found"})
 
@@ -345,9 +395,10 @@ class VPConteudoRequest(BaseModel):
 
 
 @app.post("/vp/conteudo")
-async def vp_conteudo(req: VPConteudoRequest):
-    if not safe_config.external_adapters_enabled():
-        return _disabled_json("external_adapters", safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS)
+async def vp_conteudo(req: VPConteudoRequest, project_id: str = ""):
+    blocked = _vp_project_gate("vp.conteudo", project_id, external_adapters=True)
+    if blocked:
+        return _gate_json(blocked)
     texto = _gerar_conteudo_vp(req.tipo, req.tema)
     return JSONResponse({"status": "ok", "texto": texto})
 
@@ -365,9 +416,10 @@ async def vp_conteudos_list():
 
 
 @app.post("/vp/conteudos")
-async def vp_conteudos_add(req: VPSalvarConteudo):
-    if not safe_config.vp_effects_enabled():
-        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
+async def vp_conteudos_add(req: VPSalvarConteudo, project_id: str = ""):
+    blocked = _vp_project_gate("vp.conteudos.add", project_id)
+    if blocked:
+        return _gate_json(blocked)
     import vp_store
     if not req.texto.strip():
         return JSONResponse({"status": "vazio"}, status_code=400)
@@ -375,9 +427,10 @@ async def vp_conteudos_add(req: VPSalvarConteudo):
 
 
 @app.delete("/vp/conteudos/{item_id}")
-async def vp_conteudos_del(item_id: str):
-    if not safe_config.vp_effects_enabled():
-        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
+async def vp_conteudos_del(item_id: str, project_id: str = ""):
+    blocked = _vp_project_gate("vp.conteudos.delete", project_id)
+    if blocked:
+        return _gate_json(blocked)
     import vp_store
     return JSONResponse({"status": "ok" if vp_store.remove_conteudo(item_id) else "not_found"})
 
@@ -463,9 +516,10 @@ class VPPautaRequest(BaseModel):
 
 
 @app.post("/vp/pauta")
-async def vp_pauta_add(req: VPPautaRequest):
-    if not safe_config.vp_effects_enabled():
-        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
+async def vp_pauta_add(req: VPPautaRequest, project_id: str = ""):
+    blocked = _vp_project_gate("vp.pauta.add", project_id)
+    if blocked:
+        return _gate_json(blocked)
     import vp_store
     return JSONResponse({"status": "ok", "item": vp_store.add_pauta(req.data, req.canal, req.ideia)})
 
@@ -475,17 +529,19 @@ class VPPautaStatus(BaseModel):
 
 
 @app.patch("/vp/pauta/{item_id}")
-async def vp_pauta_status(item_id: str, req: VPPautaStatus):
-    if not safe_config.vp_effects_enabled():
-        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
+async def vp_pauta_status(item_id: str, req: VPPautaStatus, project_id: str = ""):
+    blocked = _vp_project_gate("vp.pauta.status", project_id)
+    if blocked:
+        return _gate_json(blocked)
     import vp_store
     return JSONResponse({"status": "ok" if vp_store.set_pauta_status(item_id, req.status) else "not_found"})
 
 
 @app.delete("/vp/pauta/{item_id}")
-async def vp_pauta_del(item_id: str):
-    if not safe_config.vp_effects_enabled():
-        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
+async def vp_pauta_del(item_id: str, project_id: str = ""):
+    blocked = _vp_project_gate("vp.pauta.delete", project_id)
+    if blocked:
+        return _gate_json(blocked)
     import vp_store
     return JSONResponse({"status": "ok" if vp_store.remove_pauta(item_id) else "not_found"})
 
@@ -516,12 +572,11 @@ class JampaSquadRequest(BaseModel):
 
 
 @app.post("/jampa/squad")
-async def jampa_squad_run(req: JampaSquadRequest):
+async def jampa_squad_run(req: JampaSquadRequest, project_id: str = ""):
     """Aciona o squad: Orion escolhe o agente (ou força um) e executa, aterrado."""
-    if not safe_config.vp_effects_enabled():
-        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
-    if not safe_config.external_adapters_enabled():
-        return _disabled_json("external_adapters", safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS)
+    blocked = _vp_project_gate("jampa.squad", project_id, external_adapters=True)
+    if blocked:
+        return _gate_json(blocked)
     import jampa_squad
     if not req.tarefa.strip():
         return JSONResponse({"status": "error", "message": "Tarefa vazia"}, status_code=400)
@@ -540,12 +595,11 @@ class JampaLeadRequest(BaseModel):
 
 
 @app.post("/jampa/responder-lead")
-async def jampa_responder_lead(req: JampaLeadRequest):
+async def jampa_responder_lead(req: JampaLeadRequest, project_id: str = ""):
     """Fluxo-dinheiro: gera a resposta de WhatsApp pronta pro lead (aterrada)."""
-    if not safe_config.vp_effects_enabled():
-        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
-    if not safe_config.external_adapters_enabled():
-        return _disabled_json("external_adapters", safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS)
+    blocked = _vp_project_gate("jampa.responder_lead", project_id, external_adapters=True)
+    if blocked:
+        return _gate_json(blocked)
     import jampa_squad
     out = await run_in_threadpool(
         jampa_squad.responder_lead, req.nome, req.contato, req.interesse, req.obs)
@@ -558,12 +612,11 @@ class JampaForjarRequest(BaseModel):
 
 
 @app.post("/jampa/forjar-skill")
-async def jampa_forjar_skill(req: JampaForjarRequest):
+async def jampa_forjar_skill(req: JampaForjarRequest, project_id: str = ""):
     """Pipeline Nero: transcrição de expert → skill .md (rascunho p/ Murillo revisar)."""
-    if not safe_config.vp_effects_enabled():
-        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
-    if not safe_config.external_adapters_enabled():
-        return _disabled_json("external_adapters", safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS)
+    blocked = _vp_project_gate("jampa.forjar_skill", project_id, external_adapters=True)
+    if blocked:
+        return _gate_json(blocked)
     import skill_forge
     out = await run_in_threadpool(skill_forge.forge, req.transcricao, req.tema)
     return JSONResponse(out)
@@ -795,9 +848,12 @@ async def task_events(task_id: str):
 
 
 @app.post("/tasks/{task_id}/run-studio")
-async def task_run_studio(task_id: str):
+async def task_run_studio(task_id: str, project_id: str = ""):
     """Roda o Estúdio (modo seguro) na task de Design: gera criativos textuais,
     registra o Journey Log e cria o Gate 2. Sem imagem, sem publicar, sem integração."""
+    blocked = _vp_project_gate("tasks.run_studio", project_id)
+    if blocked:
+        return _gate_json(blocked)
     import studio
     out = await run_in_threadpool(studio.run_studio, task_id)
     code = 200 if out.get("ok") else 409
@@ -805,9 +861,12 @@ async def task_run_studio(task_id: str):
 
 
 @app.post("/tasks/{task_id}/prepare-distribution")
-async def task_prepare_distribution(task_id: str):
+async def task_prepare_distribution(task_id: str, project_id: str = ""):
     """Prepara a Distribuição (modo seguro) na task liberada: gera o pacote textual,
     registra o Journey Log e cria o Gate 3. NÃO publica, sem integração externa."""
+    blocked = _vp_project_gate("tasks.prepare_distribution", project_id)
+    if blocked:
+        return _gate_json(blocked)
     import distribution
     out = await run_in_threadpool(distribution.run_distribution, task_id)
     code = 200 if out.get("ok") else 409
@@ -820,9 +879,12 @@ class StatusRequest(BaseModel):
 
 
 @app.post("/tasks/{task_id}/status")
-async def task_set_status(task_id: str, req: StatusRequest):
+async def task_set_status(task_id: str, req: StatusRequest, project_id: str = ""):
     """Muda o status da task (operação do Quadro) via SQLite. completed/killed
     reusam o fluxo de conclusão/digest. Sem integração externa."""
+    blocked = _vp_project_gate("tasks.status", project_id)
+    if blocked:
+        return _gate_json(blocked)
     import task_lifecycle
     out = await run_in_threadpool(task_lifecycle.change_task_status, task_id, req.status, req.note or "")
     code = 200 if out.get("ok") else 409
@@ -834,8 +896,11 @@ class CompleteRequest(BaseModel):
 
 
 @app.post("/tasks/{task_id}/complete")
-async def task_complete(task_id: str, req: CompleteRequest):
+async def task_complete(task_id: str, req: CompleteRequest, project_id: str = ""):
     """Encerra a entidade-tarefa (completed/killed) + gera digest. Sem LLM, sem integração externa."""
+    blocked = _vp_project_gate("tasks.complete", project_id)
+    if blocked:
+        return _gate_json(blocked)
     import task_lifecycle
     out = await run_in_threadpool(task_lifecycle.complete_task, task_id, req.note or "")
     code = 200 if out.get("ok") else 409
@@ -966,10 +1031,11 @@ class VPRunRequest(BaseModel):
 
 
 @app.post("/vp/agents/run")
-async def vp_agents_run(req: VPRunRequest):
+async def vp_agents_run(req: VPRunRequest, project_id: str = ""):
     """Executa um agente do squad da Vem Passear (contrato como system prompt, na assinatura)."""
-    if not safe_config.vp_effects_enabled():
-        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
+    blocked = _vp_project_gate("vp.agents.run", project_id)
+    if blocked:
+        return _gate_json(blocked)
     if not safe_config.claude_exec_enabled():
         return _disabled_json("claude_exec", safe_config.JAVIS_ENABLE_CLAUDE_EXEC)
     import vp_squad
@@ -1377,23 +1443,44 @@ async def transcribe_audio(file: UploadFile = File(...)):
 # ── TTS ──────────────────────────────────────────────────
 
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(file: UploadFile = File(...), approved: bool = False):
     """Recebe um arquivo, salva temporariamente e analisa com file_analyzer."""
-    import tempfile, os, shutil
-    suffix = Path(file.filename or "upload").suffix or ".bin"
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+    blocked = gate.validate_upload_filename(file.filename)
+    if blocked:
+        return _gate_json(blocked)
+    blocked = gate.require_external_adapters("upload")
+    if blocked:
+        return _gate_json(blocked)
+    blocked = gate.require_approval("upload", approved)
+    if blocked:
+        return _gate_json(blocked)
+
+    tmp_path = gate.reserve_upload_path(file.filename)
     try:
-        shutil.copyfileobj(file.file, tmp)
-        tmp.close()
+        tmp_path.parent.mkdir(parents=True, exist_ok=True)
+        size = 0
+        with tmp_path.open("wb") as out:
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > gate.MAX_UPLOAD_BYTES:
+                    try:
+                        tmp_path.unlink()
+                    except Exception:
+                        pass
+                    return _gate_json(gate.upload_too_large(size), status_code=413)
+                out.write(chunk)
         import file_analyzer
-        result = await run_in_threadpool(file_analyzer.analyze, tmp.name, "")
+        result = await run_in_threadpool(file_analyzer.analyze, str(tmp_path), "")
         result["filename"] = file.filename
         return JSONResponse(result)
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
     finally:
         try:
-            os.unlink(tmp.name)
+            tmp_path.unlink()
         except Exception:
             pass
 
@@ -1404,8 +1491,14 @@ class WAAnalyzeRequest(BaseModel):
 
 
 @app.post("/wa/analyze")
-async def wa_analyze(req: WAAnalyzeRequest):
+async def wa_analyze(req: WAAnalyzeRequest, project_id: str = ""):
     """Analisa um export de conversa do WhatsApp (local, via Claude assinatura)."""
+    blocked = gate.require_project_scope(project_id)
+    if blocked:
+        return _gate_json(blocked)
+    blocked = gate.require_external_adapters("wa.analyze")
+    if blocked:
+        return _gate_json(blocked)
     import wa_analyzer
     out = await run_in_threadpool(wa_analyzer.analyze, req.text, req.me)
     return JSONResponse(out)
@@ -1416,8 +1509,20 @@ class WASaveRequest(BaseModel):
 
 
 @app.post("/wa/save-voice")
-async def wa_save_voice(req: WASaveRequest):
+async def wa_save_voice(req: WASaveRequest, project_id: str = "", approved: bool = False):
     """Salva o material destilado como grounding do squad (voz-murillo.md)."""
+    blocked = gate.require_project_scope(project_id)
+    if blocked:
+        return _gate_json(blocked)
+    blocked = gate.require_local_actions("wa.save_voice")
+    if blocked:
+        return _gate_json(blocked)
+    blocked = gate.require_vp_effects("wa.save_voice")
+    if blocked:
+        return _gate_json(blocked)
+    blocked = gate.require_approval("wa.save_voice", approved)
+    if blocked:
+        return _gate_json(blocked)
     import wa_analyzer
     path = wa_analyzer.save_voice_doc(req.content)
     return JSONResponse({"status": "ok", "file": path})

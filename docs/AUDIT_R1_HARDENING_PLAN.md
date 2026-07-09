@@ -132,6 +132,64 @@ Comportamento quando bloqueado:
 - motivo: `requires_explicit_enable`;
 - campo `capability` indica o adaptador bloqueado.
 
+## R1 — Gates por rota
+
+Camada central: `_apps/javis-local-interface/backend/gate.py`.
+
+Rotas bloqueadas por padrao quando `JAVIS_ENABLE_EXTERNAL_ADAPTERS=false`:
+
+- `POST /knowledge/dna`
+- `POST /knowledge/ingest`
+- `POST /knowledge/reindex`
+- `GET /knowledge/search`
+- `POST /wa/analyze`
+- `POST /upload`
+
+Rotas que exigem `project_id=project:cerebro-jampa`:
+
+- `POST /tasks/{id}/run-studio`
+- `POST /tasks/{id}/prepare-distribution`
+- `POST /tasks/{id}/status`
+- `POST /tasks/{id}/complete`
+- `POST /wa/analyze`
+- `POST /wa/save-voice`
+- mutacoes `POST/PATCH/DELETE /vp/*`
+- mutacoes `POST /jampa/*`
+
+Rotas que exigem aprovacao humana explicita (`approved=true` nesta R1):
+
+- `POST /knowledge/dna`
+- `POST /knowledge/ingest`
+- `POST /wa/save-voice`
+- `POST /upload`
+
+Rotas de escrita local protegidas por `JAVIS_ENABLE_LOCAL_ACTIONS`:
+
+- `POST /knowledge/graph/build`
+- `POST /wa/save-voice`
+
+Rotas/acoes VP protegidas por `JAVIS_ENABLE_VP_EFFECTS`:
+
+- templates locais de Studio e Distribution;
+- mutacoes `POST/PATCH/DELETE /vp/*`;
+- mutacoes `POST /jampa/*`;
+- mudancas de task do pipeline VP/Jampa.
+
+Validacoes adicionadas:
+
+- `/upload`: limite de tamanho (`MAX_UPLOAD_BYTES`), extensoes permitidas, bloqueio de scripts/executaveis, rejeicao de path no nome e salvamento temporario apenas em `_apps/javis-local-interface/_tmp/uploads/`.
+- `/knowledge/ingest`: resolve `folder` com `Path.resolve()`, bloqueia `..`, bloqueia caminho fora de `JAVIS_ROOT` e usa `_inbox/ingestao/` como default seguro.
+- `knowledge.py`: auto-sync, build automatico e background index respeitam `external_adapters`; o RAG global nao carrega vaults externos.
+- `knowledge_hybrid.py`: busca global exclui categoria `vp` quando nao ha escopo explicito.
+
+Pendencias R2:
+
+- trocar `approved=true` por workflow persistido/token local;
+- aplicar autenticacao local nas rotas sensiveis restantes;
+- desenhar RAG project-scoped com `project_id` explicito;
+- revisar rotas `missions/*`, `history`, `brain/active`, `approvals/decide` e `conteudo`;
+- padronizar clientes frontend para enviar `project_id` explicito.
+
 ## Autenticacao local proposta
 
 Nao foi implementado sistema complexo nesta fase. Proposta para R2:

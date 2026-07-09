@@ -11,6 +11,8 @@ import os
 import threading
 from pathlib import Path
 
+import gate
+
 JAVIS_ROOT = Path(__file__).resolve().parents[3]
 INDEX_FILE = JAVIS_ROOT / "_memoria" / "knowledge_index.json"
 
@@ -43,6 +45,8 @@ def _hybrid():
     """Módulo de RAG híbrido (SQLite: semântico + BM25 + RRF), se habilitado e já
     populado. Controlado por JAVIS_RAG (padrão 'hybrid'; qualquer outro valor usa
     só o índice JSON legado). Retorna None → segue no caminho legado."""
+    if gate.require_external_adapters("knowledge.hybrid"):
+        return None
     if os.environ.get("JAVIS_RAG", "hybrid").strip().lower() != "hybrid":
         return None
     try:
@@ -79,6 +83,8 @@ def _has_external_changes(since_mtime: float) -> bool:
 def maybe_auto_sync() -> bool:
     """Chamado a cada busca: se o índice está velho E há mudanças nos vaults externos,
     dispara rebuild incremental em background. Cooldown evita varrer o disco toda hora."""
+    if gate.require_external_adapters("knowledge.auto_sync"):
+        return False
     global _last_auto_check
     import time as _t
     now = _t.time()
@@ -98,16 +104,9 @@ def maybe_auto_sync() -> bool:
 def _external_vaults() -> list[Path]:
     """Vaults de projetos externos plugados (read-only). Hoje: Cérebro Jampa.
     Lê do project_registry; ignora silenciosamente se algo falhar."""
-    out = []
-    try:
-        import project_registry as pr
-        for slug, cfg in getattr(pr, "REGISTRY", {}).items():
-            p = cfg.get("path") if isinstance(cfg, dict) else None
-            if p and Path(p).is_dir():
-                out.append(Path(p))
-    except Exception:
-        pass
-    return out
+    # R1: o RAG global do Javis core nao carrega projetos externos implicitamente.
+    # Project-scoped RAG com project_id explicito fica para R2.
+    return []
 
 
 def _iter_files():
@@ -199,6 +198,9 @@ def _save_index(items: list[dict]) -> None:
 def build_index(force: bool = False) -> dict:
     """Indexa (incremental) os arquivos do vault. Só re-embeda o que mudou."""
     global _building
+    blocked = gate.require_external_adapters("knowledge.build_index")
+    if blocked:
+        return blocked
     if not os.environ.get("OPENAI_API_KEY", "").strip():
         return {"status": "error", "message": "Sem OPENAI_API_KEY para gerar embeddings."}
     with _lock:
@@ -277,6 +279,8 @@ def _cosine(a: list[float], b: list[float]) -> float:
 
 def search(query: str, k: int = 5) -> list[dict]:
     """Busca semântica. Retorna [{path, chunk, score}] mais relevantes."""
+    if gate.require_external_adapters("knowledge.search"):
+        return []
     query = (query or "").strip()
     if not query:
         return []
@@ -337,6 +341,9 @@ def answer_context(query: str, k: int = 5, escopo=None) -> str:
     return "\n\n---\n\n".join(blocos)
 
 
-def start_background_index() -> None:
+def start_background_index() -> bool:
     """Constrói o índice (incremental) em segundo plano no startup."""
+    if gate.require_external_adapters("knowledge.start_background_index"):
+        return False
     threading.Thread(target=lambda: build_index(force=False), daemon=True).start()
+    return True

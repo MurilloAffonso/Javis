@@ -57,6 +57,68 @@ Rotas e modulos protegidos devem retornar:
 }
 ```
 
+## R1 — Gates por rota
+
+Gate central: `_apps/javis-local-interface/backend/gate.py`.
+
+Bloqueadas por padrao com `JAVIS_ENABLE_EXTERNAL_ADAPTERS=false`:
+
+- `POST /knowledge/dna`
+- `POST /knowledge/ingest`
+- `POST /knowledge/reindex`
+- `GET /knowledge/search`
+- `POST /wa/analyze`
+- `POST /upload`
+
+Exigem `project_id=project:cerebro-jampa`:
+
+- `POST /tasks/{id}/run-studio`
+- `POST /tasks/{id}/prepare-distribution`
+- `POST /tasks/{id}/status`
+- `POST /tasks/{id}/complete`
+- `POST /wa/analyze`
+- `POST /wa/save-voice`
+- mutacoes `POST/PATCH/DELETE /vp/*`
+- mutacoes `POST /jampa/*`
+
+Exigem aprovacao humana explicita nesta R1 (`approved=true`):
+
+- `POST /knowledge/dna`
+- `POST /knowledge/ingest`
+- `POST /wa/save-voice`
+- `POST /upload`
+
+Validacoes:
+
+- `/upload`: extensao permitida, bloqueio de scripts/executaveis, limite de tamanho e temp file somente dentro do repo.
+- `/knowledge/ingest`: `folder` resolvido e bloqueado se tiver `..` ou sair de `JAVIS_ROOT`.
+- auto-reindex/build/search de knowledge respeita `external_adapters`.
+- contexto VP/Jampa nao entra no RAG global do Javis core sem escopo explicito.
+
+Contrato de bloqueio:
+
+```json
+{
+  "status": "blocked",
+  "reason": "project_id_required",
+  "scope": "project:cerebro-jampa"
+}
+```
+
+```json
+{
+  "status": "approval_required",
+  "reason": "human_approval_required"
+}
+```
+
+R2 pendente:
+
+- substituir `approved=true` por aprovacao persistida/token local;
+- autenticar rotas sensiveis restantes;
+- implementar RAG project-scoped com `project_id`;
+- atualizar clientes frontend para enviar `project_id` explicito.
+
 ## Riscos restantes
 
 - Ainda nao ha autenticacao local obrigatoria nas rotas sensiveis.

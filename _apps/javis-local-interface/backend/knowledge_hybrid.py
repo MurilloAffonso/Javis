@@ -26,6 +26,7 @@ import numpy as np
 
 import categoria as _cat
 import db
+import gate
 import knowledge as _k   # reuso: _iter_files, _external_vaults, _embed_batch, _chunks, _load_index, JAVIS_ROOT
 
 _RRF_K = 60                 # constante clássica do Reciprocal Rank Fusion
@@ -137,6 +138,9 @@ def build_index(force: bool = False) -> dict:
     """Indexa (incremental) os arquivos do vault no SQLite. Reaproveita vetores do
     JSON legado quando o chunk é idêntico; só embeda o que sobra."""
     global _building
+    blocked = gate.require_external_adapters("knowledge_hybrid.build_index")
+    if blocked:
+        return blocked
     with _lock:
         if _building:
             return {"status": "busy"}
@@ -311,10 +315,18 @@ def _rerank(cand_ids: list[int], sem_by_id: dict[int, float],
 
 
 def _ids_no_escopo(escopo) -> set[int] | None:
-    """Conjunto de ids de chunk permitidos pelo escopo (categoria). None = sem
-    filtro. `escopo` pode ser uma str ('vp') ou lista (['projeto','pessoal'])."""
+    """Conjunto de ids de chunk permitidos pelo escopo (categoria).
+    Sem escopo explicito, exclui VP/Jampa do contexto global do Javis core.
+    `escopo` pode ser uma str ('vp') ou lista (['projeto','pessoal'])."""
     if not escopo:
-        return None
+        try:
+            rows = db.query(
+                "SELECT id FROM knowledge_chunks WHERE COALESCE(categoria, '') <> ?",
+                ("vp",),
+            )
+            return {int(r["id"]) for r in rows}
+        except Exception:
+            return set()
     cats = [escopo] if isinstance(escopo, str) else list(escopo)
     cats = [c for c in cats if c]
     if not cats:
@@ -334,6 +346,8 @@ def search(query: str, k: int = 5, escopo=None, rerank: bool = False) -> list[di
     togglável p/ medir rerankers futuros; ganho real exigiria cross-encoder."""
     query = (query or "").strip()
     if not query:
+        return []
+    if gate.require_external_adapters("knowledge_hybrid.search"):
         return []
     try:
         qvec = _k._embed_batch([query])[0]
@@ -414,5 +428,8 @@ def available() -> bool:
         return False
 
 
-def start_background_index() -> None:
+def start_background_index() -> bool:
+    if gate.require_external_adapters("knowledge_hybrid.start_background_index"):
+        return False
     threading.Thread(target=lambda: build_index(force=False), daemon=True).start()
+    return True

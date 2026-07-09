@@ -9,6 +9,7 @@ import os
 
 
 def pytest_configure():
+    os.environ.setdefault("JAVIS_SKIP_DOTENV", "1")
     os.environ.setdefault("JAVIS_ENABLE_EXTERNAL_ADAPTERS", "true")
     os.environ.setdefault("JAVIS_ENABLE_BROWSER", "true")
     os.environ.setdefault("JAVIS_ENABLE_LOCAL_ACTIONS", "true")
