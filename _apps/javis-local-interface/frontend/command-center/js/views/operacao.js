@@ -1,6 +1,6 @@
 // ---------- Operação (Quadro/Kanban + Gates 1/2/3 + Aprovações) ----------
 // Extraído de app.js em 2026-07-02. MESMO comportamento; agora módulo ES.
-import { h, $, state, BACKEND, tryJson, opToast, opSend, opEsc, confirmStrong } from "../../app.js";
+import { h, $, state, BACKEND, tryJson, withProjectId, opToast, opSend, opEsc, confirmStrong } from "../../app.js";
 
 // Migrado da interface clássica (frontend/app.js). Usa SÓ endpoints já existentes:
 // GET /tasks, POST /tasks/{ext}/status|run-studio|prepare-distribution,
@@ -139,7 +139,7 @@ async function opRenderBoard() {
       e.preventDefault(); colEl.classList.remove("drag-over");
       if (_opDrag) {
         const ext = _opDrag; _opDrag = null;
-        confirmStrong({ title: "Mover status no Quadro", endpoint: `/tasks/${encodeURIComponent(ext)}/status`, method: "POST", target: ext, before: "(status atual)", after: col.setStatus, risk: "op", phrase: "CONFIRMAR", onConfirm: () => opMoveStatus(ext, col.setStatus) });
+        confirmStrong({ title: "Mover status no Quadro", endpoint: `/tasks/${encodeURIComponent(ext)}/status?project_id=project:cerebro-jampa`, method: "POST", target: ext, before: "(status atual)", after: col.setStatus, risk: "op", phrase: "CONFIRMAR", onConfirm: () => opMoveStatus(ext, col.setStatus) });
       }
     });
     board.appendChild(colEl);
@@ -163,18 +163,18 @@ function opCard(t) {
   actions.appendChild(jb);
   if (!encerrada && ext) {
     const cb = h(`<button class="op-btn ok sm">✅ Concluir</button>`);
-    cb.onclick = () => confirmStrong({ title: "Concluir tarefa (encerra + gera digest)", endpoint: `/tasks/${ext}/complete`, method: "POST", target: t.title || ext, before: t.status || "—", after: "completed + digest final", risk: "op", onConfirm: () => opComplete(ext) });
+    cb.onclick = () => confirmStrong({ title: "Concluir tarefa (encerra + gera digest)", endpoint: `/tasks/${ext}/complete?project_id=project:cerebro-jampa`, method: "POST", target: t.title || ext, before: t.status || "—", after: "completed + digest final", risk: "op", onConfirm: () => opComplete(ext) });
     actions.appendChild(cb);
   }
   if (t.has_digest) actions.appendChild(h(`<span class="opcard-digest" title="tem digest">📄</span>`));
   if (titleLow.startsWith("[design]") && liberada) {
     const b = h(`<button class="op-btn studio sm">🎨 Rodar Estúdio</button>`);
-    b.onclick = () => confirmStrong({ title: "Rodar Estúdio (Gate 2)", endpoint: `/tasks/${ext}/run-studio`, method: "POST", target: t.title || ext, before: t.status || "—", after: "gera criativos + cria Gate 2 (modo seguro)", risk: "op", phrase: "CONFIRMAR", onConfirm: () => opRunStudio(ext) });
+    b.onclick = () => confirmStrong({ title: "Rodar Estúdio (Gate 2)", endpoint: `/tasks/${ext}/run-studio?project_id=project:cerebro-jampa`, method: "POST", target: t.title || ext, before: t.status || "—", after: "gera criativos + cria Gate 2 (modo seguro)", risk: "op", phrase: "CONFIRMAR", onConfirm: () => opRunStudio(ext) });
     actions.appendChild(b);
   }
   if (titleLow.startsWith("[distribuição] preparar") && liberada) {
     const b = h(`<button class="op-btn studio sm">📤 Preparar Distribuição</button>`);
-    b.onclick = () => confirmStrong({ title: "Preparar Distribuição (Gate 3)", endpoint: `/tasks/${ext}/prepare-distribution`, method: "POST", target: t.title || ext, before: t.status || "—", after: "gera pacote + cria Gate 3 (modo seguro)", risk: "op", phrase: "CONFIRMAR", onConfirm: () => opRunDistribution(ext) });
+    b.onclick = () => confirmStrong({ title: "Preparar Distribuição (Gate 3)", endpoint: `/tasks/${ext}/prepare-distribution?project_id=project:cerebro-jampa`, method: "POST", target: t.title || ext, before: t.status || "—", after: "gera pacote + cria Gate 3 (modo seguro)", risk: "op", phrase: "CONFIRMAR", onConfirm: () => opRunDistribution(ext) });
     actions.appendChild(b);
   }
   if (!encerrada) {
@@ -187,7 +187,7 @@ function opCard(t) {
 // Concluir tarefa: POST /tasks/{id}/complete → completed + digest (200) ou 409 se já encerrada.
 async function opComplete(extId) {
   try {
-    const res = await opSend(BACKEND + `tasks/${encodeURIComponent(extId)}/complete`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note: "concluída no Quadro (command-center)" }) });
+    const res = await opSend(withProjectId(BACKEND + `tasks/${encodeURIComponent(extId)}/complete`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note: "concluída no Quadro (command-center)" }) });
     if (res.status === 409) opToast("Tarefa já estava encerrada.", "info");
     else if (res.ok && res.data.ok) opToast("Tarefa concluída. Digest gerado.", "ok");
     else opToast(res.data.error || "Não consegui concluir.", "warn");
@@ -216,7 +216,7 @@ async function opJourney(extId, host) {
 
 async function opMoveStatus(extId, setStatus) {
   try {
-    const res = await opSend(BACKEND + `tasks/${encodeURIComponent(extId)}/status`, {
+    const res = await opSend(withProjectId(BACKEND + `tasks/${encodeURIComponent(extId)}/status`), {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: setStatus, note: "movido no Quadro (command-center)" }),
     });
@@ -230,7 +230,7 @@ async function opMoveStatus(extId, setStatus) {
 
 async function opRunStudio(extId) {
   try {
-    const res = await opSend(BACKEND + `tasks/${encodeURIComponent(extId)}/run-studio`, { method: "POST", headers: { "Content-Type": "application/json" } });
+    const res = await opSend(withProjectId(BACKEND + `tasks/${encodeURIComponent(extId)}/run-studio`), { method: "POST", headers: { "Content-Type": "application/json" } });
     if (res.status === 409) opToast("Essa ação já foi processada (Gate 2 já criado).", "info");
     else if (res.ok && res.data.ok) { opToast("Criativos gerados. Gate 2 aguardando aprovação.", "ok"); setTimeout(opLoadApprovals, 600); }
     else opToast(res.data.error || "Não consegui rodar o Estúdio.", "warn");
@@ -240,7 +240,7 @@ async function opRunStudio(extId) {
 
 async function opRunDistribution(extId) {
   try {
-    const res = await opSend(BACKEND + `tasks/${encodeURIComponent(extId)}/prepare-distribution`, { method: "POST", headers: { "Content-Type": "application/json" } });
+    const res = await opSend(withProjectId(BACKEND + `tasks/${encodeURIComponent(extId)}/prepare-distribution`), { method: "POST", headers: { "Content-Type": "application/json" } });
     if (res.status === 409) opToast("Essa ação já foi processada (Gate 3 já criado).", "info");
     else if (res.ok && res.data.ok) { opToast("Distribuição preparada. Gate 3 aguardando aprovação.", "ok"); setTimeout(opLoadApprovals, 600); }
     else opToast(res.data.error || "Não consegui preparar a distribuição.", "warn");
@@ -249,4 +249,3 @@ async function opRunDistribution(extId) {
 }
 
 export { viewOperacao };
-

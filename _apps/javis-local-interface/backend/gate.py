@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import uuid
+import hmac
+import os
 from pathlib import Path
 
 import safe_config
@@ -11,6 +13,8 @@ CEREBRO_JAMPA_SCOPE = "project:cerebro-jampa"
 INGEST_DEFAULT_DIR = JAVIS_ROOT / "_inbox" / "ingestao"
 UPLOAD_TMP_DIR = JAVIS_ROOT / "_apps" / "javis-local-interface" / "_tmp" / "uploads"
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+LOCAL_TOKEN_HEADER = "X-Javes-Local-Token"
+LOCAL_TOKEN_ENVS = ("JAVES_LOCAL_TOKEN", "JAVIS_LOCAL_TOKEN")
 
 BLOCKED_UPLOAD_EXTENSIONS = {
     ".bat", ".cmd", ".com", ".dll", ".exe", ".js", ".msi", ".ps1", ".py",
@@ -61,12 +65,34 @@ def project_id_mismatch(project_id: str, scope: str = CEREBRO_JAMPA_SCOPE) -> di
     )
 
 
-def approval_required(action: str) -> dict:
-    return {
+def approval_required(action: str, **extra) -> dict:
+    out = {
         "status": "approval_required",
         "reason": "human_approval_required",
         "action": action,
     }
+    out.update({k: v for k, v in extra.items() if v not in ("", None)})
+    return out
+
+
+def _configured_local_token() -> str:
+    for name in LOCAL_TOKEN_ENVS:
+        token = os.environ.get(name, "").strip()
+        if token:
+            return token
+    return ""
+
+
+def require_local_auth(token: str | None, action: str = "local_auth") -> dict | None:
+    configured = _configured_local_token()
+    provided = token.strip() if isinstance(token, str) else ""
+    if not provided:
+        return blocked("unauthorized_local_token_required", action)
+    if not configured:
+        return blocked("local_token_not_configured", action)
+    if not hmac.compare_digest(provided, configured):
+        return blocked("unauthorized_local_token_invalid", action)
+    return None
 
 
 def explicit_approval(value: bool | str | None) -> bool:
@@ -78,9 +104,61 @@ def explicit_approval(value: bool | str | None) -> bool:
 
 
 def require_approval(action: str, approved: bool | str | None = False) -> dict | None:
-    if explicit_approval(approved):
-        return None
-    return approval_required(action)
+    return approval_required(action, approved_param_ignored=explicit_approval(approved))
+
+
+def require_persisted_approval(
+    action: str,
+    approval_id: int | None = None,
+    route: str = "",
+    project_id: str = "",
+    risk_level: str = "medium",
+    reason: str = "human_approval_required",
+    metadata: dict | None = None,
+    approved: bool | str | None = False,
+) -> dict | None:
+    import repositories as repo
+
+    if approval_id:
+        approval = repo.approvals.get(approval_id)
+        if repo.approvals.valid_for_action(approval, action, route=route, project_id=project_id):
+            return None
+        status = approval.get("status") if approval else "missing"
+        return approval_required(
+            action,
+            approval_id=approval_id,
+            approval_status=status,
+            route=route,
+            project_id=project_id,
+        )
+
+    existing = repo.approvals.find_pending_action(action, route=route, project_id=project_id)
+    created = False
+    if existing:
+        gate_id = existing["id"]
+    else:
+        gate_id = repo.approvals.add(
+            subject=f"{action} precisa de aprovação humana",
+            kind="route_gate",
+            detail=reason,
+            project_id=project_id,
+            action=action,
+            route=route,
+            risk_level=risk_level,
+            requested_by="route",
+            reason=reason,
+            metadata=metadata or {},
+        )
+        created = True
+    return approval_required(
+        action,
+        approval_id=gate_id,
+        approval_status="pending",
+        approval_created=created,
+        approved_param_ignored=explicit_approval(approved),
+        route=route,
+        project_id=project_id,
+    )
 
 
 def require_external_adapters(action: str) -> dict | None:

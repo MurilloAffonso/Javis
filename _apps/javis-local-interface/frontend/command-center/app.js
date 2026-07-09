@@ -18,10 +18,13 @@ import { viewMaquina } from "./js/views/maquina.js";
 import { viewConteudo } from "./js/views/conteudo.js";
 import { viewIngestao } from "./js/views/ingestao.js";
 // Helpers do núcleo que as telas-módulo consomem (live bindings):
-export { _esc, h, $, state, BACKEND, tryJson, renderCanvas, renderRightPanel, setView, opToast, opSend, opEsc, confirmStrong, activeAgent, pct, sc, projName, tele };
+export { _esc, h, $, state, BACKEND, VP_PROJECT_ID, tryJson, withProjectId, withLocalAuth, renderCanvas, renderRightPanel, setView, opToast, opSend, opEsc, confirmStrong, activeAgent, pct, sc, projName, tele };
 
 const DATA_BASE = "../../data/";
 const BACKEND = (location.port === "8000") ? "/" : "http://localhost:8000/";
+const VP_PROJECT_ID = "project:cerebro-jampa";
+const LOCAL_TOKEN_KEY = "javes.localToken";
+const LOCAL_TOKEN_HEADER = "X-Javes-Local-Token";
 
 const ICONS = {
   chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
@@ -80,7 +83,25 @@ const $ = (id) => document.getElementById(id);
 const h = (html) => { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstElementChild; };
 
 // ---------- Dados ----------
-async function tryJson(url, opts) { const r = await fetch(url, opts); if (!r.ok) throw new Error(r.status); return r.json(); }
+function localToken() {
+  try { return (localStorage.getItem(LOCAL_TOKEN_KEY) || "").trim(); }
+  catch (_) { return ""; }
+}
+
+function withLocalAuth(opts = {}) {
+  const token = localToken();
+  const headers = { ...(opts.headers || {}) };
+  if (token) headers[LOCAL_TOKEN_HEADER] = token;
+  return { ...opts, headers };
+}
+
+function withProjectId(url, projectId = VP_PROJECT_ID) {
+  const u = new URL(url, window.location.href);
+  u.searchParams.set("project_id", projectId);
+  return u.toString();
+}
+
+async function tryJson(url, opts) { const r = await fetch(url, withLocalAuth(opts || {})); if (!r.ok) throw new Error(r.status); return r.json(); }
 
 async function loadData() {
   try {
@@ -245,7 +266,7 @@ const opEsc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;",
 
 // fetch que NÃO lança em status de erro — devolve {status, ok, data} pra tratar 409 etc.
 async function opSend(url, opts) {
-  const r = await fetch(url, opts);
+  const r = await fetch(url, withLocalAuth(opts || {}));
   let data = {};
   try { data = await r.json(); } catch (_) {}
   return { status: r.status, ok: r.ok, data };

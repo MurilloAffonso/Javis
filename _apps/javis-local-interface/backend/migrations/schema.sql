@@ -63,10 +63,20 @@ CREATE TABLE IF NOT EXISTS approvals (
     subject    TEXT NOT NULL,                     -- o que precisa aprovar
     agent      TEXT,
     task_id    TEXT,                              -- task relacionada (ext_id), se houver
-    status     TEXT DEFAULT 'pending',            -- pending | approved | rejected
+    project_id TEXT,
+    action     TEXT,
+    route      TEXT,
+    risk_level TEXT,
+    status     TEXT DEFAULT 'pending',            -- pending | approved | rejected | expired | canceled
     detail     TEXT,
     note       TEXT,                              -- observação da decisão humana
+    requested_by TEXT,
+    approved_by TEXT,
+    approval_token_id TEXT,
+    reason     TEXT,
+    metadata_json TEXT,
     created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
     decided_at TEXT
 );
 

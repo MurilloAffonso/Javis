@@ -102,21 +102,54 @@ class _Tasks:
 # ── approvals ─────────────────────────────────────────────────────────────
 class _Approvals:
     def add(self, subject: str, kind: str = "gate", agent: str = "",
-            detail: str = "", task_id: str = "") -> int:
+            detail: str = "", task_id: str = "", project_id: str = "",
+            action: str = "", route: str = "", risk_level: str = "",
+            requested_by: str = "", reason: str = "",
+            metadata: dict | None = None) -> int:
+        metadata_json = _json.dumps(metadata, ensure_ascii=False) if metadata else None
         return db.execute(
-            "INSERT INTO approvals(kind, subject, agent, task_id, status, detail) "
-            "VALUES(?,?,?,?,'pending',?)",
-            (kind, subject, agent, task_id, detail),
+            "INSERT INTO approvals(kind, subject, agent, task_id, project_id, action, route, "
+            "risk_level, status, detail, requested_by, reason, metadata_json, updated_at) "
+            "VALUES(?,?,?,?,?,?,?,?,'pending',?,?,?,?,datetime('now'))",
+            (
+                kind, subject, agent, task_id, project_id, action, route,
+                risk_level, detail, requested_by, reason, metadata_json,
+            ),
         )
 
     def get(self, approval_id: int) -> dict | None:
         return db.query_one("SELECT * FROM approvals WHERE id=?", (approval_id,))
 
-    def decide(self, approval_id: int, approved: bool, note: str = "") -> int:
+    def decide(self, approval_id: int, approved: bool, note: str = "",
+               approved_by: str = "local") -> int:
         return db.execute(
-            "UPDATE approvals SET status=?, note=?, decided_at=datetime('now') WHERE id=?",
-            ("approved" if approved else "rejected", note, approval_id),
+            "UPDATE approvals SET status=?, note=?, approved_by=?, "
+            "decided_at=datetime('now'), updated_at=datetime('now') WHERE id=?",
+            ("approved" if approved else "rejected", note, approved_by, approval_id),
         )
+
+    def find_pending_action(self, action: str, route: str = "", project_id: str = "") -> dict | None:
+        return db.query_one(
+            "SELECT * FROM approvals WHERE status='pending' "
+            "AND COALESCE(action,'')=? AND COALESCE(route,'')=? "
+            "AND COALESCE(project_id,'')=? ORDER BY id DESC LIMIT 1",
+            (action, route, project_id),
+        )
+
+    def valid_for_action(self, approval: dict | None, action: str,
+                         route: str = "", project_id: str = "") -> bool:
+        if not approval or approval.get("status") != "approved":
+            return False
+        saved_action = approval.get("action") or ""
+        if saved_action and saved_action != action:
+            return False
+        saved_route = approval.get("route") or ""
+        if route and saved_route and saved_route != route:
+            return False
+        saved_project = approval.get("project_id") or ""
+        if project_id and saved_project != project_id:
+            return False
+        return True
 
     def pending(self) -> list[dict]:
         return db.query("SELECT * FROM approvals WHERE status='pending' ORDER BY id DESC")

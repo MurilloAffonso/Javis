@@ -182,7 +182,7 @@ Validacoes adicionadas:
 - `knowledge.py`: auto-sync, build automatico e background index respeitam `external_adapters`; o RAG global nao carrega vaults externos.
 - `knowledge_hybrid.py`: busca global exclui categoria `vp` quando nao ha escopo explicito.
 
-Pendencias R2:
+Pendencias R2 originais:
 
 - trocar `approved=true` por workflow persistido/token local;
 - aplicar autenticacao local nas rotas sensiveis restantes;
@@ -190,14 +190,56 @@ Pendencias R2:
 - revisar rotas `missions/*`, `history`, `brain/active`, `approvals/decide` e `conteudo`;
 - padronizar clientes frontend para enviar `project_id` explicito.
 
-## Autenticacao local proposta
+Status R2:
 
-Nao foi implementado sistema complexo nesta fase. Proposta para R2:
+- resolvido em `hardening/r2-approval-auth-projectid`;
+- `approved=true` nao libera mais rota sensivel sem `approval_id` persistido;
+- token local leve via `X-Javes-Local-Token`;
+- `project_id=project:cerebro-jampa` enviado pelo frontend nas chamadas VP/Jampa/WA/tasks/conteudo conectado;
+- rotas `missions/*`, `history`, `brain/active`, `approvals/decide` e `/conteudo` classificadas e endurecidas.
 
-- exigir token local simples em rotas sensiveis via header `X-Javis-Local-Token`;
-- token lido por nome de variavel, sem registrar valor em logs;
-- manter rotas read-only publicas apenas em `127.0.0.1`;
-- bloquear mutacoes sem token mesmo com CORS local.
+## R2 — Auth local aplicada
+
+Nao foi implementado sistema complexo nesta fase. A R2 usa:
+
+- token local simples em rotas sensiveis via header `X-Javes-Local-Token`;
+- token lido de `JAVES_LOCAL_TOKEN` ou `JAVIS_LOCAL_TOKEN`, sem registrar valor em logs;
+- testes com token fake controlado em `conftest.py`;
+- bloqueio de mutacoes sem token mesmo com CORS local.
+
+## R2 — Approval persistido
+
+A R2 reutiliza a tabela `approvals` e adiciona campos de rota:
+
+- `project_id`
+- `action`
+- `route`
+- `risk_level`
+- `requested_by`
+- `approved_by`
+- `approval_token_id`
+- `reason`
+- `metadata_json`
+- `updated_at`
+
+Rotas sensiveis sem `approval_id` aprovado retornam:
+
+```json
+{
+  "status": "approval_required",
+  "reason": "human_approval_required"
+}
+```
+
+`approved=true` e mantido apenas como compatibilidade de entrada; ele cria/consulta gate pendente, mas nao autoriza execucao.
+
+## R2 — Rotas revisadas
+
+- `missions/*`: leitura `safe`; mutacao `auth_required + local_actions`.
+- `history`: leitura `auth_required`; delete `auth_required + local_actions`.
+- `brain/active`: GET `safe`; POST `auth_required + local_actions`.
+- `approvals/decide`: `auth_required`; efeitos seguem sob `vp_effects`.
+- `/conteudo`: GET `safe`; POST `auth_required`; VP/Jampa exige `project_id_required + vp_effects`; demais projetos exigem `local_actions`.
 
 ## CORS restrito
 

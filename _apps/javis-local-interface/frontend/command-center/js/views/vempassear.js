@@ -1,12 +1,13 @@
 // Vem Passear — view do projeto conectado. Extraído de app.js em 2026-07-02.
 // MESMO comportamento; agora é um módulo ES que importa os helpers do núcleo.
-import { _esc, h, $, state, BACKEND, tryJson, renderCanvas, opToast, opSend, confirmStrong } from "../../app.js";
+import { _esc, h, $, state, BACKEND, tryJson, withProjectId, renderCanvas, opToast, opSend, confirmStrong } from "../../app.js";
 
 // Fronteira: projeto EXTERNO do Cérebro Jampa, consultado pelo Javes por registro.
 // NÃO mistura contexto com o núcleo. Escritas reais existem desde 2026-07-03
 // (lead, funil, sugestão do squad, rodar agente) e TODAS passam por confirmação
 // forte (confirmStrong). Nenhum envio/publicação automático. Tudo escapado.
 let _vpTab = "resumo";
+const vpUrl = (path) => withProjectId(BACKEND + path.replace(/^\/+/, ""));
 const VP_TABS = [
   { id: "resumo",      label: "Resumo" },
   { id: "atendimento", label: "Atendimento" },
@@ -50,7 +51,7 @@ function viewVempassear(body) {
 async function vpResumo() {
   const host = $("vp-content"); if (!host) return;
   let resumo = {};
-  if (state.online) { try { resumo = (await tryJson(BACKEND + "vp/passeios")).resumo || {}; } catch (_) {} }
+  if (state.online) { try { resumo = (await tryJson(vpUrl("vp/passeios"))).resumo || {}; } catch (_) {} }
   host.innerHTML = `
     <div class="vp-card">
       <div class="vp-row"><span class="vp-k">Nome</span><span class="vp-v">Vem Passear Jampa</span></div>
@@ -126,7 +127,7 @@ function vpNovoAtendimento() {
         risk: "leve", phrase: "CONFIRMAR",
         onConfirm: async () => {
           try {
-            const res = await opSend(BACKEND + "vp/clientes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome, contato, obs }) });
+            const res = await opSend(vpUrl("vp/clientes"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome, contato, obs }) });
             if (res.ok && res.data.status === "ok") { opToast("Lead cadastrado. 🔗", "ok"); ov.remove(); renderCanvas(); }
             else opToast(res.data.message || ("Falha (" + res.status + ")"), "warn");
           } catch (e) { opToast("Backend offline — não cadastrei.", "err"); }
@@ -138,7 +139,7 @@ function vpNovoAtendimento() {
 async function vpAgentes() {
   const host = $("vp-content"); if (!host) return;
   let agents = [];
-  try { agents = (await tryJson(BACKEND + "vp/agents")).agents || []; }
+  try { agents = (await tryJson(vpUrl("vp/agents"))).agents || []; }
   catch (e) { host.innerHTML = `<div class="card-sub">Não consegui carregar os agentes.</div>`; return; }
   if (!agents.length) { host.innerHTML = `<div class="op-empty">Nenhum agente VP.</div>`; return; }
   host.innerHTML = `<div class="card-sub" style="margin-bottom:10px">Squad da Vem Passear. Execução real via <code>/vp/agents/run</code> — sempre com confirmação forte.</div>`;
@@ -167,7 +168,7 @@ async function vpAgentes() {
         onConfirm: async () => {
           go.disabled = true; out.textContent = "⏳ Executando (pode levar um pouco)…";
           try {
-            const r = await tryJson(BACKEND + "vp/agents/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ agent_id: a.id, task }) });
+            const r = await tryJson(vpUrl("vp/agents/run"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ agent_id: a.id, task }) });
             out.textContent = r.status === "ok" ? (r.result || "(sem saída)") : ("⚠️ " + (r.message || "falhou"));
           } catch (e) { out.textContent = "Falhou: " + e.message; }
           go.disabled = false;
@@ -274,7 +275,7 @@ let _vpRealLeads = [];
 async function vpSyncRealLeads() {
   if (!state.online) { _vpRealLeads = []; return; }
   try {
-    const d = await tryJson(BACKEND + "vp/clientes");
+    const d = await tryJson(vpUrl("vp/clientes"));
     _vpRealLeads = (d.leads || []).map((c, i) => ({
       id: "real-" + i, real: true, backendId: c.id || null,
       cliente: c.nome || "(cliente)", telefone: c.contato || "",
@@ -390,7 +391,7 @@ function atColCenter() {
     genBtn.disabled = true; genBtn.textContent = "⏳ Gerando…";
     const box = ai.querySelector(".at-ai-text");
     try {
-      const r = await tryJson(BACKEND + "jampa/responder-lead", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: l.cliente, contato: l.telefone, interesse: l.passeio !== "—" ? l.passeio : "", obs: l.ultimaMsg || "" }) });
+      const r = await tryJson(vpUrl("jampa/responder-lead"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: l.cliente, contato: l.telefone, interesse: l.passeio !== "—" ? l.passeio : "", obs: l.ultimaMsg || "" }) });
       if (r.mensagem) { box.textContent = r.mensagem; opToast("Resposta gerada pelo squad. Revise antes de enviar.", "ok"); }
       else opToast("O squad não devolveu mensagem.", "warn");
     } catch (e) { opToast("Falhou ao gerar: " + e.message, "err"); }
@@ -516,7 +517,7 @@ async function vpFunil() {
           before: l.status, after: prox, risk: "op", phrase: "CONFIRMAR",
           onConfirm: async () => {
             try {
-              const res = await opSend(BACKEND + `vp/clientes/${encodeURIComponent(l.backendId)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: prox }) });
+              const res = await opSend(vpUrl(`vp/clientes/${encodeURIComponent(l.backendId)}`), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: prox }) });
               if (res.ok && res.data.status === "ok") { opToast(`${l.cliente} → ${prox}.`, "ok"); vpFunil(); }
               else opToast(res.data.status === "not_found" ? "Lead não encontrado no backend." : "Falha (" + res.status + ")", "warn");
             } catch (e) { opToast("Backend offline — não movi.", "err"); }
@@ -757,7 +758,7 @@ function vpMarketing() {
   </div>`);
   host.appendChild(secao);
   if (state.online) {
-    tryJson(BACKEND + "conteudo?projeto=vempassear").then((d) => {
+    tryJson(vpUrl("conteudo?projeto=vempassear")).then((d) => {
       const list = $("vp-estudio-list"); if (!list) return;
       const itens = d.itens || [];
       if (!itens.length) { list.innerHTML = `<div class="op-empty">Nenhum conteúdo ainda. Crie na aba <b>Conteúdo</b>. 👈</div>`; return; }

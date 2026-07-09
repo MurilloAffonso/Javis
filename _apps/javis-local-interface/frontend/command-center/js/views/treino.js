@@ -1,5 +1,5 @@
 // Treino — status de treinamento por área — extraído de app.js em 2026-07-03. MESMO comportamento; módulo ES.
-import { h, state, BACKEND, tryJson, renderCanvas } from "../../app.js";
+import { h, state, BACKEND, tryJson, withProjectId, renderCanvas } from "../../app.js";
 
 function viewTreino(body) {
   body.appendChild(h(`<div class="card-sub" style="margin-bottom:16px">Pipeline: <b>_entrada</b> (vídeos/repos/PDFs, coletados ou manuais) → resumo no <b>NotebookLM</b> → <b>_resumos</b> entra na base RAG do Javes.</div>`));
@@ -46,7 +46,7 @@ function viewTreino(body) {
     const btn = wa.querySelector("#wa-run"); btn.disabled = true;
     out.innerHTML = `<div class="card-sub">Analisando (pode levar ~1 min — lendo a conversa inteira)…</div>`;
     try {
-      const r = await tryJson(BACKEND + "wa/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, me }) });
+      const r = await tryJson(withProjectId(BACKEND + "wa/analyze"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, me }) });
       out.innerHTML = "";
       if (r.error && !r.analysis) { const b = h(`<div class="banner"></div>`); b.textContent = "⚠️ " + r.error; out.appendChild(b); btn.disabled = false; return; }
       if (r.stats && r.stats.total) out.appendChild(h(`<div class="card-sub" style="margin-bottom:8px">${r.stats.total} mensagens · ${r.stats.periodo || "—"} · você: ${r.stats.minhas_msgs || 0} · pico ${r.stats.hora_pico != null ? r.stats.hora_pico + "h" : "—"}</div>`));
@@ -55,7 +55,7 @@ function viewTreino(body) {
       out.appendChild(saveRow);
       saveRow.querySelector("#wa-save").onclick = async (e) => {
         e.target.disabled = true;
-        try { const s = await tryJson(BACKEND + "wa/save-voice", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: r.analysis }) }); saveRow.querySelector(".wa-save-fb").textContent = "✓ salvo em " + (s.file || "voz-murillo.md"); }
+        try { const s = await tryJson(withProjectId(BACKEND + "wa/save-voice"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: r.analysis }) }); saveRow.querySelector(".wa-save-fb").textContent = "✓ salvo em " + (s.file || "voz-murillo.md"); }
         catch (err) { saveRow.querySelector(".wa-save-fb").textContent = "falhou: " + err.message; e.target.disabled = false; }
       };
     } catch (e) { const d = h(`<div class="card-sub"></div>`); d.textContent = "Falhou: " + e.message; out.innerHTML = ""; out.appendChild(d); }

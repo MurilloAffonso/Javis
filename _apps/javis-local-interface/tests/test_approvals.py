@@ -10,12 +10,14 @@ import json
 import asyncio
 import inspect
 import tempfile
+import os
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 
 PASS = "\033[32mPASS\033[0m"
 FAIL = "\033[31mFAIL\033[0m"
+TEST_TOKEN = "test-local-token"
 
 
 def check(description: str, condition: bool) -> bool:
@@ -25,6 +27,8 @@ def check(description: str, condition: bool) -> bool:
 
 def _fresh_db():
     """Aponta o db pra um arquivo temporário e recria o schema (isolado)."""
+    os.environ.setdefault("JAVIS_SKIP_DOTENV", "1")
+    os.environ.setdefault("JAVES_LOCAL_TOKEN", TEST_TOKEN)
     import db
     tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
     tmp.close()
@@ -118,7 +122,7 @@ def test_endpoint_decide_e_log() -> int:
     logs_antes = repo.logs.count()
 
     req = server.DecisionRequest(decision="approved", note="ok pelo endpoint")
-    resp = asyncio.run(server.approvals_decide(aid, req))
+    resp = asyncio.run(server.approvals_decide(aid, req, x_javes_local_token=TEST_TOKEN))
     body = json.loads(bytes(resp.body))
 
     if not check("endpoint retorna ok=True", body.get("ok") is True):
@@ -134,7 +138,7 @@ def test_endpoint_decide_e_log() -> int:
         failures += 1
 
     # decidir de novo deve recusar (já decidida) — 409
-    resp2 = asyncio.run(server.approvals_decide(aid, req))
+    resp2 = asyncio.run(server.approvals_decide(aid, req, x_javes_local_token=TEST_TOKEN))
     if not check("re-decidir retorna erro (status != 200)", resp2.status_code == 409):
         failures += 1
     return failures
@@ -262,7 +266,7 @@ def test_endpoint_gate1_destrava_e_loga() -> int:
     try:
         aid = repo.approvals.add(_GATE1_AP["subject"], agent="nova", task_id=_T1)
         req = server.DecisionRequest(decision="approved", note="pode ir pro design")
-        resp = asyncio.run(server.approvals_decide(aid, req))
+        resp = asyncio.run(server.approvals_decide(aid, req, x_javes_local_token=TEST_TOKEN))
         body = json.loads(bytes(resp.body))
         if not check("endpoint sinaliza advanced=True", body.get("advanced") is True):
             failures += 1

@@ -1,5 +1,8 @@
 // Painel Cérebro Vem Passear — consome os endpoints /vp/* do backend do Jamba.
 const API = "http://localhost:8000";
+const VP_PROJECT_ID = "project:cerebro-jampa";
+const LOCAL_TOKEN_KEY = "javes.localToken";
+const LOCAL_TOKEN_HEADER = "X-Javes-Local-Token";
 
 // Relógio
 function tickClock() {
@@ -16,15 +19,31 @@ function esc(s) {
 }
 function brl(n) { return "R$ " + Number(n || 0).toLocaleString("pt-BR"); }
 
+function scopedPath(path) {
+  if (!path.startsWith("/vp") && !path.startsWith("/jampa")) return path;
+  const url = new URL(API + path);
+  url.searchParams.set("project_id", VP_PROJECT_ID);
+  return url.pathname + url.search;
+}
+
+function authHeaders(extra = {}) {
+  const headers = { ...extra };
+  try {
+    const token = (localStorage.getItem(LOCAL_TOKEN_KEY) || "").trim();
+    if (token) headers[LOCAL_TOKEN_HEADER] = token;
+  } catch (_) {}
+  return headers;
+}
+
 async function getJSON(path) {
-  const res = await fetch(API + path, { signal: AbortSignal.timeout(8000) });
+  const res = await fetch(API + scopedPath(path), { signal: AbortSignal.timeout(8000), headers: authHeaders() });
   if (!res.ok) throw new Error(res.status);
   return res.json();
 }
 async function sendJSON(path, method, body) {
-  const res = await fetch(API + path, {
+  const res = await fetch(API + scopedPath(path), {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) throw new Error(res.status);

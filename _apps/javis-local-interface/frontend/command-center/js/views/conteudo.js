@@ -7,7 +7,7 @@
 // A ÚNICA escrita real é a geração com IA via POST /chat. Salvar/Publicar apenas
 // adicionam um card à biblioteca local (sem endpoint). Todo texto do usuário é
 // escapado com _esc antes de ir pro HTML. CSS injetado de forma idempotente.
-import { h, $, state, BACKEND, tryJson, _esc, opToast } from "../../app.js";
+import { h, $, state, BACKEND, tryJson, withProjectId, _esc, opToast } from "../../app.js";
 
 // ---------- Estado local (só em memória, reseta ao recarregar) ----------
 let _projeto = "vempassear"; // default: Vem Passear
@@ -374,7 +374,8 @@ function salvarItem(status) {
   opToast(status === "rascunho" ? "Rascunho salvo na biblioteca. 💾" : "Conteúdo agendado na biblioteca. 📤", "ok");
   // Persiste no backend (não bloqueia a UI; só avisa se falhar).
   if (state.online) {
-    tryJson(BACKEND + "conteudo", {
+    const url = _projeto === "vempassear" ? withProjectId(BACKEND + "conteudo") : BACKEND + "conteudo";
+    tryJson(url, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ project: _projeto, channel: _canal, title: titulo, body: corpo, status }),
     }).catch(() => opToast("Salvo aqui, mas falhou ao gravar no servidor.", "warn"));
@@ -387,7 +388,10 @@ function carregarBackend() {
   if (!state.online || _carregado[_projeto]) return;
   const proj = _projeto;
   _carregado[proj] = true;
-  tryJson(BACKEND + "conteudo?projeto=" + encodeURIComponent(proj)).then((d) => {
+  const url = proj === "vempassear"
+    ? withProjectId(BACKEND + "conteudo?projeto=" + encodeURIComponent(proj))
+    : BACKEND + "conteudo?projeto=" + encodeURIComponent(proj);
+  tryJson(url).then((d) => {
     const itens = (d.itens || []).map((r) => ({
       id: "db" + r.id, titulo: r.title || "(sem título)",
       canal: r.channel || "instagram", status: r.status || "rascunho",

@@ -28,7 +28,7 @@ if not os.environ.get("JAVIS_SKIP_DOTENV"):
     except ImportError:
         pass
 
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Header
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -68,7 +68,21 @@ def _gate_json(payload: dict, status_code: int = 403):
     return JSONResponse(payload, status_code=status_code)
 
 
-def _vp_project_gate(action: str, project_id: str, external_adapters: bool = False) -> dict | None:
+def _local_auth_gate(token: str | None, action: str) -> dict | None:
+    return gate.require_local_auth(token, action)
+
+
+def _vp_project_gate(
+    action: str,
+    project_id: str,
+    external_adapters: bool = False,
+    local_token: str | None = None,
+    auth_required: bool = False,
+) -> dict | None:
+    if auth_required:
+        blocked = _local_auth_gate(local_token, action)
+        if blocked:
+            return blocked
     blocked = gate.require_project_scope(project_id)
     if blocked:
         return blocked
@@ -149,8 +163,13 @@ async def _start_integrations():
 
 
 @app.post("/knowledge/reindex")
-async def knowledge_reindex():
+async def knowledge_reindex(
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Reindexa os arquivos do vault (incremental)."""
+    blocked = _local_auth_gate(x_javes_local_token, "knowledge.reindex")
+    if blocked:
+        return _gate_json(blocked)
     blocked = gate.require_external_adapters("knowledge.reindex")
     if blocked:
         return _gate_json(blocked)
@@ -160,7 +179,13 @@ async def knowledge_reindex():
 
 
 @app.get("/knowledge/search")
-async def knowledge_search(q: str = ""):
+async def knowledge_search(
+    q: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _local_auth_gate(x_javes_local_token, "knowledge.search")
+    if blocked:
+        return _gate_json(blocked)
     blocked = gate.require_external_adapters("knowledge.search")
     if blocked:
         return _gate_json(blocked)
@@ -186,13 +211,28 @@ class DnaReq(BaseModel):
 
 
 @app.post("/knowledge/dna")
-async def knowledge_dna(req: DnaReq, approved: bool = False):
+async def knowledge_dna(
+    req: DnaReq,
+    approved: bool = False,
+    approval_id: int | None = None,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Extrai o DNA cognitivo de um texto (transcrição, export, material),
     grava o dossiê em _memoria/dna/ e reindexa o RAG."""
+    blocked = _local_auth_gate(x_javes_local_token, "knowledge.dna")
+    if blocked:
+        return _gate_json(blocked)
     blocked = gate.require_external_adapters("knowledge.dna")
     if blocked:
         return _gate_json(blocked)
-    blocked = gate.require_approval("knowledge.dna", approved)
+    blocked = gate.require_persisted_approval(
+        "knowledge.dna",
+        approval_id=approval_id,
+        route="/knowledge/dna",
+        risk_level="high",
+        reason="dna_extractor usa adaptadores externos e escreve dossie",
+        approved=approved,
+    )
     if blocked:
         return _gate_json(blocked)
     import dna_extractor
@@ -202,8 +242,13 @@ async def knowledge_dna(req: DnaReq, approved: bool = False):
 
 
 @app.post("/knowledge/graph/build")
-async def knowledge_graph_build():
+async def knowledge_graph_build(
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """(Re)constrói o grafo de conhecimento a partir dos dossiês de DNA."""
+    blocked = _local_auth_gate(x_javes_local_token, "knowledge.graph.build")
+    if blocked:
+        return _gate_json(blocked)
     blocked = gate.require_local_actions("knowledge.graph.build")
     if blocked:
         return _gate_json(blocked)
@@ -221,16 +266,32 @@ async def knowledge_graph_query(q: str = "", depth: int = 1):
 
 
 @app.post("/knowledge/ingest")
-async def knowledge_ingest(folder: str = "", approved: bool = False):
+async def knowledge_ingest(
+    folder: str = "",
+    approved: bool = False,
+    approval_id: int | None = None,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Ingestão em LOTE: processa .txt/.md de uma pasta (default _inbox/ingestao/)
     → DNA → RAG → grafo. Assíncrono; acompanhe em /knowledge/ingest/status."""
     safe_folder, blocked = gate.validate_ingest_folder(folder)
     if blocked:
         return _gate_json(blocked)
+    blocked = _local_auth_gate(x_javes_local_token, "knowledge.ingest")
+    if blocked:
+        return _gate_json(blocked)
     blocked = gate.require_external_adapters("knowledge.ingest")
     if blocked:
         return _gate_json(blocked)
-    blocked = gate.require_approval("knowledge.ingest", approved)
+    blocked = gate.require_persisted_approval(
+        "knowledge.ingest",
+        approval_id=approval_id,
+        route="/knowledge/ingest",
+        risk_level="high",
+        reason="ingest chama DNA em lote e reindexa conhecimento",
+        metadata={"folder": str(safe_folder)},
+        approved=approved,
+    )
     if blocked:
         return _gate_json(blocked)
     import ingest
@@ -325,8 +386,12 @@ class VPPasseioRequest(BaseModel):
 
 
 @app.post("/vp/passeios")
-async def vp_passeios_add(req: VPPasseioRequest, project_id: str = ""):
-    blocked = _vp_project_gate("vp.passeios.add", project_id)
+async def vp_passeios_add(
+    req: VPPasseioRequest,
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _vp_project_gate("vp.passeios.add", project_id, local_token=x_javes_local_token, auth_required=True)
     if blocked:
         return _gate_json(blocked)
     import vp_store
@@ -335,8 +400,12 @@ async def vp_passeios_add(req: VPPasseioRequest, project_id: str = ""):
 
 
 @app.delete("/vp/passeios/{item_id}")
-async def vp_passeios_del(item_id: str, project_id: str = ""):
-    blocked = _vp_project_gate("vp.passeios.delete", project_id)
+async def vp_passeios_del(
+    item_id: str,
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _vp_project_gate("vp.passeios.delete", project_id, local_token=x_javes_local_token, auth_required=True)
     if blocked:
         return _gate_json(blocked)
     import vp_store
@@ -357,8 +426,12 @@ class VPClienteRequest(BaseModel):
 
 
 @app.post("/vp/clientes")
-async def vp_clientes_add(req: VPClienteRequest, project_id: str = ""):
-    blocked = _vp_project_gate("vp.clientes.add", project_id)
+async def vp_clientes_add(
+    req: VPClienteRequest,
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _vp_project_gate("vp.clientes.add", project_id, local_token=x_javes_local_token, auth_required=True)
     if blocked:
         return _gate_json(blocked)
     import vp_store
@@ -371,8 +444,13 @@ class VPStatusRequest(BaseModel):
 
 
 @app.patch("/vp/clientes/{item_id}")
-async def vp_clientes_status(item_id: str, req: VPStatusRequest, project_id: str = ""):
-    blocked = _vp_project_gate("vp.clientes.status", project_id)
+async def vp_clientes_status(
+    item_id: str,
+    req: VPStatusRequest,
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _vp_project_gate("vp.clientes.status", project_id, local_token=x_javes_local_token, auth_required=True)
     if blocked:
         return _gate_json(blocked)
     import vp_store
@@ -380,8 +458,12 @@ async def vp_clientes_status(item_id: str, req: VPStatusRequest, project_id: str
 
 
 @app.delete("/vp/clientes/{item_id}")
-async def vp_clientes_del(item_id: str, project_id: str = ""):
-    blocked = _vp_project_gate("vp.clientes.delete", project_id)
+async def vp_clientes_del(
+    item_id: str,
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _vp_project_gate("vp.clientes.delete", project_id, local_token=x_javes_local_token, auth_required=True)
     if blocked:
         return _gate_json(blocked)
     import vp_store
@@ -395,8 +477,18 @@ class VPConteudoRequest(BaseModel):
 
 
 @app.post("/vp/conteudo")
-async def vp_conteudo(req: VPConteudoRequest, project_id: str = ""):
-    blocked = _vp_project_gate("vp.conteudo", project_id, external_adapters=True)
+async def vp_conteudo(
+    req: VPConteudoRequest,
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _vp_project_gate(
+        "vp.conteudo",
+        project_id,
+        external_adapters=True,
+        local_token=x_javes_local_token,
+        auth_required=True,
+    )
     if blocked:
         return _gate_json(blocked)
     texto = _gerar_conteudo_vp(req.tipo, req.tema)
@@ -416,8 +508,12 @@ async def vp_conteudos_list():
 
 
 @app.post("/vp/conteudos")
-async def vp_conteudos_add(req: VPSalvarConteudo, project_id: str = ""):
-    blocked = _vp_project_gate("vp.conteudos.add", project_id)
+async def vp_conteudos_add(
+    req: VPSalvarConteudo,
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _vp_project_gate("vp.conteudos.add", project_id, local_token=x_javes_local_token, auth_required=True)
     if blocked:
         return _gate_json(blocked)
     import vp_store
@@ -427,8 +523,12 @@ async def vp_conteudos_add(req: VPSalvarConteudo, project_id: str = ""):
 
 
 @app.delete("/vp/conteudos/{item_id}")
-async def vp_conteudos_del(item_id: str, project_id: str = ""):
-    blocked = _vp_project_gate("vp.conteudos.delete", project_id)
+async def vp_conteudos_del(
+    item_id: str,
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _vp_project_gate("vp.conteudos.delete", project_id, local_token=x_javes_local_token, auth_required=True)
     if blocked:
         return _gate_json(blocked)
     import vp_store
@@ -454,9 +554,24 @@ async def conteudo_list(projeto: str = ""):
 
 
 @app.post("/conteudo")
-async def conteudo_add(req: ConteudoReq):
-    if not safe_config.vp_effects_enabled():
-        return _disabled_json("vp_effects", safe_config.JAVIS_ENABLE_VP_EFFECTS)
+async def conteudo_add(
+    req: ConteudoReq,
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _local_auth_gate(x_javes_local_token, "conteudo.add")
+    if blocked:
+        return _gate_json(blocked)
+    project = (req.project or "").strip().lower()
+    if project in {"vempassear", "vem-passear", "jampa", "cerebro-jampa"}:
+        blocked = gate.require_project_scope(project_id)
+        if blocked:
+            return _gate_json(blocked)
+        blocked = gate.require_vp_effects("conteudo.add")
+    else:
+        blocked = gate.require_local_actions("conteudo.add")
+    if blocked:
+        return _gate_json(blocked)
     import repositories as repo
     if not (req.title.strip() or req.body.strip()):
         return JSONResponse({"status": "vazio"}, status_code=400)
@@ -516,8 +631,12 @@ class VPPautaRequest(BaseModel):
 
 
 @app.post("/vp/pauta")
-async def vp_pauta_add(req: VPPautaRequest, project_id: str = ""):
-    blocked = _vp_project_gate("vp.pauta.add", project_id)
+async def vp_pauta_add(
+    req: VPPautaRequest,
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _vp_project_gate("vp.pauta.add", project_id, local_token=x_javes_local_token, auth_required=True)
     if blocked:
         return _gate_json(blocked)
     import vp_store
@@ -529,8 +648,13 @@ class VPPautaStatus(BaseModel):
 
 
 @app.patch("/vp/pauta/{item_id}")
-async def vp_pauta_status(item_id: str, req: VPPautaStatus, project_id: str = ""):
-    blocked = _vp_project_gate("vp.pauta.status", project_id)
+async def vp_pauta_status(
+    item_id: str,
+    req: VPPautaStatus,
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _vp_project_gate("vp.pauta.status", project_id, local_token=x_javes_local_token, auth_required=True)
     if blocked:
         return _gate_json(blocked)
     import vp_store
@@ -538,8 +662,12 @@ async def vp_pauta_status(item_id: str, req: VPPautaStatus, project_id: str = ""
 
 
 @app.delete("/vp/pauta/{item_id}")
-async def vp_pauta_del(item_id: str, project_id: str = ""):
-    blocked = _vp_project_gate("vp.pauta.delete", project_id)
+async def vp_pauta_del(
+    item_id: str,
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _vp_project_gate("vp.pauta.delete", project_id, local_token=x_javes_local_token, auth_required=True)
     if blocked:
         return _gate_json(blocked)
     import vp_store
@@ -572,9 +700,19 @@ class JampaSquadRequest(BaseModel):
 
 
 @app.post("/jampa/squad")
-async def jampa_squad_run(req: JampaSquadRequest, project_id: str = ""):
+async def jampa_squad_run(
+    req: JampaSquadRequest,
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Aciona o squad: Orion escolhe o agente (ou força um) e executa, aterrado."""
-    blocked = _vp_project_gate("jampa.squad", project_id, external_adapters=True)
+    blocked = _vp_project_gate(
+        "jampa.squad",
+        project_id,
+        external_adapters=True,
+        local_token=x_javes_local_token,
+        auth_required=True,
+    )
     if blocked:
         return _gate_json(blocked)
     import jampa_squad
@@ -595,9 +733,19 @@ class JampaLeadRequest(BaseModel):
 
 
 @app.post("/jampa/responder-lead")
-async def jampa_responder_lead(req: JampaLeadRequest, project_id: str = ""):
+async def jampa_responder_lead(
+    req: JampaLeadRequest,
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Fluxo-dinheiro: gera a resposta de WhatsApp pronta pro lead (aterrada)."""
-    blocked = _vp_project_gate("jampa.responder_lead", project_id, external_adapters=True)
+    blocked = _vp_project_gate(
+        "jampa.responder_lead",
+        project_id,
+        external_adapters=True,
+        local_token=x_javes_local_token,
+        auth_required=True,
+    )
     if blocked:
         return _gate_json(blocked)
     import jampa_squad
@@ -612,9 +760,19 @@ class JampaForjarRequest(BaseModel):
 
 
 @app.post("/jampa/forjar-skill")
-async def jampa_forjar_skill(req: JampaForjarRequest, project_id: str = ""):
+async def jampa_forjar_skill(
+    req: JampaForjarRequest,
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Pipeline Nero: transcrição de expert → skill .md (rascunho p/ Murillo revisar)."""
-    blocked = _vp_project_gate("jampa.forjar_skill", project_id, external_adapters=True)
+    blocked = _vp_project_gate(
+        "jampa.forjar_skill",
+        project_id,
+        external_adapters=True,
+        local_token=x_javes_local_token,
+        auth_required=True,
+    )
     if blocked:
         return _gate_json(blocked)
     import skill_forge
@@ -725,9 +883,16 @@ class BrainActiveRequest(BaseModel):
 
 
 @app.post("/brain/active")
-async def brain_active_set(req: BrainActiveRequest):
-    if not safe_config.local_actions_enabled():
-        return _disabled_json("local_actions", safe_config.JAVIS_ENABLE_LOCAL_ACTIONS)
+async def brain_active_set(
+    req: BrainActiveRequest,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _local_auth_gate(x_javes_local_token, "brain.active")
+    if blocked:
+        return _gate_json(blocked)
+    blocked = gate.require_local_actions("brain.active")
+    if blocked:
+        return _gate_json(blocked)
     import brain_switch
     try:
         engine = brain_switch.set_active(req.engine)
@@ -848,10 +1013,14 @@ async def task_events(task_id: str):
 
 
 @app.post("/tasks/{task_id}/run-studio")
-async def task_run_studio(task_id: str, project_id: str = ""):
+async def task_run_studio(
+    task_id: str,
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Roda o Estúdio (modo seguro) na task de Design: gera criativos textuais,
     registra o Journey Log e cria o Gate 2. Sem imagem, sem publicar, sem integração."""
-    blocked = _vp_project_gate("tasks.run_studio", project_id)
+    blocked = _vp_project_gate("tasks.run_studio", project_id, local_token=x_javes_local_token, auth_required=True)
     if blocked:
         return _gate_json(blocked)
     import studio
@@ -861,10 +1030,14 @@ async def task_run_studio(task_id: str, project_id: str = ""):
 
 
 @app.post("/tasks/{task_id}/prepare-distribution")
-async def task_prepare_distribution(task_id: str, project_id: str = ""):
+async def task_prepare_distribution(
+    task_id: str,
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Prepara a Distribuição (modo seguro) na task liberada: gera o pacote textual,
     registra o Journey Log e cria o Gate 3. NÃO publica, sem integração externa."""
-    blocked = _vp_project_gate("tasks.prepare_distribution", project_id)
+    blocked = _vp_project_gate("tasks.prepare_distribution", project_id, local_token=x_javes_local_token, auth_required=True)
     if blocked:
         return _gate_json(blocked)
     import distribution
@@ -879,10 +1052,15 @@ class StatusRequest(BaseModel):
 
 
 @app.post("/tasks/{task_id}/status")
-async def task_set_status(task_id: str, req: StatusRequest, project_id: str = ""):
+async def task_set_status(
+    task_id: str,
+    req: StatusRequest,
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Muda o status da task (operação do Quadro) via SQLite. completed/killed
     reusam o fluxo de conclusão/digest. Sem integração externa."""
-    blocked = _vp_project_gate("tasks.status", project_id)
+    blocked = _vp_project_gate("tasks.status", project_id, local_token=x_javes_local_token, auth_required=True)
     if blocked:
         return _gate_json(blocked)
     import task_lifecycle
@@ -896,9 +1074,14 @@ class CompleteRequest(BaseModel):
 
 
 @app.post("/tasks/{task_id}/complete")
-async def task_complete(task_id: str, req: CompleteRequest, project_id: str = ""):
+async def task_complete(
+    task_id: str,
+    req: CompleteRequest,
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Encerra a entidade-tarefa (completed/killed) + gera digest. Sem LLM, sem integração externa."""
-    blocked = _vp_project_gate("tasks.complete", project_id)
+    blocked = _vp_project_gate("tasks.complete", project_id, local_token=x_javes_local_token, auth_required=True)
     if blocked:
         return _gate_json(blocked)
     import task_lifecycle
@@ -941,9 +1124,16 @@ class DecisionRequest(BaseModel):
 
 
 @app.post("/approvals/{approval_id}/decide")
-async def approvals_decide(approval_id: int, req: DecisionRequest):
+async def approvals_decide(
+    approval_id: int,
+    req: DecisionRequest,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Decide um Gate (aprovar/rejeitar). Persiste no SQLite e registra em action_logs.
     NÃO aciona integração externa, NÃO publica, NÃO envia WhatsApp — só registra a decisão."""
+    blocked = _local_auth_gate(x_javes_local_token, "approvals.decide")
+    if blocked:
+        return _gate_json(blocked)
     import repositories as repo
     decision = (req.decision or "").strip().lower()
     if decision not in ("approved", "rejected"):
@@ -956,7 +1146,7 @@ async def approvals_decide(approval_id: int, req: DecisionRequest):
                              "approval": ap}, status_code=409)
 
     approved = decision == "approved"
-    repo.approvals.decide(approval_id, approved, note=req.note or "")
+    repo.approvals.decide(approval_id, approved, note=req.note or "", approved_by="local")
     # registra a decisão em action_logs (sem JSONL — é decisão humana, não ação de IA)
     try:
         repo.logs.add(
@@ -1031,9 +1221,13 @@ class VPRunRequest(BaseModel):
 
 
 @app.post("/vp/agents/run")
-async def vp_agents_run(req: VPRunRequest, project_id: str = ""):
+async def vp_agents_run(
+    req: VPRunRequest,
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Executa um agente do squad da Vem Passear (contrato como system prompt, na assinatura)."""
-    blocked = _vp_project_gate("vp.agents.run", project_id)
+    blocked = _vp_project_gate("vp.agents.run", project_id, local_token=x_javes_local_token, auth_required=True)
     if blocked:
         return _gate_json(blocked)
     if not safe_config.claude_exec_enabled():
@@ -1306,19 +1500,37 @@ async def rootcause(req: RootcauseRequest):
 
 
 @app.get("/history/session")
-async def history():
+async def history(
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _local_auth_gate(x_javes_local_token, "history.session")
+    if blocked:
+        return _gate_json(blocked)
     return JSONResponse({"history": _history[-50:]})
 
 
 @app.get("/history")
-async def get_history():
+async def get_history(
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Retorna histórico de chat persistido em disco."""
+    blocked = _local_auth_gate(x_javes_local_token, "history.read")
+    if blocked:
+        return _gate_json(blocked)
     return JSONResponse(history_store.load())
 
 
 @app.delete("/history")
-async def clear_history():
+async def clear_history(
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Limpa o histórico de chat."""
+    blocked = _local_auth_gate(x_javes_local_token, "history.clear")
+    if blocked:
+        return _gate_json(blocked)
+    blocked = gate.require_local_actions("history.clear")
+    if blocked:
+        return _gate_json(blocked)
     history_store.clear()
     return JSONResponse({"status": "ok"})
 
@@ -1443,15 +1655,31 @@ async def transcribe_audio(file: UploadFile = File(...)):
 # ── TTS ──────────────────────────────────────────────────
 
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(...), approved: bool = False):
+async def upload_file(
+    file: UploadFile = File(...),
+    approved: bool = False,
+    approval_id: int | None = None,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Recebe um arquivo, salva temporariamente e analisa com file_analyzer."""
     blocked = gate.validate_upload_filename(file.filename)
+    if blocked:
+        return _gate_json(blocked)
+    blocked = _local_auth_gate(x_javes_local_token, "upload")
     if blocked:
         return _gate_json(blocked)
     blocked = gate.require_external_adapters("upload")
     if blocked:
         return _gate_json(blocked)
-    blocked = gate.require_approval("upload", approved)
+    blocked = gate.require_persisted_approval(
+        "upload",
+        approval_id=approval_id,
+        route="/upload",
+        risk_level="high",
+        reason="upload salva arquivo temporario e chama analise LLM/visao",
+        metadata={"filename": file.filename or ""},
+        approved=approved,
+    )
     if blocked:
         return _gate_json(blocked)
 
@@ -1491,8 +1719,15 @@ class WAAnalyzeRequest(BaseModel):
 
 
 @app.post("/wa/analyze")
-async def wa_analyze(req: WAAnalyzeRequest, project_id: str = ""):
+async def wa_analyze(
+    req: WAAnalyzeRequest,
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Analisa um export de conversa do WhatsApp (local, via Claude assinatura)."""
+    blocked = _local_auth_gate(x_javes_local_token, "wa.analyze")
+    if blocked:
+        return _gate_json(blocked)
     blocked = gate.require_project_scope(project_id)
     if blocked:
         return _gate_json(blocked)
@@ -1509,8 +1744,17 @@ class WASaveRequest(BaseModel):
 
 
 @app.post("/wa/save-voice")
-async def wa_save_voice(req: WASaveRequest, project_id: str = "", approved: bool = False):
+async def wa_save_voice(
+    req: WASaveRequest,
+    project_id: str = "",
+    approved: bool = False,
+    approval_id: int | None = None,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Salva o material destilado como grounding do squad (voz-murillo.md)."""
+    blocked = _local_auth_gate(x_javes_local_token, "wa.save_voice")
+    if blocked:
+        return _gate_json(blocked)
     blocked = gate.require_project_scope(project_id)
     if blocked:
         return _gate_json(blocked)
@@ -1520,7 +1764,15 @@ async def wa_save_voice(req: WASaveRequest, project_id: str = "", approved: bool
     blocked = gate.require_vp_effects("wa.save_voice")
     if blocked:
         return _gate_json(blocked)
-    blocked = gate.require_approval("wa.save_voice", approved)
+    blocked = gate.require_persisted_approval(
+        "wa.save_voice",
+        approval_id=approval_id,
+        route="/wa/save-voice",
+        project_id=project_id,
+        risk_level="high",
+        reason="wa.save_voice escreve grounding no projeto conectado",
+        approved=approved,
+    )
     if blocked:
         return _gate_json(blocked)
     import wa_analyzer
@@ -2322,9 +2574,20 @@ class TaskDoneRequest(BaseModel):
 
 
 @app.post("/missions/{mission_id}/nodes/{node_id}/done")
-async def set_mission_task_done(mission_id: str, node_id: str, req: TaskDoneRequest):
+async def set_mission_task_done(
+    mission_id: str,
+    node_id: str,
+    req: TaskDoneRequest,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
     """Marca/desmarca uma tarefa real no backlog (drag-and-drop do Quadro).
     Missões sintéticas (calculadas, sem checkbox) devolvem 404."""
+    blocked = _local_auth_gate(x_javes_local_token, "missions.done")
+    if blocked:
+        return _gate_json(blocked)
+    blocked = gate.require_local_actions("missions.done")
+    if blocked:
+        return _gate_json(blocked)
     import mission_board
     ok = mission_board.set_task_done(mission_id, node_id, req.done)
     if not ok:

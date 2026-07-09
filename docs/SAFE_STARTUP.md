@@ -1,7 +1,7 @@
 # Safe Startup — Javis antigo
 
 Data: 2026-07-08  
-Estado: R1 aplicado, mas servidor ainda nao deve ser iniciado para uso operacional.
+Estado: R2 aplicado, mas servidor ainda nao deve ser iniciado para uso operacional.
 
 ## O que pode rodar
 
@@ -112,17 +112,73 @@ Contrato de bloqueio:
 }
 ```
 
-R2 pendente:
+R2 aplicado:
 
-- substituir `approved=true` por aprovacao persistida/token local;
-- autenticar rotas sensiveis restantes;
-- implementar RAG project-scoped com `project_id`;
-- atualizar clientes frontend para enviar `project_id` explicito.
+- `approved=true` nao libera mais execucao sozinho; rotas sensiveis usam aprovacao persistida em SQLite.
+- rotas sensiveis exigem header local `X-Javes-Local-Token`.
+- frontend Command Center e painel VP legado enviam `project_id=project:cerebro-jampa` para chamadas VP/Jampa/WA/tasks/conteudo conectado.
+- rotas pendentes foram classificadas: `missions/*`, `history`, `brain/active`, `approvals/decide` e `/conteudo`.
+
+## R2 — Approval persistido, auth local e project_id
+
+Token local:
+
+- header: `X-Javes-Local-Token`;
+- fonte local: `JAVES_LOCAL_TOKEN` ou `JAVIS_LOCAL_TOKEN`;
+- testes usam token fake controlado pelo `conftest.py`;
+- o token nao e logado nem exibido.
+
+Aprovacao persistida:
+
+- tabela reutilizada: `approvals`;
+- campos aditivos: `project_id`, `action`, `route`, `risk_level`, `requested_by`, `approved_by`, `approval_token_id`, `reason`, `metadata_json`, `updated_at`;
+- status aceitos: `pending`, `approved`, `rejected`, `expired`, `canceled`;
+- sem `approval_id` aprovado, a rota retorna `approval_required`;
+- `approved=true` legado apenas cria/consulta gate pendente e retorna `approval_required`.
+
+Rotas com auth local:
+
+- `POST /knowledge/dna`
+- `POST /knowledge/ingest`
+- `POST /knowledge/reindex`
+- `GET /knowledge/search`
+- `POST /knowledge/graph/build`
+- `POST /upload`
+- `POST /wa/analyze`
+- `POST /wa/save-voice`
+- mutacoes `POST/PATCH/DELETE /vp/*`
+- mutacoes `POST /jampa/*`
+- `POST /tasks/{id}/run-studio`
+- `POST /tasks/{id}/prepare-distribution`
+- `POST /tasks/{id}/status`
+- `POST /tasks/{id}/complete`
+- `POST /approvals/{id}/decide`
+- `GET /history/session`
+- `GET /history`
+- `DELETE /history`
+- `POST /brain/active`
+- `POST /missions/{mission_id}/nodes/{node_id}/done`
+- `POST /conteudo`
+
+Classificacao das rotas pendentes:
+
+- `missions/*`: leitura `safe`; mutacao `auth_required + local_actions`.
+- `history`: leitura `auth_required`; delete `auth_required + local_actions`.
+- `brain/active`: GET `safe`; POST `auth_required + local_actions`.
+- `approvals/decide`: `auth_required`; efeitos VP seguem protegidos por `vp_effects`.
+- `/conteudo`: GET `safe`; POST `auth_required`; se projeto VP/Jampa, tambem `project_id_required + vp_effects`; caso contrario `local_actions`.
+
+R3 pendente:
+
+- RAG project-scoped real por `project_id`;
+- UI explicita para cadastro/rotacao do token local;
+- expiracao/TTL formal para approvals;
+- auditoria de rotas de chat/voice/agents/train/browser antes de uso operacional.
 
 ## Riscos restantes
 
-- Ainda nao ha autenticacao local obrigatoria nas rotas sensiveis.
-- Existem rotas de leitura/mutacao de memoria, tarefas, historico e knowledge que precisam de classificacao fina.
+- Ainda nao ha UI dedicada para cadastrar/rotacionar o token local.
+- Rotas amplas de chat/voice/agents/train/browser ainda precisam de revisao R3 antes de uso operacional.
 - `_apps/javis-local-interface/iniciar-javis.bat` tambem inicia Chainlit; ainda nao deve ser usado.
 - `.env` existe localmente e nao deve ser aberto.
 - VP/Jampa ainda esta acoplado ao backend antigo, embora efeitos estejam bloqueados por flag.
@@ -165,9 +221,9 @@ browser_agent.py
 
 ## O que falta antes de iniciar o servidor
 
-- Implementar autenticacao local simples nas rotas sensiveis.
+- Implementar UI/politica operacional para token local.
 - Auditar Chainlit/app_ui antes de usar `iniciar-javis.bat`.
-- Classificar rotas restantes por risco: read-only, mutacao local, rede externa, execucao local.
+- Classificar rotas restantes de chat/voice/agents/train/browser por risco: read-only, mutacao local, rede externa, execucao local.
 - Separar ou isolar VP/Jampa do core Javis.
 - Decidir politica de limpeza para caches/runtime/logs com aprovacao explicita.
 - Rodar testes offline apenas depois da autenticacao e das flags serem revisadas.

@@ -14,3 +14,4 @@ def pytest_configure():
     os.environ.setdefault("JAVIS_ENABLE_BROWSER", "true")
     os.environ.setdefault("JAVIS_ENABLE_LOCAL_ACTIONS", "true")
     os.environ.setdefault("JAVIS_ENABLE_VP_EFFECTS", "true")
+    os.environ.setdefault("JAVES_LOCAL_TOKEN", "test-local-token")
