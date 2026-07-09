@@ -12,6 +12,7 @@ import re
 import time
 
 import actions
+import safe_config
 
 # Decisão 21/06 — Haiku 4.5 como default do tool-use (era sonnet-4-6).
 # Sonnet/Opus continuam acessíveis via env JAVIS_CLAUDE_MODEL e via `pensar_profundo`.
@@ -1166,6 +1167,14 @@ def respond(user_text: str, history: list[dict] | None = None, max_rounds: int =
     Claude Code headless); pedido pesado e fallback continuam no Claude assinatura.
     Retorna {text, tools} ou None se nenhum provedor disponível."""
     history = history or []
+    if not safe_config.external_adapters_enabled():
+        return {
+            "text": safe_config.disabled_message(
+                "external_adapters",
+                safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS,
+            ),
+            "tools": [],
+        }
 
     # 0) Conversa leve → Gemini grátis primeiro (rápido). Pesado pula direto pro
     #    Claude assinatura. Gemini ainda pode chamar ferramentas (incl.

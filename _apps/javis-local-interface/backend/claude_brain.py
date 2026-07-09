@@ -29,6 +29,8 @@ import subprocess
 import threading
 from pathlib import Path
 
+import safe_config
+
 JAVIS_ROOT = Path(__file__).resolve().parents[3]
 
 # Opus 4.8 = mais novo e capaz. Trocável pelo .env (alias 'opus'/'sonnet' ou ID).
@@ -58,7 +60,7 @@ _SYSTEM = (
 
 
 def available() -> bool:
-    return _CLAUDE_BIN is not None
+    return safe_config.claude_exec_enabled() and _CLAUDE_BIN is not None
 
 
 def _env() -> dict:

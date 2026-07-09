@@ -26,6 +26,8 @@ import threading
 import time as _time
 from pathlib import Path
 
+import safe_config
+
 JAVIS_ROOT = Path(__file__).resolve().parents[3]
 
 _TIMEOUT = int(os.environ.get("JAVIS_CLAUDE_EXEC_TIMEOUT", "900"))
@@ -47,7 +49,7 @@ _exec_state: dict = {
 
 
 def available() -> bool:
-    return _CLAUDE_BIN is not None
+    return safe_config.claude_exec_enabled() and _CLAUDE_BIN is not None
 
 
 def get_status() -> dict:
@@ -70,6 +72,11 @@ def run(task: str, pasta: str | None = None) -> str:
     task = (task or "").strip()
     if not task:
         return "O que devo executar, senhor?"
+    if not safe_config.claude_exec_enabled():
+        return safe_config.disabled_message(
+            "claude_exec",
+            f"{safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS}+{safe_config.JAVIS_ENABLE_CLAUDE_EXEC}",
+        )
     if not available():
         return ("O Claude Code não está instalado, senhor. Instale e faça login na "
                 "assinatura para eu executar tarefas por aqui.")
@@ -141,6 +148,13 @@ def _run_bg(task: str, pasta: str | None = None) -> None:
 
 def audit(pasta: str | None = None) -> str:
     """Vistoria rápida (30s) após Codex — valida estrutura e padrões."""
+    if not safe_config.claude_exec_enabled():
+        return safe_config.disabled_message(
+            "claude_exec",
+            f"{safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS}+{safe_config.JAVIS_ENABLE_CLAUDE_EXEC}",
+        )
+    if not available():
+        return ""
     work_dir = Path(pasta) if pasta else JAVIS_ROOT
     if not work_dir.is_dir():
         return ""
@@ -167,6 +181,11 @@ def dispatch(task: str, pasta: str | None = None) -> str:
     task = (task or "").strip()
     if not task:
         return "O que devo executar, senhor?"
+    if not safe_config.claude_exec_enabled():
+        return safe_config.disabled_message(
+            "claude_exec",
+            f"{safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS}+{safe_config.JAVIS_ENABLE_CLAUDE_EXEC}",
+        )
     if not available():
         return ("O Claude Code não está instalado/logado, senhor. Sem ele, eu uso o "
                 "Codex como reserva para programar.")

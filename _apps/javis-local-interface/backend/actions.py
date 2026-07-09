@@ -8,6 +8,8 @@ import platform
 from datetime import datetime
 from pathlib import Path
 
+import safe_config
+
 JAVIS_ROOT = Path(__file__).resolve().parents[3]
 
 URLS = {
@@ -54,6 +56,18 @@ _MUSIC_FILLERS = {
 
 _MAX_IDEA_LEN = 2000
 
+_LOCAL_EFFECT_INTENTS = {
+    "abrir_navegador", "abrir_youtube", "tocar_musica", "abrir_openwebui",
+    "abrir_javis", "abrir_vscode", "abrir_terminal", "abrir_projeto",
+    "registrar_ideia", "status_sistema", "analisar_site", "clima",
+    "trocar_motor", "atualizar_memoria",
+}
+_BROWSER_INTENTS = {
+    "abrir_navegador", "abrir_youtube", "tocar_musica", "abrir_openwebui",
+    "analisar_site",
+}
+_EXTERNAL_INTENTS = {"analisar_site", "clima", "tocar_musica"}
+
 
 def _hora_data(_: str) -> dict:
     from datetime import datetime
@@ -65,6 +79,21 @@ def _hora_data(_: str) -> dict:
 
 def execute(intent: str, user_text: str = "") -> dict:
     """Despacha para o handler correto e retorna resultado padronizado."""
+    if intent in _LOCAL_EFFECT_INTENTS and not safe_config.local_actions_enabled():
+        return safe_config.disabled_response(
+            "local_actions",
+            safe_config.JAVIS_ENABLE_LOCAL_ACTIONS,
+        )
+    if intent in _BROWSER_INTENTS and not safe_config.browser_enabled():
+        return safe_config.disabled_response(
+            "browser",
+            safe_config.JAVIS_ENABLE_BROWSER,
+        )
+    if intent in _EXTERNAL_INTENTS and not safe_config.external_adapters_enabled():
+        return safe_config.disabled_response(
+            "external_adapters",
+            safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS,
+        )
     handlers = {
         "abrir_navegador":  _open_browser,
         "abrir_youtube":    _open_youtube,

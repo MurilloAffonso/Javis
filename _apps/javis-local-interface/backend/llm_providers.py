@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 
 import claude_brain
+import safe_config
 
 _SEM_CEREBRO = (
     "Estou sem cérebro disponível agora, senhor: o Claude pela assinatura não "
@@ -33,6 +34,8 @@ def _split_messages(messages: list[dict]) -> tuple[str, str, str]:
 
 def _openrouter_fallback(messages: list[dict], temperature: float) -> str | None:
     """Plano B free-first (OpenRouter). Só ativa se OPENROUTER_API_KEY existir."""
+    if not safe_config.external_adapters_enabled():
+        return None
     try:
         import openrouter_fallback as orf
         if orf.available():
@@ -44,6 +47,11 @@ def _openrouter_fallback(messages: list[dict], temperature: float) -> str | None
 
 def call_claude(messages: list[dict], temperature: float = 0.7) -> str:
     """Claude pela assinatura (primário). Plano B: OpenRouter free, se configurado."""
+    if not safe_config.external_adapters_enabled():
+        return safe_config.disabled_message(
+            "external_adapters",
+            safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS,
+        )
     if claude_brain.available():
         system_text, context, question = _split_messages(messages)
         out = claude_brain.answer(question, context, system=system_text or None)
@@ -61,6 +69,12 @@ call_openai = call_claude
 
 def stream_claude(messages: list[dict], temperature: float = 0.7):
     """Gerador síncrono de tokens — Claude pela assinatura. Sem fallback local."""
+    if not safe_config.external_adapters_enabled():
+        yield safe_config.disabled_message(
+            "external_adapters",
+            safe_config.JAVIS_ENABLE_EXTERNAL_ADAPTERS,
+        )
+        return
     if claude_brain.available():
         system_text, context, question = _split_messages(messages)
         got = False
@@ -78,6 +92,8 @@ def stream_claude(messages: list[dict], temperature: float = 0.7):
 
 def embed(text: str) -> list[float] | None:
     """Embedding semântico via OpenAI text-embedding-3-small."""
+    if not safe_config.external_adapters_enabled():
+        return None
     api_key = os.environ.get("OPENAI_API_KEY", "")
     if not api_key:
         return None

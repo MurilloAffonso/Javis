@@ -4,6 +4,8 @@ import urllib.parse
 import requests
 from bs4 import BeautifulSoup
 
+import safe_config
+
 try:
     from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
     _HAS_PLAYWRIGHT = True
@@ -20,6 +22,8 @@ def _clean(text: str, limit: int = 2500) -> str:
 
 def search_google(query: str) -> dict:
     """Pesquisa na web via DuckDuckGo (sem CAPTCHA) e devolve os top resultados."""
+    if not safe_config.browser_enabled():
+        return safe_config.disabled_response("browser", safe_config.JAVIS_ENABLE_BROWSER)
     try:
         from ddgs import DDGS
         raw = list(DDGS().text(query, max_results=6))
@@ -44,6 +48,8 @@ def search_google(query: str) -> dict:
 
 def read_page(url: str) -> dict:
     """Lê o conteúdo principal de uma página web."""
+    if not safe_config.browser_enabled():
+        return safe_config.disabled_response("browser", safe_config.JAVIS_ENABLE_BROWSER)
     try:
         if not url.startswith("http"):
             url = "https://" + url
@@ -87,6 +93,8 @@ def _read_playwright(url: str) -> dict:
 
 def navigate_visible(url: str) -> dict:
     """Abre uma URL no navegador padrão (visível para o senhor)."""
+    if not safe_config.browser_enabled():
+        return safe_config.disabled_response("browser", safe_config.JAVIS_ENABLE_BROWSER)
     try:
         import webbrowser
         if not url.startswith("http"):

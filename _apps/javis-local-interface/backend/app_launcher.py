@@ -12,6 +12,8 @@ import subprocess
 import urllib.parse
 import webbrowser
 
+import safe_config
+
 # Aliases → como abrir (comando para shell `start`)
 WINDOWS_APPS: dict[str, str] = {
     # navegadores
@@ -63,6 +65,11 @@ SETTINGS_URIS = {
 
 def open_app(name: str) -> dict:
     """Abre um app/janela do sistema pelo nome falado."""
+    if not safe_config.local_actions_enabled():
+        return safe_config.disabled_response(
+            "local_actions",
+            safe_config.JAVIS_ENABLE_LOCAL_ACTIONS,
+        )
     raw = (name or "").strip()
     key = raw.lower()
     if not key:
@@ -117,6 +124,11 @@ def open_folder(name: str) -> dict:
     Resolve a pasta certa do perfil do Windows em vez de só abrir o Explorer no
     lugar padrão.
     """
+    if not safe_config.local_actions_enabled():
+        return safe_config.disabled_response(
+            "local_actions",
+            safe_config.JAVIS_ENABLE_LOCAL_ACTIONS,
+        )
     raw = (name or "").strip()
     if not raw:
         return {"status": "error", "message": "Qual pasta devo abrir, senhor?"}
@@ -154,6 +166,8 @@ def open_folder(name: str) -> dict:
 
 def open_site(url: str) -> dict:
     """Abre qualquer site. Aceita 'youtube.com' ou 'https://...'."""
+    if not safe_config.browser_enabled():
+        return safe_config.disabled_response("browser", safe_config.JAVIS_ENABLE_BROWSER)
     u = (url or "").strip()
     if not u:
         return {"status": "error", "message": "Qual site, senhor?"}
@@ -165,6 +179,8 @@ def open_site(url: str) -> dict:
 
 def google_search(term: str) -> dict:
     """Pesquisa no Google."""
+    if not safe_config.browser_enabled():
+        return safe_config.disabled_response("browser", safe_config.JAVIS_ENABLE_BROWSER)
     t = (term or "").strip()
     if not t:
         return {"status": "error", "message": "O que pesquiso, senhor?"}

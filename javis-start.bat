@@ -12,12 +12,9 @@ echo  [Javis] Servidor nao esta respondendo. Subindo...
 echo.
 
 :: Janela visivel (nao minimizada) para enxergar erros se cair
-:: JAVIS_AUTO_CODEX=1 -> delegacao automatica Claude->Codex ligada (Claude pensa,
-:: Codex executa tarefas de codigo, Claude audita depois). Guardrails: sem git
-:: commit/push. Pra desligar, troque para 0.
-:: JAVIS_VOICE_BRAIN=openrouter -> voz responde em ~1-2s (OpenRouter free) em
-:: vez de ~20s (Claude). pt-BR limpo, chama de "senhor", nao expira.
-start "Javis Server" cmd /k "cd /d C:\Users\noteacer\Desktop\javis\_apps\javis-local-interface && set JAVIS_AUTO_CODEX=1 && set JAVIS_VOICE_BRAIN=openrouter && C:\Python314\python.exe backend\server.py"
+:: R1 safe startup: adaptadores externos, execucao headless e acoes locais ficam
+:: desligados por padrao. Ligue flags explicitamente em outra janela se precisar.
+start "Javis Server" cmd /k "cd /d C:\Users\noteacer\Desktop\javis\_apps\javis-local-interface && set JAVIS_ENABLE_EXTERNAL_ADAPTERS=false && set JAVIS_ENABLE_CODEX_EXEC=false && set JAVIS_ENABLE_CLAUDE_EXEC=false && set JAVIS_ENABLE_BROWSER=false && set JAVIS_ENABLE_TELEGRAM=false && set JAVIS_ENABLE_MCP=false && set JAVIS_ENABLE_LOCAL_ACTIONS=false && set JAVIS_ENABLE_VP_EFFECTS=false && set JAVIS_DEV_ALLOW_CORS=false && set JAVIS_AUTO_CODEX=0 && C:\Python314\python.exe backend\server.py"
 
 :: Espera o servidor responder (ate ~25s), checando a cada 1s
 set /a tries=0
