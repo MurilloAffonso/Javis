@@ -47,7 +47,9 @@ def test_ollama_embedder_posts_to_local_embed_endpoint(monkeypatch):
 
     monkeypatch.setattr(knowledge.urllib.request, "urlopen", fake_urlopen)
 
-    vectors = knowledge._selected_embedder().embed(["alpha", "beta"])
+    # embedder cru, já aquecido (warm-up testado à parte) → posta o batch real
+    knowledge._OllamaEmbedder._warmed = True
+    vectors = knowledge._OllamaEmbedder().embed(["alpha", "beta"])
 
     assert vectors == [[0.1, 0.2], [0.3, 0.4]]
     assert captured["url"] == "http://127.0.0.1:11434/api/embed"
@@ -56,7 +58,28 @@ def test_ollama_embedder_posts_to_local_embed_endpoint(monkeypatch):
 
 
 def test_ollama_embedder_requires_external_adapters(monkeypatch):
+    # O embedder CRU recusa sem o flag (garantia de gate no processo externo).
     knowledge = _knowledge(monkeypatch, external_adapters=False)
 
     with pytest.raises(RuntimeError, match="JAVIS_ENABLE_EXTERNAL_ADAPTERS"):
-        knowledge._selected_embedder().embed(["alpha"])
+        knowledge._OllamaEmbedder().embed(["alpha"])
+
+
+def test_selected_embedder_falls_back_to_local_when_ollama_down(monkeypatch):
+    # Default (ollama) indisponível → cai para local (offline), NUNCA openai,
+    # e nunca trava a busca.
+    knowledge = _knowledge(monkeypatch)
+    knowledge._OllamaEmbedder._warmed = False
+
+    def boom(req, timeout):
+        raise knowledge.urllib.error.URLError("connection refused")
+
+    monkeypatch.setattr(knowledge.urllib.request, "urlopen", boom)
+    # se openai for tocado, o teste falha de propósito
+    monkeypatch.setattr(knowledge, "_embed_batch",
+                        lambda texts: (_ for _ in ()).throw(AssertionError("openai não deve ser tocado")))
+
+    vectors = knowledge._selected_embedder().embed(["alpha", "beta"])
+
+    assert len(vectors) == 2
+    assert all(isinstance(v, list) and v for v in vectors)

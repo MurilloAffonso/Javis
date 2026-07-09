@@ -44,6 +44,7 @@ _LOCAL_EMBED_DIM = 256
 _OLLAMA_DEFAULT_BASE_URL = "http://127.0.0.1:11434"
 _OLLAMA_DEFAULT_MODEL = "nomic-embed-text"
 _OLLAMA_EMBED_BATCH = 32
+_OLLAMA_WARMUP_TIMEOUT = 90.0   # cold start medido ~28s; margem na 1a carga
 _MAX_FILES = 800    # trava de segurança contra indexar demais
 
 _lock = threading.Lock()
@@ -131,7 +132,10 @@ def scope_for_project(project_id: str | None) -> str | list[str]:
 
 
 def _embedder_name() -> str:
-    return (os.environ.get("JAVIS_RAG_EMBEDDER") or "openai").strip().lower() or "openai"
+    # Default = ollama (local, offline, custo zero). Bench 09/07: nomic-embed-text
+    # recall@5 0.73 vs local 0.35 vs openai (não medido). JAVIS_RAG_EMBEDDER
+    # sobrescreve para 'openai' ou 'local'.
+    return (os.environ.get("JAVIS_RAG_EMBEDDER") or "ollama").strip().lower() or "ollama"
 
 
 class _BaseEmbedder:
@@ -189,6 +193,21 @@ class _LocalEmbedder(_BaseEmbedder):
 
 class _OllamaEmbedder(_BaseEmbedder):
     name = "ollama"
+    _warmed = False
+
+    def _warm(self) -> None:
+        # Cold start do modelo mede ~28s (1a carga na RAM); quente fica ~0.15s.
+        # A 1a chamada do processo usa timeout longo, UMA vez. Se falhar aqui,
+        # a exceção sobe e o _FallbackEmbedder cai para o local (offline).
+        if type(self)._warmed:
+            return
+        prev = self.timeout
+        self.timeout = max(self.timeout, _OLLAMA_WARMUP_TIMEOUT)
+        try:
+            self._embed_batch_api(["warmup"])
+            type(self)._warmed = True
+        finally:
+            self.timeout = prev
 
     def __init__(self):
         self.model = (os.environ.get("JAVIS_OLLAMA_EMBED_MODEL") or _OLLAMA_DEFAULT_MODEL).strip()
@@ -263,6 +282,7 @@ class _OllamaEmbedder(_BaseEmbedder):
         self._require_enabled()
         if not texts:
             return []
+        self._warm()
         out: list[list[float]] = []
         for i in range(0, len(texts), _OLLAMA_EMBED_BATCH):
             batch = texts[i:i + _OLLAMA_EMBED_BATCH]
@@ -275,12 +295,34 @@ class _OllamaEmbedder(_BaseEmbedder):
         return out
 
 
+class _FallbackEmbedder(_BaseEmbedder):
+    """Tenta o provider primário; se falhar, cai para o fallback offline.
+    NUNCA cai silenciosamente para OpenAI — o fallback é sempre o local."""
+
+    def __init__(self, primary: _BaseEmbedder, fallback: _BaseEmbedder):
+        self.primary = primary
+        self.fallback = fallback
+        self.name = primary.name
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        try:
+            return self.primary.embed(texts)
+        except Exception as exc:
+            print(
+                f"[knowledge] embedder '{self.primary.name}' indisponível ({exc}); "
+                f"fallback -> '{self.fallback.name}' (offline)",
+                flush=True,
+            )
+            return self.fallback.embed(texts)
+
+
 def _selected_embedder() -> _BaseEmbedder:
     name = _embedder_name()
     if name == "local":
         return _LocalEmbedder()
     if name == "ollama":
-        return _OllamaEmbedder()
+        # default: ollama com rede de segurança offline (local), nunca openai.
+        return _FallbackEmbedder(_OllamaEmbedder(), _LocalEmbedder())
     return _OpenAIEmbedder()
 
 

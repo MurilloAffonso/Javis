@@ -66,6 +66,7 @@ def test_recall_precision_math(monkeypatch):
 # --- integração real: híbrido acha por BM25 onde o legado (semântico) falha --
 def test_hybrid_beats_legacy_on_keyword(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("JAVIS_RAG_EMBEDDER", "openai")  # este teste mocka _embed_batch (openai)
     monkeypatch.setattr(db, "DB_PATH", tmp_path / "eval.db")
     monkeypatch.setattr(db, "_initialized", False)
     monkeypatch.setattr(k, "JAVIS_ROOT", tmp_path)
