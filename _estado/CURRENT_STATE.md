@@ -24,26 +24,27 @@
 | **R3** | Sessões, histórico e memória isolados por `project_id` | ✅ **Concluído** |
 | **R3.1** | Fechamento do escopo: tasks/approvals sempre por `project_id` + estado interno fora do prompt do Jampa | ✅ **Concluído** |
 | **R4.1** | Fundação do executor supervisionado: `execution_task` + `worktree_manager` + `execution_policy` (nenhum agente roda) | ✅ **Concluído** |
+| **R4.2A** | Dois gates de aprovação (`execution.start`/`execution.merge`, single-use, escopados) + `result_collector` sanitizado/truncado (sem adapters, sem merge) | ✅ **Concluído** |
 
-> **Executor ainda DESLIGADO.** A R4.1 é só fundação: nenhum agente é executado,
-> o fluxo atual de execução não foi alterado, e `JAVIS_ENABLE_SUPERVISED_EXEC`
-> continua `False`.
+> **Executor ainda DESLIGADO.** R4.1/R4.2A são fundação + gates: nenhum agente é
+> executado, nenhum merge é feito, o fluxo atual de execução não foi alterado, e
+> `JAVIS_ENABLE_SUPERVISED_EXEC` continua `False`.
 
 ---
 
 ## 🎯 PRÓXIMO PASSO OFICIAL
 
-**R4.2 — Adapters supervisionados + approval persistido + result collector**
+**R4.2B — Adapters supervisionados + merge real**
 
-`CodexAdapter`/`ClaudeCodeAdapter` sobre a fundação R4.1 (mesmo contrato), consumo
-do approval persistido (2 gates: exec e merge) e `result_collector` com diff/test
-report sanitizados. Nada roda no repo vivo — só na worktree isolada.
+`CodexAdapter`/`ClaudeCodeAdapter` sobre a fundação R4.1 (mesmo contrato),
+executando na worktree isolada e ligando os gates da R4.2A ao fluxo real; merge
+da work_branch **só** após `approved_for_merge`. Nada roda no repo vivo.
 
 ---
 
 ## Fases seguintes (ordem oficial)
 
-1. **R4.2 — Adapters + approval persistido + result collector** (próximo passo acima).
+1. **R4.2B — Adapters supervisionados + merge real** (próximo passo acima).
 
 2. **R4.3 — Endurecimento adicional / sandbox opcional**
    Bloqueio de rede real (Docker `--network none` opcional, nunca default),

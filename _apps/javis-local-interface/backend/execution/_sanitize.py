@@ -16,9 +16,24 @@ _SECRET_PATTERNS = (
 )
 
 
-def sanitize(value: object, limit: int = 500) -> str:
-    """Retorna texto sem tokens/chaves/senhas/credenciais-em-URL, truncado."""
-    text = str(value or "")
+def _redact(text: str) -> str:
     for pattern in _SECRET_PATTERNS:
         text = pattern.sub("[REDACTED]", text)
-    return text[:limit]
+    return text
+
+
+def sanitize(value: object, limit: int = 500) -> str:
+    """Retorna texto sem tokens/chaves/senhas/credenciais-em-URL, truncado."""
+    return _redact(str(value or ""))[:limit]
+
+
+def sanitize_truncated(value: object, limit: int) -> str:
+    """Como sanitize, mas com marcador explícito de truncagem.
+
+    Redige SEMPRE o texto inteiro ANTES de truncar (evita vazar um segredo que
+    ficaria na fronteira do corte) e só então limita ao tamanho pedido.
+    """
+    text = _redact(str(value or ""))
+    if len(text) > limit:
+        return text[:limit] + f"\n...[truncado em {limit} chars]"
+    return text

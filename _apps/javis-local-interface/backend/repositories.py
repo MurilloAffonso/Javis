@@ -437,6 +437,20 @@ class _ExecutionTasks:
             (last_error, task_id, project_id),
         )
 
+    def set_approval(self, task_id: str, project_id: str, approval_id: int,
+                     started_at: str | None = None) -> int:
+        return db.execute_rowcount(
+            "UPDATE execution_tasks SET approval_id=?, "
+            "started_at=COALESCE(started_at, ?) WHERE task_id=? AND project_id=?",
+            (approval_id, started_at, task_id, project_id),
+        )
+
+    def set_merge_approval(self, task_id: str, project_id: str, merge_approval_id: int) -> int:
+        return db.execute_rowcount(
+            "UPDATE execution_tasks SET merge_approval_id=? WHERE task_id=? AND project_id=?",
+            (merge_approval_id, task_id, project_id),
+        )
+
     def set_result_paths(self, task_id: str, project_id: str, *, result_path: str = "",
                          diff_path: str = "", test_report_path: str = "",
                          finished_at: str | None = None) -> int:
@@ -454,6 +468,16 @@ class _ExecutionTasks:
             "execution_tasks",
             "status NOT IN ('completed','blocked','failed','timed_out','canceled','review_rejected')",
         )
+
+    def count_by_status(self, status: str) -> int:
+        """Contagem global por status (para o doctor; sem conteúdo)."""
+        return db.count("execution_tasks", "status=?", (status,))
+
+    def count_by_statuses(self, statuses: tuple[str, ...]) -> int:
+        if not statuses:
+            return 0
+        placeholders = ",".join("?" for _ in statuses)
+        return db.count("execution_tasks", f"status IN ({placeholders})", tuple(statuses))
 
 
 # instâncias prontas pra uso
