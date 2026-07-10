@@ -265,6 +265,49 @@ python -m pytest -q _apps/javis-local-interface/tests/test_provider_fallback.py 
 Os testes usam mocks de Ollama e dos providers; não abrem `.env`, não sobem
 servidor e nenhuma credencial é impressa.
 
+## R2.2 — Status local e frescor do RAG
+
+Comandos determinísticos no chat:
+
+- `status_sistema` e frases como `qual é o status do sistema?`, `status do Javes` e `como está o sistema?` retornam localmente.
+- `hora_data` continua determinístico.
+- Ações com efeito local continuam protegidas pelas flags; status é consulta read-only e não depende de `JAVIS_ENABLE_LOCAL_ACTIONS`.
+
+Bypass de status:
+
+- `command_router.py` classifica `status_sistema` por palavra-chave, sem LLM.
+- `server.py` trata `status_sistema` como fast-path mesmo quando a frase é pergunta.
+- `agent.py` intercepta `status_sistema` antes de `JAVES_PROVIDER_MODE` selecionar Ollama/cloud.
+- A resposta vem de `actions._system_status()`: provider_mode, embedder do RAG, porta local do Ollama, flags de adapters/actions/VP/Codex/Claude/browser/Telegram/MCP e aprovações pendentes.
+- Nenhum token, segredo, chave ou valor de `.env` é exibido.
+
+Frescor e escopo do RAG:
+
+- `project_id` vazio continua virando `javes-core`.
+- Busca `javes-core` restringe categorias `pessoal` e `projeto`; VP/Jampa exige `project_id=project:cerebro-jampa`.
+- `_projetos/cerebro-jampa/`, `_projetos/vem-passear/` e `_projetos/vempassear/` são categorizados como `vp`.
+- A pasta `docs/` agora entra no índice; antes só `_docs/` era varrida, então auditorias recentes e `SAFE_STARTUP.md` podiam ficar fora do RAG.
+- O ranking local soma similaridade/RRF com bônus pequeno para termos exatos, `mtime` recente e docs críticos (`SAFE_STARTUP`, `AUDIT_R*`, releases).
+- Índices antigos seguem compatíveis; quando faltar metadata, a categoria é inferida pelo path e `mtime` continua opcional.
+
+Reindex local seguro:
+
+```powershell
+$env:JAVES_PROVIDER_MODE = "local"
+$env:JAVIS_RAG_EMBEDDER = "ollama"
+$env:JAVIS_ENABLE_EXTERNAL_ADAPTERS = "true"
+python -c "import sys; sys.path.insert(0, r'_apps/javis-local-interface/backend'); import knowledge; print(knowledge.build_index(force=True))"
+```
+
+Esse comando não sobe servidor e não chama Gemini, OpenAI, Claude ou OpenRouter. Com `JAVIS_RAG_EMBEDDER=ollama`, o RAG tenta somente o Ollama local e cai para o embedder `local` offline se o Ollama não responder.
+
+O que não é indexado:
+
+- `.env`, credenciais e tokens.
+- caches, `.venv`, `venv`, `node_modules`, builds, snapshots e blobs.
+- `_referencias/` e projetos externos fora do registro/escopo explícito.
+- Cérebro Jampa/VP no contexto `javes-core`; esse conteúdo só aparece com `project_id=project:cerebro-jampa`.
+
 ## O que falta antes de iniciar o servidor
 
 - Implementar UI/politica operacional para token local.

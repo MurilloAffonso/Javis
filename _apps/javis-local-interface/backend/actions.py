@@ -59,7 +59,7 @@ _MAX_IDEA_LEN = 2000
 _LOCAL_EFFECT_INTENTS = {
     "abrir_navegador", "abrir_youtube", "tocar_musica", "abrir_openwebui",
     "abrir_javis", "abrir_vscode", "abrir_terminal", "abrir_projeto",
-    "registrar_ideia", "status_sistema", "analisar_site", "clima",
+    "registrar_ideia", "analisar_site", "clima",
     "trocar_motor", "atualizar_memoria",
 }
 _BROWSER_INTENTS = {
@@ -291,16 +291,54 @@ def _register_idea(text: str) -> dict:
 
 def _system_status(_: str) -> dict:
     import socket
-    services = {"Open WebUI (3000)": 3000, "Voz sandbox (12393)": 12393}
-    results = []
-    for name, port in services.items():
+
+    def onoff(value: bool) -> str:
+        return "ligado" if value else "desligado"
+
+    def local_port_open(port: int, timeout: float = 0.2) -> bool:
         try:
-            with socket.create_connection(("localhost", port), timeout=1):
-                results.append(f"  ✅ {name}")
+            with socket.create_connection(("127.0.0.1", port), timeout=timeout):
+                return True
         except OSError:
-            results.append(f"  ❌ {name}")
-    summary = "\n".join(results)
-    return {"status": "ok", "message": f"Status dos serviços:\n{summary}"}
+            return False
+
+    try:
+        import knowledge
+        embedder = knowledge._embedder_name()
+    except Exception:
+        embedder = os.environ.get("JAVIS_RAG_EMBEDDER", "ollama").strip().lower() or "ollama"
+
+    try:
+        import db
+        pending_approvals = db.count("approvals", "status=?", ("pending",))
+    except Exception:
+        pending_approvals = "indisponivel"
+
+    ollama_status = "disponivel" if local_port_open(11434) else "indisponivel"
+    lines = [
+        "Status local do Javes:",
+        "- backend: online",
+        f"- provider_mode: {safe_config.provider_mode()}",
+        f"- rag_embedder: {embedder}",
+        f"- ollama: {ollama_status}",
+        f"- external_adapters: {onoff(safe_config.external_adapters_enabled())}",
+        f"- local_actions: {onoff(safe_config.local_actions_enabled())}",
+        f"- vp_effects: {onoff(safe_config.vp_effects_enabled())}",
+        f"- codex_exec: {onoff(safe_config.codex_exec_enabled())}",
+        f"- claude_headless: {onoff(safe_config.claude_exec_enabled())}",
+        f"- browser: {onoff(safe_config.browser_enabled())}",
+        f"- telegram: {onoff(safe_config.telegram_enabled())}",
+        f"- mcp: {onoff(safe_config.mcp_enabled())}",
+        f"- aprovacoes_pendentes: {pending_approvals}",
+    ]
+    return {
+        "status": "ok",
+        "message": "\n".join(lines),
+        "provider_mode": safe_config.provider_mode(),
+        "rag_embedder": embedder,
+        "ollama": ollama_status,
+        "pending_approvals": pending_approvals,
+    }
 
 
 def _reindex_memory(_: str) -> dict:

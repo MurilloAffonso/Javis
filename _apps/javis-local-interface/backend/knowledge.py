@@ -29,7 +29,7 @@ INDEX_FILE = JAVIS_ROOT / "_memoria" / "knowledge_index.json"
 _KNOWLEDGE_DIRS = [
     "_memoria", "_ideias", "_projetos", "_logs", "_estado",
     "_prompts", "_skills", "_inbox", "_outbox", "_ferramentas",
-    "_treinamento", "_docs", "_sessoes",
+    "_treinamento", "_docs", "docs", "_sessoes",
 ]
 # subpastas a pular mesmo dentro das de conhecimento (caches, libs, lixo)
 _SKIP_DIRS = {
@@ -129,6 +129,14 @@ def scope_for_project(project_id: str | None) -> str | list[str]:
     if pid == gate.CORE_SCOPE or not pid:
         return ["pessoal", "projeto"]
     return ["projeto"]
+
+
+def _normalize_project_id(project_id: str | None) -> str:
+    return (project_id or "").strip() or gate.CORE_SCOPE
+
+
+def _scope_set(scope: str | list[str]) -> set[str]:
+    return {scope} if isinstance(scope, str) else set(scope)
 
 
 def _embedder_name() -> str:
@@ -412,6 +420,58 @@ def _save_index(items: list[dict]) -> None:
     INDEX_FILE.write_text(json.dumps(items, ensure_ascii=False), encoding="utf-8")
 
 
+def _iso_from_mtime(mtime: float | int | None) -> str:
+    if not mtime:
+        return ""
+    try:
+        from datetime import datetime, timezone
+        return datetime.fromtimestamp(float(mtime), tz=timezone.utc).isoformat(timespec="seconds")
+    except Exception:
+        return ""
+
+
+def _metadata_for(rel: str, mtime: float | int | None) -> dict:
+    import categoria as _cat
+    return {
+        "project_id": gate.CORE_SCOPE,
+        "categoria": _cat.de_path(rel),
+        "modified_at": _iso_from_mtime(mtime),
+    }
+
+
+def _query_terms(query: str) -> set[str]:
+    stop = {
+        "qual", "quais", "como", "esta", "está", "sao", "são", "de", "do",
+        "da", "dos", "das", "e", "o", "a", "os", "as", "um", "uma", "me",
+        "diga", "javes", "javis", "sistema", "projeto",
+    }
+    return {
+        t for t in re.findall(r"[0-9A-Za-zÀ-ÿ_.-]+", (query or "").lower())
+        if len(t) > 1 and t not in stop
+    }
+
+
+def _ranking_bonus(item: dict, query: str, max_mtime: float) -> float:
+    path = (item.get("path") or "").replace("\\", "/")
+    text = f"{path}\n{item.get('chunk') or ''}".lower()
+    exact = sum(1 for term in _query_terms(query) if term in text)
+    try:
+        mtime = float(item.get("mtime") or 0)
+        recency = (mtime / max_mtime) if max_mtime and mtime else 0.0
+    except (TypeError, ValueError):
+        recency = 0.0
+    priority = 0.0
+    low_path = path.lower()
+    if low_path.startswith("docs/"):
+        priority += 0.08
+    if any(name in low_path for name in (
+        "safe_startup", "audit_r0", "audit_r1", "audit_r2", "audit_r3",
+        "audit_r4", "audit_r5", "release",
+    )):
+        priority += 0.12
+    return min(exact * 0.05, 0.25) + min(recency * 0.12, 0.12) + priority
+
+
 def build_index(force: bool = False) -> dict:
     """Indexa (incremental) os arquivos do vault. Só re-embeda o que mudou."""
     global _building
@@ -457,6 +517,11 @@ def build_index(force: bool = False) -> dict:
                 continue   # arquivo quebrado / symlink inacessível → ignora
             cached = by_path.get(rel)
             if cached and all(abs(c.get("mtime", 0) - mtime) < 1 for c in cached):
+                meta = _metadata_for(rel, mtime)
+                for c in cached:
+                    c.setdefault("mtime", mtime)
+                    for key, value in meta.items():
+                        c.setdefault(key, value)
                 new_index.extend(cached)            # inalterado → reaproveita
                 continue
             try:
@@ -464,7 +529,12 @@ def build_index(force: bool = False) -> dict:
             except Exception:
                 continue
             for ch in _chunks(text):
-                pending_meta.append({"path": rel, "mtime": mtime, "chunk": ch})
+                pending_meta.append({
+                    "path": rel,
+                    "mtime": mtime,
+                    "chunk": ch,
+                    **_metadata_for(rel, mtime),
+                })
                 pending_texts.append(ch)
             files_done += 1
 
@@ -502,7 +572,7 @@ def _cosine(a: list[float], b: list[float]) -> float:
     return dot / (na * nb) if na and nb else 0.0
 
 
-def search(query: str, k: int = 5) -> list[dict]:
+def search(query: str, k: int = 5, project_id: str | None = None) -> list[dict]:
     """Busca semântica. Retorna [{path, chunk, score}] mais relevantes."""
     if gate.require_external_adapters("knowledge.search"):
         return []
@@ -512,7 +582,7 @@ def search(query: str, k: int = 5) -> list[dict]:
     kh = _hybrid()
     if kh is not None:
         try:
-            return kh.search(query, k)
+            return kh.search(query, k, escopo=scope_for_project(_normalize_project_id(project_id)))
         except Exception:
             pass   # qualquer falha no híbrido → cai no índice JSON legado
     # Auto-sync lazy: se mudou algo nos vaults externos, dispara rebuild em
@@ -534,8 +604,28 @@ def search(query: str, k: int = 5) -> list[dict]:
         if embedder.name == "ollama":
             raise RuntimeError(f"Falha no embedder ollama: {exc}") from exc
         return []
-    scored = [{"path": it["path"], "chunk": it["chunk"], "score": _cosine(qvec, it["vec"])}
-              for it in index if it.get("vec")]
+    cats = _scope_set(scope_for_project(_normalize_project_id(project_id)))
+    max_mtime = max((float(it.get("mtime") or 0) for it in index), default=0.0)
+    scored = []
+    for it in index:
+        if not it.get("vec"):
+            continue
+        categoria = it.get("categoria")
+        if not categoria:
+            import categoria as _cat
+            categoria = _cat.de_path(it.get("path", ""))
+        if categoria not in cats:
+            continue
+        base_score = _cosine(qvec, it["vec"])
+        scored.append({
+            "path": it["path"],
+            "chunk": it["chunk"],
+            "score": base_score + _ranking_bonus(it, query, max_mtime),
+            "base_score": base_score,
+            "mtime": it.get("mtime", 0),
+            "modified_at": it.get("modified_at", ""),
+            "categoria": categoria,
+        })
     scored.sort(key=lambda x: x["score"], reverse=True)
     return scored[:k]
 
@@ -549,7 +639,15 @@ def answer_context(query: str, k: int = 5, escopo=None) -> str:
             return kh.answer_context(query, k, escopo=escopo)
         except Exception:
             pass   # falha no híbrido → contexto pelo caminho legado
-    hits = search(query, k)
+    search_project_id = gate.CORE_SCOPE
+    if escopo:
+        cats_for_search = {escopo} if isinstance(escopo, str) else set(escopo)
+        if "vp" in cats_for_search:
+            search_project_id = gate.CEREBRO_JAMPA_SCOPE
+    try:
+        hits = search(query, k, project_id=search_project_id)
+    except TypeError:
+        hits = search(query, k)
     if not hits:
         return ""
     # Fallback legado (índice JSON, sem coluna de categoria): filtra por escopo

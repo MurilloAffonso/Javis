@@ -18,7 +18,6 @@ ser plugado como substituto transparente, com fallback pro legado.
 """
 from __future__ import annotations
 
-import os
 import re
 import threading
 
@@ -180,14 +179,17 @@ def build_index(force: bool = False) -> dict:
                     if vec is None:
                         pending_idx.append(len(staged) - 1)
 
-            # embeddings só do que faltou (sem key: fica NULL → indexado só no BM25)
+            # embeddings só do que faltou; usa o embedder configurado no RAG local.
             embedded = 0
-            if pending_idx and os.environ.get("OPENAI_API_KEY", "").strip():
+            if pending_idx:
                 texts = [staged[i][3] for i in pending_idx]
-                vecs = _k._embed_batch(texts)
-                for i, v in zip(pending_idx, vecs):
-                    staged[i][4] = v
-                    embedded += 1
+                try:
+                    vecs = _k._selected_embedder().embed(texts)
+                    for i, v in zip(pending_idx, vecs):
+                        staged[i][4] = v
+                        embedded += 1
+                except Exception:
+                    pass
 
             # remove do banco os paths alterados (reinseridos) e os sumidos do disco
             stale = set(stored) - seen
@@ -288,6 +290,49 @@ def _rrf(sem: list[tuple[int, float]], kw: list[tuple[int, int]], k: int):
 _RERANK_ALPHA = 0.7
 
 
+def _query_terms(query: str) -> set[str]:
+    stop = {
+        "qual", "quais", "como", "esta", "está", "sao", "são", "de", "do",
+        "da", "dos", "das", "e", "o", "a", "os", "as", "um", "uma", "me",
+        "diga", "javes", "javis", "sistema", "projeto",
+    }
+    return {
+        t for t in re.findall(r"[0-9A-Za-zÀ-ÿ_.-]+", (query or "").lower())
+        if len(t) > 1 and t not in stop
+    }
+
+
+def _iso_from_mtime(mtime) -> str:
+    if not mtime:
+        return ""
+    try:
+        from datetime import datetime, timezone
+        return datetime.fromtimestamp(float(mtime), tz=timezone.utc).isoformat(timespec="seconds")
+    except Exception:
+        return ""
+
+
+def _ranking_bonus(row: dict, query: str, max_mtime: float) -> float:
+    path = (row.get("path") or "").replace("\\", "/")
+    text = f"{path}\n{row.get('content') or ''}".lower()
+    exact = sum(1 for term in _query_terms(query) if term in text)
+    try:
+        mtime = float(row.get("mtime") or 0)
+        recency = (mtime / max_mtime) if max_mtime and mtime else 0.0
+    except (TypeError, ValueError):
+        recency = 0.0
+    priority = 0.0
+    low_path = path.lower()
+    if low_path.startswith("docs/"):
+        priority += 0.08
+    if any(name in low_path for name in (
+        "safe_startup", "audit_r0", "audit_r1", "audit_r2", "audit_r3",
+        "audit_r4", "audit_r5", "release",
+    )):
+        priority += 0.12
+    return min(exact * 0.05, 0.25) + min(recency * 0.12, 0.12) + priority
+
+
 def _rerank(cand_ids: list[int], sem_by_id: dict[int, float],
             kw_rank_by_id: dict[int, int], rrf_by_id: dict[int, float],
             alpha: float = _RERANK_ALPHA) -> list[tuple[int, float]]:
@@ -350,7 +395,7 @@ def search(query: str, k: int = 5, escopo=None, rerank: bool = False) -> list[di
     if gate.require_external_adapters("knowledge_hybrid.search"):
         return []
     try:
-        qvec = _k._embed_batch([query])[0]
+        qvec = _k._selected_embedder().embed([query])[0]
     except Exception:
         qvec = None
 
@@ -371,27 +416,40 @@ def search(query: str, k: int = 5, escopo=None, rerank: bool = False) -> list[di
         kw_rank_by_id = {cid: r for cid, r in kw}
         cand = list(dict.fromkeys([c for c, _ in sem] + [c for c, _ in kw]))  # união, dedup ordem-preservada
         rrf_by_id = dict(_rrf(sem, kw, len(cand)))                            # desempate
-        ordered = _rerank(cand, sem_by_id, kw_rank_by_id, rrf_by_id)[:k]
+        ordered = _rerank(cand, sem_by_id, kw_rank_by_id, rrf_by_id)
     else:
-        ordered = _rrf(sem, kw, k)
+        ordered = _rrf(sem, kw, pool)
     ids = [cid for cid, _ in ordered]
     if not ids:
         return []
 
     ph = ",".join("?" * len(ids))
-    rows = db.query(f"SELECT id, path, content FROM knowledge_chunks WHERE id IN ({ph})", tuple(ids))
+    rows = db.query(
+        f"SELECT id, path, content, mtime, categoria FROM knowledge_chunks WHERE id IN ({ph})",
+        tuple(ids),
+    )
     by_id = {r["id"]: r for r in rows}
+    max_mtime = max((float(r.get("mtime") or 0) for r in rows), default=0.0)
 
-    out = []
+    ranked = []
     for cid, sc in ordered:
         r = by_id.get(cid)
         if not r:
             continue
+        ranked.append((cid, float(sc) + _ranking_bonus(r, query, max_mtime), float(sc), r))
+    ranked.sort(key=lambda x: x[1], reverse=True)
+
+    out = []
+    for cid, final_score, rrf_score, r in ranked[:k]:
         out.append({
             "path": r["path"], "chunk": r["content"],
-            "score": round(float(sc), 6),
+            "score": round(float(final_score), 6),
+            "rrf": round(float(rrf_score), 6),
             "sem": round(float(sem_by_id.get(cid, 0.0)), 4),
             "kw": cid in kw_ids,
+            "mtime": r.get("mtime", 0),
+            "modified_at": _iso_from_mtime(r.get("mtime")),
+            "categoria": r.get("categoria") or _cat.de_path(r["path"]),
         })
     return out
 
@@ -406,12 +464,17 @@ def answer_context(query: str, k: int = 5, escopo=None, rerank: bool = False) ->
     # Guard: se o embedding estiver morto (sem OPENAI_API_KEY em runtime), TODO sem
     # vem 0 → cai no gate legado (kw OU sem>=_SEM_MIN) pra NÃO zerar o grounding.
     sem_vivo = any(h["sem"] > 0 for h in hits)
+    has_kw = any(h["kw"] for h in hits)
     blocos = []
     for h in hits:
         if sem_vivo:
             # embedding vivo: piso semântico firme; kw só conta se ainda houver
             # alguma afinidade semântica (mata "match fraco só por palavra").
-            keep = h["sem"] >= _SEM_KEEP or (h["kw"] and h["sem"] >= _SEM_KW_FLOOR)
+            keep = (
+                (h["kw"] and h["sem"] >= _SEM_KW_FLOOR)
+                or (not has_kw and h["sem"] >= _SEM_KEEP)
+                or (has_kw and h["sem"] >= 0.55)
+            )
         else:
             keep = h["kw"] or h["sem"] >= _SEM_MIN     # modo degradado (legado)
         if not keep:

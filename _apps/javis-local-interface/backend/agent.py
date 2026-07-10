@@ -1213,6 +1213,15 @@ def respond(
     # project_id nunca fica indefinido: normaliza e propaga às tools (R2.1).
     _PROJECT_CTX.set(_normalize_project_id(project_id))
 
+    try:
+        import command_router
+        route = command_router.route(user_text or "")
+        if route.get("intent") == "status_sistema":
+            res = actions.execute("status_sistema", user_text)
+            return {"text": res.get("message", ""), "tools": ["status_sistema"]}
+    except Exception:
+        pass
+
     # R2.1 — modo de provider (local | cloud | auto).
     mode = safe_config.provider_mode()
     if mode in ("local", "auto"):

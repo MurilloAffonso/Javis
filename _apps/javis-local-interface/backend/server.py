@@ -1938,6 +1938,8 @@ _FAST_OPEN = {
 def _is_fast_path(intent: str, text: str) -> bool:
     if intent not in FAST_PATH:
         return False
+    if intent == "status_sistema":
+        return True
     if " e " in f" {text.lower()} ":
         return False
     if _looks_like_question(text):

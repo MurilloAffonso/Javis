@@ -23,6 +23,11 @@ from pathlib import Path
 # Prefixos (relativos à raiz do Javis) que contam como PESSOAL. Uma linha de
 # ajuste: hoje só o DNA cognitivo do Murillo. Comparado em minúsculas, com '/'.
 PESSOAL_PREFIXES: tuple[str, ...] = ("_memoria/dna/",)
+VP_PREFIXES: tuple[str, ...] = (
+    "_projetos/cerebro-jampa/",
+    "_projetos/vem-passear/",
+    "_projetos/vempassear/",
+)
 
 # Categoria default para o que é interno do Javis e não é pessoal.
 DEFAULT = "projeto"
@@ -71,4 +76,7 @@ def de_path(path: str) -> str:
     for pre in PESSOAL_PREFIXES:
         if low.startswith(pre):
             return "pessoal"
+    for pre in VP_PREFIXES:
+        if low.startswith(pre):
+            return "vp"
     return DEFAULT
