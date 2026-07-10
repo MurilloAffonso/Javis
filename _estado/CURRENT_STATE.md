@@ -20,21 +20,15 @@
 | **R2.1** | Provider fallback + modo local (`JAVES_PROVIDER_MODE`), fix `project_id` | ✅ **Concluído** |
 | **R2.2** | Consolidação de estado / hardening intermediário | ✅ **Concluído** |
 | **R2.2.1** | Fonte canônica de estado (este arquivo) + priorização | ✅ **Concluído** |
+| **R2.3** | Provider Registry + classificação de falhas + cooldown + `javes doctor` | ✅ **Concluído** |
 
 ---
 
 ## 🎯 PRÓXIMO PASSO OFICIAL
 
-**R2.3 — Provider Registry + `javes doctor`**
+**R3 — Sessões isoladas por `project_id`**
 
-- `provider_registry.py`: providers como dados (id, kind local/cloud, prioridade,
-  `available()`, classificador de erro `rate_limit`/`auth`/`terminal`), cooldown
-  in-memory. `agent.respond()` itera o registry em vez do `if/elif` atual.
-- `scripts/javes_doctor.py`: diagnóstico **read-only** (flags, providers
-  disponíveis, Ollama up + modelo, token "configurado? sim/não" — nunca imprime
-  chave/token/credencial).
-
-> **Não iniciar o R2.3 sem aprovação explícita de Murillo.**
+Histórico, escopo de RAG e approvals chaveados por `project_id` (`history_store.py` hoje é global).
 
 ---
 

@@ -14,11 +14,13 @@ BACKEND_DIR = Path(__file__).resolve().parents[1] / "backend"
 sys.path.insert(0, str(BACKEND_DIR))
 
 import agent  # noqa: E402
+import provider_health  # noqa: E402
 import safe_config  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
-def _clean_provider_env(monkeypatch):
+def _clean_provider_env(monkeypatch, tmp_path):
+    monkeypatch.setattr(provider_health, "STATE_FILE", tmp_path / "provider_health.json")
     for name in (
         "JAVES_PROVIDER_MODE",
         "OPENAI_API_KEY",

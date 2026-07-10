@@ -14,6 +14,9 @@ import contextvars
 
 import actions
 import safe_config
+from provider_errors import ProviderError
+import provider_health
+import provider_registry
 
 # project_id da conversa em curso (R2.1). Normalizado para "javes-core" por padrão
 # e propagado às ferramentas (ex.: buscar_conhecimento) via contextvar, sem
@@ -1197,6 +1200,73 @@ def _respond_ollama(user_text: str, history: list[dict]) -> dict | None:
     return {"text": out, "tools": []}
 
 
+def _provider_for_step(step: str) -> str:
+    if step.startswith("gemini"):
+        return "gemini"
+    if step.startswith("claude"):
+        return "claude"
+    if step == "anthropic":
+        return "claude"
+    return step
+
+
+def _cloud_provider_steps(user_text: str) -> list[str]:
+    steps: list[str] = []
+    fast_brain = (os.environ.get("JAVIS_CHAT_FAST_BRAIN") or "gemini").strip().lower()
+    use_gemini_fast = (
+        fast_brain != "claude"
+        and not _is_heavy_request(user_text)
+        and bool(os.environ.get("GEMINI_API_KEY", "").strip())
+    )
+    if use_gemini_fast:
+        steps.append("gemini_primary")
+    steps.append("claude_subscription")
+    if os.environ.get("OPENAI_API_KEY", "").strip():
+        steps.append("openai")
+    if os.environ.get("ANTHROPIC_API_KEY", "").strip():
+        steps.append("claude_api")
+    if os.environ.get("GEMINI_API_KEY", "").strip() and not use_gemini_fast:
+        steps.append("gemini_fallback")
+    if os.environ.get("OPENROUTER_API_KEY", "").strip():
+        steps.append("openrouter")
+    return steps
+
+
+def _provider_steps(mode: str, user_text: str) -> list[str]:
+    if mode == "local":
+        return provider_registry.selected_provider_ids("local", capability="chat")
+    steps: list[str] = []
+    if mode == "auto":
+        steps.extend(provider_registry.selected_provider_ids("local", capability="chat"))
+    if mode in ("cloud", "auto") and safe_config.external_adapters_enabled():
+        enabled_cloud = set(provider_registry.selected_provider_ids("cloud", capability="chat"))
+        steps.extend(
+            step
+            for step in _cloud_provider_steps(user_text)
+            if _provider_for_step(step) in enabled_cloud
+        )
+    return steps
+
+
+def _respond_provider(step: str, user_text: str, history: list[dict], max_rounds: int) -> dict | None:
+    provider_id = _provider_for_step(step)
+    if provider_id == "ollama":
+        return _respond_ollama(user_text, history)
+    if step == "gemini_primary":
+        return _respond_gemini(user_text, history, max_rounds, fallback_used=False)
+    if step == "gemini_fallback":
+        return _respond_gemini(user_text, history, max_rounds, fallback_used=True)
+    if step == "claude_subscription":
+        return _respond_claude_subscription(user_text, history, max_rounds)
+    if step == "claude_api":
+        return _respond_claude(user_text, history, max_rounds)
+    if provider_id == "openai":
+        return _respond_openai(user_text, history, max_rounds)
+    if provider_id == "openrouter":
+        return _respond_openrouter(user_text, history, max_rounds, fallback_used=True)
+    return None
+
+
 def respond(
     user_text: str,
     history: list[dict] | None = None,
@@ -1222,23 +1292,10 @@ def respond(
     except Exception:
         pass
 
-    # R2.1 — modo de provider (local | cloud | auto).
+    # R2.3 — provider registry + health/cooldown.
     mode = safe_config.provider_mode()
-    if mode in ("local", "auto"):
-        local_out = _respond_ollama(user_text, history)
-        if local_out is not None:
-            return local_out
-        if mode == "local":
-            # Modo local NÃO cai silenciosamente em provider externo.
-            return {
-                "status": "provider_unavailable",
-                "reason": "ollama_unavailable_or_model_missing",
-                "text": _PROVIDER_UNAVAILABLE_MSG,
-                "tools": [],
-            }
-        # mode == "auto": Ollama indisponível → segue para a cadeia cloud abaixo.
-
-    if not safe_config.external_adapters_enabled():
+    provider_steps = _provider_steps(mode, user_text)
+    if not provider_steps and mode in ("cloud", "auto") and not safe_config.external_adapters_enabled():
         return {
             "text": safe_config.disabled_message(
                 "external_adapters",
@@ -1247,60 +1304,33 @@ def respond(
             "tools": [],
         }
 
-    # 0) Conversa leve → Gemini grátis primeiro (rápido). Pesado pula direto pro
-    #    Claude assinatura. Gemini ainda pode chamar ferramentas (incl.
-    #    pensar_profundo) quando a própria mensagem leve precisar. Desligar com
-    #    JAVIS_CHAT_FAST_BRAIN=claude.
-    fast_brain = os.environ.get("JAVIS_CHAT_FAST_BRAIN", "gemini").strip().lower()
-    if (fast_brain == "gemini"
-            and os.environ.get("GEMINI_API_KEY", "").strip()
-            and not _is_heavy_request(user_text)):
+    for step in provider_steps:
+        provider_id = _provider_for_step(step)
         try:
-            return _respond_gemini(user_text, history, max_rounds, fallback_used=False)
+            out = _respond_provider(step, user_text, history, max_rounds)
+            if out is not None:
+                provider_health.record_success(provider_id)
+                return out
+            provider_health.record_failure(provider_id, ProviderError("unavailable", "unavailable"))
         except Exception as e:
-            _log(f"Gemini (chat rápido) falhou, caindo no Claude assinatura: {e}")
+            err = provider_health.record_failure(provider_id, e)
+            _log(f"{provider_id} falhou ({err.error_type}), tentando próximo.")
+            continue
 
-    # 1) Claude pela assinatura — primário (sem custo de API)
-    try:
-        out = _respond_claude_subscription(user_text, history, max_rounds)
-        if out is not None:
-            return out
-    except Exception as e:
-        _log(f"Claude (assinatura) falhou, tentando próximo: {e}")
+    if mode == "local":
+        return {
+            "status": "provider_unavailable",
+            "reason": "ollama_unavailable_or_model_missing",
+            "text": _PROVIDER_UNAVAILABLE_MSG,
+            "tools": [],
+        }
 
-    # 2) OpenAI — só se a assinatura estiver indisponível
-    if os.environ.get("OPENAI_API_KEY", "").strip():
-        try:
-            return _respond_openai(user_text, history, max_rounds)
-        except Exception as e:
-            _log(f"OpenAI (tool-use) falhou, tentando próximo: {e}")
-
-    # 3) Claude (Anthropic API) — se tiver crédito
-    if os.environ.get("ANTHROPIC_API_KEY", "").strip():
-        try:
-            return _respond_claude(user_text, history, max_rounds)
-        except Exception as e:
-            _log(f"Claude (tool-use) falhou, tentando próximo: {e}")
-
-    # 4) Gemini — grátis (1.500 req/dia), key sem cartão em aistudio.google.com
-    if os.environ.get("GEMINI_API_KEY", "").strip():
-        try:
-            return _respond_gemini(user_text, history, max_rounds, fallback_used=True)
-        except Exception as e:
-            _log(f"Gemini (tool-use) falhou, tentando próximo: {e}")
-
-    # 5) OpenRouter — requer cartão cadastrado em openrouter.ai
-    if os.environ.get("OPENROUTER_API_KEY", "").strip():
-        try:
-            return _respond_openrouter(user_text, history, max_rounds, fallback_used=True)
-        except Exception as e:
-            safe_error = _sanitize_telemetry_error(e) or type(e).__name__
-            _log(f"OpenRouter (tool-use) falhou: {safe_error}")
+    if mode in ("cloud", "auto"):
+        if provider_health.is_in_cooldown("openrouter"):
             return {
                 "text": _PROVIDER_UNAVAILABLE_MSG,
                 "tools": [],
             }
-
     return None
 
 

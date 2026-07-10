@@ -18,13 +18,15 @@ BACKEND_DIR = Path(__file__).resolve().parents[1] / "backend"
 sys.path.insert(0, str(BACKEND_DIR))
 
 import agent
+import provider_health
 
 
 @pytest.fixture(autouse=True)
-def zero_network_and_clean_env(monkeypatch):
+def zero_network_and_clean_env(monkeypatch, tmp_path):
     def blocked(*_args, **_kwargs):
         raise AssertionError("rede bloqueada pelo teste offline")
 
+    monkeypatch.setattr(provider_health, "STATE_FILE", tmp_path / "provider_health.json")
     monkeypatch.setattr(socket, "create_connection", blocked)
     monkeypatch.setattr(socket.socket, "connect", blocked)
     monkeypatch.setattr(socket.socket, "connect_ex", blocked)
@@ -34,10 +36,14 @@ def zero_network_and_clean_env(monkeypatch):
         "OPENROUTER_API_KEY",
         "GEMINI_API_KEY",
         "JAVIS_CHAT_FAST_BRAIN",
+        "JAVES_PROVIDER_MODE",
+        "JAVIS_ENABLE_EXTERNAL_ADAPTERS",
         "JAVIS_ALLOW_LIVE_OPENROUTER_TEST",
         "JAVIS_OPENROUTER_BENCHMARK_MAX_USD",
     ):
         monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("JAVES_PROVIDER_MODE", "cloud")
+    monkeypatch.setenv("JAVIS_ENABLE_EXTERNAL_ADAPTERS", "true")
 
 
 def test_ausencia_de_chave_pula_provedores_api(monkeypatch):
