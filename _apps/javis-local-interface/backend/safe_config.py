@@ -20,6 +20,7 @@ JAVIS_ENABLE_BROWSER = "JAVIS_ENABLE_BROWSER"
 JAVIS_ENABLE_TELEGRAM = "JAVIS_ENABLE_TELEGRAM"
 JAVIS_ENABLE_MCP = "JAVIS_ENABLE_MCP"
 JAVIS_ENABLE_LOCAL_ACTIONS = "JAVIS_ENABLE_LOCAL_ACTIONS"
+JAVIS_ENABLE_SUPERVISED_EXEC = "JAVIS_ENABLE_SUPERVISED_EXEC"
 JAVIS_ENABLE_VP_EFFECTS = "JAVIS_ENABLE_VP_EFFECTS"
 JAVIS_DEV_ALLOW_CORS = "JAVIS_DEV_ALLOW_CORS"
 
@@ -68,6 +69,12 @@ def local_actions_enabled() -> bool:
     return flag(JAVIS_ENABLE_LOCAL_ACTIONS, False)
 
 
+def supervised_execution_enabled() -> bool:
+    """Executor supervisionado em worktree (R4). Desligado por padrão; a R4.1 é
+    só fundação (nenhum agente roda mesmo com a flag ligada)."""
+    return flag(JAVIS_ENABLE_SUPERVISED_EXEC, False)
+
+
 def vp_effects_enabled() -> bool:
     return flag(JAVIS_ENABLE_VP_EFFECTS, False)
 
@@ -113,6 +120,7 @@ EXPECTED_FLAGS = [
     JAVIS_ENABLE_TELEGRAM,
     JAVIS_ENABLE_MCP,
     JAVIS_ENABLE_LOCAL_ACTIONS,
+    JAVIS_ENABLE_SUPERVISED_EXEC,
     JAVIS_ENABLE_VP_EFFECTS,
     JAVIS_DEV_ALLOW_CORS,
 ]

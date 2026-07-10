@@ -372,6 +372,90 @@ class _TaskEvents:
         return db.count("task_events", "task_id=?", (task_id,))
 
 
+class _ExecutionTasks:
+    """Executor supervisionado (R4.1). Toda leitura/alteração filtra
+    task_id + project_id — nunca há consulta operacional sem project_id."""
+
+    _COLS = (
+        "task_id", "project_id", "executor", "objective", "repository_path",
+        "source_branch", "work_branch", "worktree_path", "approval_id",
+        "merge_approval_id", "status", "started_at", "finished_at",
+        "timeout_seconds", "result_path", "diff_path", "test_report_path",
+        "last_error",
+    )
+
+    def create(self, *, task_id: str, project_id: str, executor: str, objective: str,
+               repository_path: str, source_branch: str, work_branch: str,
+               worktree_path: str, status: str = "draft",
+               timeout_seconds: int = 900, approval_id: int | None = None,
+               merge_approval_id: int | None = None) -> str:
+        db.execute(
+            "INSERT INTO execution_tasks(task_id, project_id, executor, objective, "
+            "repository_path, source_branch, work_branch, worktree_path, status, "
+            "timeout_seconds, approval_id, merge_approval_id) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            (task_id, project_id, executor, objective, repository_path, source_branch,
+             work_branch, worktree_path, status, timeout_seconds, approval_id,
+             merge_approval_id),
+        )
+        return task_id
+
+    def get(self, task_id: str, project_id: str) -> dict | None:
+        return db.query_one(
+            "SELECT * FROM execution_tasks WHERE task_id=? AND project_id=?",
+            (task_id, project_id),
+        )
+
+    def list_by_project(self, project_id: str, status: str = "") -> list[dict]:
+        if status:
+            return db.query(
+                "SELECT * FROM execution_tasks WHERE project_id=? AND status=? ORDER BY created_at DESC",
+                (project_id, status),
+            )
+        return db.query(
+            "SELECT * FROM execution_tasks WHERE project_id=? ORDER BY created_at DESC",
+            (project_id,),
+        )
+
+    def update_status(self, task_id: str, project_id: str, status: str) -> int:
+        return db.execute_rowcount(
+            "UPDATE execution_tasks SET status=? WHERE task_id=? AND project_id=?",
+            (status, task_id, project_id),
+        )
+
+    def set_workspace(self, task_id: str, project_id: str, *, work_branch: str,
+                      worktree_path: str, started_at: str | None = None) -> int:
+        return db.execute_rowcount(
+            "UPDATE execution_tasks SET work_branch=?, worktree_path=?, "
+            "started_at=COALESCE(?, started_at) WHERE task_id=? AND project_id=?",
+            (work_branch, worktree_path, started_at, task_id, project_id),
+        )
+
+    def set_error(self, task_id: str, project_id: str, last_error: str) -> int:
+        return db.execute_rowcount(
+            "UPDATE execution_tasks SET last_error=? WHERE task_id=? AND project_id=?",
+            (last_error, task_id, project_id),
+        )
+
+    def set_result_paths(self, task_id: str, project_id: str, *, result_path: str = "",
+                         diff_path: str = "", test_report_path: str = "",
+                         finished_at: str | None = None) -> int:
+        return db.execute_rowcount(
+            "UPDATE execution_tasks SET result_path=COALESCE(NULLIF(?,''), result_path), "
+            "diff_path=COALESCE(NULLIF(?,''), diff_path), "
+            "test_report_path=COALESCE(NULLIF(?,''), test_report_path), "
+            "finished_at=COALESCE(?, finished_at) WHERE task_id=? AND project_id=?",
+            (result_path, diff_path, test_report_path, finished_at, task_id, project_id),
+        )
+
+    def count_active(self) -> int:
+        """Contagem global de tarefas NÃO terminais (para o doctor; sem conteúdo)."""
+        return db.count(
+            "execution_tasks",
+            "status NOT IN ('completed','blocked','failed','timed_out','canceled','review_rejected')",
+        )
+
+
 # instâncias prontas pra uso
 messages  = _Messages()
 tasks     = _Tasks()
@@ -383,3 +467,4 @@ workflows = _Workflows()
 memories  = _Memories()
 content   = _Content()
 task_events = _TaskEvents()
+execution_tasks = _ExecutionTasks()

@@ -22,26 +22,34 @@
 | **R2.2.1** | Fonte canônica de estado (este arquivo) + priorização | ✅ **Concluído** |
 | **R2.3** | Provider Registry + classificação de falhas + cooldown + `javes doctor` | ✅ **Concluído** |
 | **R3** | Sessões, histórico e memória isolados por `project_id` | ✅ **Concluído** |
+| **R3.1** | Fechamento do escopo: tasks/approvals sempre por `project_id` + estado interno fora do prompt do Jampa | ✅ **Concluído** |
+| **R4.1** | Fundação do executor supervisionado: `execution_task` + `worktree_manager` + `execution_policy` (nenhum agente roda) | ✅ **Concluído** |
+
+> **Executor ainda DESLIGADO.** A R4.1 é só fundação: nenhum agente é executado,
+> o fluxo atual de execução não foi alterado, e `JAVIS_ENABLE_SUPERVISED_EXEC`
+> continua `False`.
 
 ---
 
 ## 🎯 PRÓXIMO PASSO OFICIAL
 
-**R4 — Codex supervisionado em worktree/sandbox**
+**R4.2 — Adapters supervisionados + approval persistido + result collector**
 
-Execução do Codex em worktree/sandbox descartável, com aprovação humana e auditoria antes de qualquer merge no repo vivo.
+`CodexAdapter`/`ClaudeCodeAdapter` sobre a fundação R4.1 (mesmo contrato), consumo
+do approval persistido (2 gates: exec e merge) e `result_collector` com diff/test
+report sanitizados. Nada roda no repo vivo — só na worktree isolada.
 
 ---
 
 ## Fases seguintes (ordem oficial)
 
-1. **R4 — Codex supervisionado em worktree/sandbox**
-   Execução (`code_agent.py`/`claude_exec.py`) roda em **git worktree**
-   descartável, não no repo vivo; merge só após aprovação. Codex como
-   especialista atrás de approval + sandbox + auditoria Claude. Docker opcional,
-   nunca default.
+1. **R4.2 — Adapters + approval persistido + result collector** (próximo passo acima).
 
-2. **Integrações externas e canais**
+2. **R4.3 — Endurecimento adicional / sandbox opcional**
+   Bloqueio de rede real (Docker `--network none` opcional, nunca default),
+   limites de recurso e hardening extra do executor.
+
+3. **Integrações externas e canais**
    Browser, Telegram, WhatsApp, MCP e automações externas só depois da R4,
    sempre atrás de default-deny, approval e escopo explícito.
 
