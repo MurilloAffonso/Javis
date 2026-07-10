@@ -95,4 +95,45 @@ sensíveis completos.
 ## Flag
 
 `JAVIS_ENABLE_SUPERVISED_EXEC` — default **False**. Nesta fase, mesmo ligada,
-nenhum agente roda (não há adapter). Ligar de verdade só faz sentido na R4.2.
+nenhum agente roda (não há adapter). Ligar de verdade só faz sentido na R4.2B.
+
+---
+
+# R4.2A — Gates de aprovação + coleta de resultados
+
+Ainda **sem executar agente e sem fazer merge**. Adiciona os dois gates humanos e
+a coleta segura de resultados sobre a fundação R4.1.
+
+## Dois gates de aprovação (`execution/execution_approvals.py`)
+
+- **Gate 1 — `execution.start`**: `request_execution_start` cria a aprovação
+  (pending) e leva `draft → pending_approval`; `approve_execution_start` consome a
+  aprovação (single-use) e leva `pending_approval → approved`.
+- **Gate 2 — `execution.merge`**: `request_merge` cria uma aprovação **separada**;
+  `approve_merge` consome e leva `awaiting_review → approved_for_merge` e preenche
+  `merge_approval_id`. **Não faz merge** (isso é R4.2B).
+
+Invariantes: a aprovação precisa estar amarrada à **mesma task e ao mesmo
+`project_id`** (ação + `task_id` + `project_id` conferem); é **single-use**
+(consumida via `repo.approvals.consume`); execução e merge usam aprovações
+**diferentes**; o estado **não muda** sem aprovação válida.
+
+## Coleta de resultados (`execution/result_collector.py`)
+
+`ResultCollector.collect(task_id, project_id, worktree, stdout, stderr, test_report)`:
+- **sanitiza** (token/Authorization/credencial-em-URL/segredo) e **trunca** stdout,
+  stderr, diff e relatório de testes (tetos `MAX_STREAM_CHARS`/`MAX_DIFF_CHARS`);
+- coleta `git status`, `git diff --stat`, diff completo (limitado) e a lista de
+  arquivos alterados (validados como **dentro** da worktree);
+- grava numa **raiz de resultados controlada, fora do repo**
+  (`<desktop>/javis-exec-results/<task_id>`, override `JAVIS_EXEC_RESULTS_ROOT`),
+  com o path reconstruído a partir do `task_id`;
+- persiste `result_path`/`diff_path`/`test_report_path` na `execution_task`
+  (filtrado por `task_id`+`project_id`) e devolve **só paths + contagens** — nunca
+  conteúdo bruto ou segredo.
+
+## Doctor (R4.2A)
+
+Novas contagens (só números): `awaiting_execution_approval` (pending_approval),
+`awaiting_review`, `awaiting_merge_approval` (approved_for_merge, aguardando o
+merge da R4.2B) e `failed_execution_tasks` (failed + timed_out).

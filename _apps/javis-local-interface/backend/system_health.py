@@ -33,6 +33,11 @@ def _execution_stats() -> dict:
         "active_worktrees": 0,
         "orphan_worktrees": 0,
         "worktree_root_configured": False,
+        # R4.2A — filas de aprovação/review (só contagens)
+        "awaiting_execution_approval": 0,
+        "awaiting_merge_approval": 0,
+        "awaiting_review": 0,
+        "failed_execution_tasks": 0,
     }
     try:
         from execution import worktree_manager as wm
@@ -49,7 +54,14 @@ def _execution_stats() -> dict:
         if has_tbl:
             stats["execution_schema_present"] = True
             import repositories as repo
-            stats["active_execution_tasks"] = repo.execution_tasks.count_active()
+            et = repo.execution_tasks
+            stats["active_execution_tasks"] = et.count_active()
+            # filas por estado (awaiting_merge_approval = já aprovado p/ merge,
+            # aguardando o passo de merge, que chega na R4.2B)
+            stats["awaiting_execution_approval"] = et.count_by_status("pending_approval")
+            stats["awaiting_review"] = et.count_by_status("awaiting_review")
+            stats["awaiting_merge_approval"] = et.count_by_status("approved_for_merge")
+            stats["failed_execution_tasks"] = et.count_by_statuses(("failed", "timed_out"))
             db_ids = {r["task_id"] for r in db.query("SELECT task_id FROM execution_tasks")}
             stats["orphan_worktrees"] = len(disk_ids - db_ids)
     except Exception:
@@ -164,6 +176,10 @@ def render_text(data: dict) -> str:
         f"- worktree_root_configured: {data.get('worktree_root_configured', False)}",
         f"- active_worktrees: {data.get('active_worktrees', 0)}",
         f"- orphan_worktrees: {data.get('orphan_worktrees', 0)}",
+        f"- awaiting_execution_approval: {data.get('awaiting_execution_approval', 0)}",
+        f"- awaiting_merge_approval: {data.get('awaiting_merge_approval', 0)}",
+        f"- awaiting_review: {data.get('awaiting_review', 0)}",
+        f"- failed_execution_tasks: {data.get('failed_execution_tasks', 0)}",
         "- providers:",
     ]
     for item in data["providers"]:
