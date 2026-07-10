@@ -94,8 +94,8 @@ sensíveis completos.
 
 ## Flag
 
-`JAVIS_ENABLE_SUPERVISED_EXEC` — default **False**. Nesta fase, mesmo ligada,
-nenhum agente roda (não há adapter). Ligar de verdade só faz sentido na R4.2B.
+`JAVIS_ENABLE_SUPERVISED_EXEC` — default **False**. Na R4.2B, execução real só
+deve ser ligada em ambiente controlado e explícito; merge continua fora do escopo.
 
 ---
 
@@ -111,7 +111,7 @@ a coleta segura de resultados sobre a fundação R4.1.
   aprovação (single-use) e leva `pending_approval → approved`.
 - **Gate 2 — `execution.merge`**: `request_merge` cria uma aprovação **separada**;
   `approve_merge` consome e leva `awaiting_review → approved_for_merge` e preenche
-  `merge_approval_id`. **Não faz merge** (isso é R4.2B).
+  `merge_approval_id`. **Não faz merge** (isso é R4.2C).
 
 Invariantes: a aprovação precisa estar amarrada à **mesma task e ao mesmo
 `project_id`** (ação + `task_id` + `project_id` conferem); é **single-use**
@@ -136,4 +136,63 @@ Invariantes: a aprovação precisa estar amarrada à **mesma task e ao mesmo
 
 Novas contagens (só números): `awaiting_execution_approval` (pending_approval),
 `awaiting_review`, `awaiting_merge_approval` (approved_for_merge, aguardando o
-merge da R4.2B) e `failed_execution_tasks` (failed + timed_out).
+merge da R4.2C) e `failed_execution_tasks` (failed + timed_out).
+
+---
+
+# R4.2B — Adapters supervisionados em worktree
+
+A R4.2B conecta adapters supervisionados à fundação segura, mas a execução continua desligada por padrão por `JAVIS_ENABLE_SUPERVISED_EXEC=False`. Nenhum merge é implementado nesta fase.
+
+## Fluxo
+
+Quando a flag for injetada explicitamente em ambiente de teste/controlado, o serviço `execution/execution_service.py` conduz:
+
+```
+approved → preparing_workspace → running → testing → awaiting_review
+```
+
+O fluxo para obrigatoriamente em `awaiting_review`. `approved_for_merge`, merge real e Command Center ficam para a R4.2C.
+
+## Adapters
+
+`execution/executor_adapter.py` define um contrato comum:
+
+- entrada: `task_id`, `project_id`, `objective`, `worktree_path`, `timeout_seconds`, `prompt_path`, `executor`;
+- saída: `exit_code`, `status`, `stdout`, `stderr`, `timed_out`, `duration_ms`, `command_summary`.
+
+`ClaudeCodeAdapter` roda apenas com ferramentas de leitura/edição/escrita (`Read,Edit,Write`) e não recebe Bash, browser, MCP ou diretórios externos. Os testes são executados pelo Javes depois, não pelo modelo.
+
+`CodexAdapter` exige sandbox `workspace-write` verificado. Como `codex exec --help` não pôde ser inspecionado pelo allowlist local durante esta fase, o adapter falha fechado por padrão com `secure_codex_sandbox_unavailable` até que um help compatível seja injetado/verificado em ambiente controlado.
+
+## Subprocesso e ambiente
+
+`execution/process_utils.py` centraliza subprocesso com:
+
+- `argv` estruturado e `shell=False`;
+- `cwd` validado e fixo na worktree;
+- timeout com kill da árvore de processos no Windows;
+- remoção de `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE` e correlatos;
+- remoção de variáveis com token/chave/segredo;
+- stdout/stderr sanitizados e truncados antes de persistir.
+
+## Test Runner
+
+`execution/test_runner.py` recebe lista explícita criada pela tarefa e permite somente:
+
+- `python -m py_compile <arquivos explícitos>`;
+- `python -m pytest -q <testes explícitos>`.
+
+O runner aplica `execution_policy` antes de cada comando e bloqueia pytest sem alvo, flags arbitrárias, paths fora da worktree, instalação, rede e servidor.
+
+## Evidência e estados finais
+
+`result_collector` é chamado quando existe worktree válida, inclusive em falha. Worktrees são preservadas em `failed`, `timed_out`, `awaiting_review` e `review_rejected`. Estados finais desta fase: `awaiting_review`, `failed`, `timed_out` ou `blocked` por pré-condição.
+
+## Doctor (R4.2B)
+
+O doctor mostra somente contagens passivas: `supervised_adapters_present`, `executions_running`, `executions_testing`, `executions_timed_out`, `executions_awaiting_review`. Não mostra objective, prompt, stdout, stderr, diff nem paths completos.
+
+## Caminhos antigos
+
+`code_agent.py`, `claude_exec.py`, `orchestrator.py`, `brain_switch.py` e `delegacao.py` não foram conectados ao novo serviço. Continuam atrás das flags existentes e serão aposentados/conectados somente na R4.2C.
