@@ -43,6 +43,8 @@ def test_doctor_conta_filas():
     _mk("approved_for_merge")
     _mk("failed")
     _mk("timed_out")
+    conflict = _mk("review_rejected")
+    repo.execution_tasks.set_error(conflict, CORE, "merge_conflict")
     _mk("completed")  # terminal, não entra em nenhuma fila ativa
     stats = system_health._execution_stats()
     assert stats["awaiting_execution_approval"] == 1
@@ -55,6 +57,10 @@ def test_doctor_conta_filas():
     assert stats["executions_testing"] == 1
     assert stats["executions_timed_out"] == 1
     assert stats["executions_awaiting_review"] == 1
+    assert stats["approved_for_merge"] == 1
+    assert stats["merge_conflicts"] == 1
+    assert stats["completed_execution_tasks"] == 1
+    assert "preserved_worktrees" in stats
 
 
 def test_doctor_render_so_contagens_sem_conteudo():
@@ -79,6 +85,10 @@ def test_doctor_render_so_contagens_sem_conteudo():
     assert "executions_testing:" in text
     assert "executions_timed_out:" in text
     assert "executions_awaiting_review:" in text
+    assert "approved_for_merge:" in text
+    assert "merge_conflicts:" in text
+    assert "completed_execution_tasks:" in text
+    assert "preserved_worktrees:" in text
     # nunca imprime objetivo/stdout/diff
     assert "NAO_DEVE_VAZAR" not in text
     assert "objective" not in text.lower()

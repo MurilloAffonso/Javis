@@ -143,7 +143,7 @@ def request_merge(task_id: str, project_id: str) -> dict:
 
 def approve_merge(task_id: str, project_id: str, merge_approval_id: int) -> dict:
     """awaiting_review → approved_for_merge SOMENTE com aprovação de merge válida.
-    NÃO executa o merge (isso é R4.2B). Exige aprovação DIFERENTE da de execução."""
+    NÃO executa o merge (isso é R4.2C1). Exige aprovação DIFERENTE da de execução."""
     repo = _repo()
     task = _load_task(task_id, project_id)
     tid, pid = task["task_id"], task["project_id"]
@@ -167,7 +167,7 @@ def approve_merge(task_id: str, project_id: str, merge_approval_id: int) -> dict
     repo.execution_tasks.set_merge_approval(tid, pid, merge_approval_id)
     repo.execution_tasks.update_status(tid, pid, et.APPROVED_FOR_MERGE)
     _journey(tid, "merge_approved",
-             f"Merge aprovado (approval {merge_approval_id}) — merge real é R4.2B",
+             f"Merge aprovado (approval {merge_approval_id}) — merge real é R4.2C1",
              {"merge_approval_id": merge_approval_id})
     _log(ACTION_MERGE, f"merge {tid}: aprovado via approval {merge_approval_id} (sem merge)", True)
     return {"task_id": tid, "project_id": pid, "merge_approval_id": merge_approval_id,

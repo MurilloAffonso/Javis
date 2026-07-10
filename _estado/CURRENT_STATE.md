@@ -26,35 +26,33 @@
 | **R4.1** | Fundação do executor supervisionado: `execution_task` + `worktree_manager` + `execution_policy` (nenhum agente roda) | ✅ **Concluído** |
 | **R4.2A** | Dois gates de aprovação (`execution.start`/`execution.merge`, single-use, escopados) + `result_collector` sanitizado/truncado (sem adapters, sem merge) | ✅ **Concluído** |
 | **R4.2B** | Adapters supervisionados (`CodexAdapter`/`ClaudeCodeAdapter`) + `execution_service` até `awaiting_review` (sem merge) | ✅ **Concluído** |
+| **R4.2C1** | Merge local controlado apos segundo approval persistido, com protecao `source_commit` (sem chat/orchestrator/Command Center) | Concluido |
 
-> **Executor ainda DESLIGADO.** R4.1/R4.2A/R4.2B são fundação + gates + adapters
-> supervisionados: nenhum agente real roda por default, nenhum merge é feito, o fluxo atual de execução não foi alterado, e
+> **Executor ainda DESLIGADO.** R4.1/R4.2A/R4.2B/R4.2C1 sao fundacao + gates + adapters + merge local
+> controlado: nenhum agente real roda por default, o fluxo atual de execucao nao foi alterado, e
 > `JAVIS_ENABLE_SUPERVISED_EXEC` continua `False`.
-
 ---
 
-## 🎯 PRÓXIMO PASSO OFICIAL
+## PROXIMO PASSO OFICIAL
 
-**R4.2C — revisão, merge controlado e Command Center**
+**R4.2C2 - integracao segura com orchestrator e Command Center**
 
-Revisar resultados em `awaiting_review`, implementar merge controlado somente
-após aprovação humana específica e conectar o Command Center ao fluxo seguro.
-
+Conectar o fluxo seguro ao orchestrator e ao Command Center sem execucao automatica,
+mantendo approval explicito, project_id e default-deny.
 ---
 
 ## Fases seguintes (ordem oficial)
 
-1. **R4.2C — revisão, merge controlado e Command Center** (próximo passo acima).
+1. **R4.2C2 - integracao segura com orchestrator e Command Center** (proximo passo acima).
 
-2. **R4.3 — Endurecimento adicional / sandbox opcional**
+2. **R4.3 - Endurecimento adicional / sandbox opcional**
    Bloqueio de rede real (Docker `--network none` opcional, nunca default),
    limites de recurso e hardening extra do executor.
 
-3. **Modo Madrugada e integrações externas/canais**
-   Modo Madrugada somente depois da R4.2C e testes controlados; browser,
-   Telegram, WhatsApp, MCP e automações externas só depois da R4,
-   sempre atrás de default-deny, approval e escopo explícito.
-
+3. **Modo Madrugada e integracoes externas/canais**
+   Modo Madrugada somente depois da R4.2C2 e testes controlados; browser,
+   Telegram, WhatsApp, MCP e automacoes externas so depois da R4,
+   sempre atras de default-deny, approval e escopo explicito.
 ---
 
 ## Invariantes preservadas (não regridem)

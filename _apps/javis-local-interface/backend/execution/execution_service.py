@@ -101,6 +101,7 @@ class ExecutionService:
                 pid,
                 work_branch=workspace["work_branch"],
                 worktree_path=worktree_path,
+                source_commit=workspace.get("source_commit", ""),
                 started_at=_utc_now(),
             )
             self._transition(task, et.RUNNING)

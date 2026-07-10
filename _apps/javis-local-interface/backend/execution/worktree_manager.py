@@ -141,6 +141,16 @@ class WorktreeManager:
         rc, _, _ = self._git(repo, ["rev-parse", "--verify", "--quiet", f"refs/heads/{branch}"])
         return rc == 0
 
+    def branch_head(self, repository_path, branch: str) -> str:
+        repo = self.validate_repository_path(repository_path)
+        branch = (branch or "").strip()
+        if not branch:
+            raise GitStateError("source_branch vazio")
+        rc, out, err = self._git(repo, ["rev-parse", "--verify", branch])
+        if rc != 0:
+            raise GitStateError(f"source_branch inexistente: {sanitize(branch)}")
+        return out.strip()
+
     # ── create ────────────────────────────────────────────────────────────
     def create(self, task_id: str, repository_path, source_branch: str,
                project_id: str | None = None, idempotent: bool = False) -> dict:
@@ -149,6 +159,7 @@ class WorktreeManager:
         source_branch = (source_branch or "").strip()
         if not source_branch:
             raise GitStateError("source_branch vazio")
+        source_commit = self.branch_head(repo, source_branch)
         work_branch = et.validate_work_branch(et.branch_for(tid))
         worktree_path = self.worktree_path_for(tid)
         pid = et.normalize_project_id(project_id)
@@ -178,6 +189,7 @@ class WorktreeManager:
             "project_id": pid,
             "repository_path": str(repo),
             "source_branch": source_branch,
+            "source_commit": source_commit,
             "work_branch": work_branch,
             "worktree_path": str(worktree_path),
         }

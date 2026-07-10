@@ -378,7 +378,7 @@ class _ExecutionTasks:
 
     _COLS = (
         "task_id", "project_id", "executor", "objective", "repository_path",
-        "source_branch", "work_branch", "worktree_path", "approval_id",
+        "source_branch", "source_commit", "work_branch", "worktree_path", "approval_id",
         "merge_approval_id", "status", "started_at", "finished_at",
         "timeout_seconds", "result_path", "diff_path", "test_report_path",
         "last_error",
@@ -388,14 +388,15 @@ class _ExecutionTasks:
                repository_path: str, source_branch: str, work_branch: str,
                worktree_path: str, status: str = "draft",
                timeout_seconds: int = 900, approval_id: int | None = None,
-               merge_approval_id: int | None = None) -> str:
+               merge_approval_id: int | None = None,
+               source_commit: str = "") -> str:
         db.execute(
             "INSERT INTO execution_tasks(task_id, project_id, executor, objective, "
-            "repository_path, source_branch, work_branch, worktree_path, status, "
+            "repository_path, source_branch, source_commit, work_branch, worktree_path, status, "
             "timeout_seconds, approval_id, merge_approval_id) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (task_id, project_id, executor, objective, repository_path, source_branch,
-             work_branch, worktree_path, status, timeout_seconds, approval_id,
+             source_commit, work_branch, worktree_path, status, timeout_seconds, approval_id,
              merge_approval_id),
         )
         return task_id
@@ -424,11 +425,19 @@ class _ExecutionTasks:
         )
 
     def set_workspace(self, task_id: str, project_id: str, *, work_branch: str,
-                      worktree_path: str, started_at: str | None = None) -> int:
+                      worktree_path: str, started_at: str | None = None,
+                      source_commit: str = "") -> int:
         return db.execute_rowcount(
             "UPDATE execution_tasks SET work_branch=?, worktree_path=?, "
+            "source_commit=COALESCE(NULLIF(?,''), source_commit), "
             "started_at=COALESCE(?, started_at) WHERE task_id=? AND project_id=?",
-            (work_branch, worktree_path, started_at, task_id, project_id),
+            (work_branch, worktree_path, source_commit, started_at, task_id, project_id),
+        )
+
+    def set_source_commit(self, task_id: str, project_id: str, source_commit: str) -> int:
+        return db.execute_rowcount(
+            "UPDATE execution_tasks SET source_commit=? WHERE task_id=? AND project_id=?",
+            (source_commit, task_id, project_id),
         )
 
     def set_error(self, task_id: str, project_id: str, last_error: str) -> int:
