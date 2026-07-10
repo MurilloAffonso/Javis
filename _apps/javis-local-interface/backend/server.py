@@ -336,6 +336,27 @@ class ChatRequest(BaseModel):
     model: str = "claude"
 
 
+class ExecutionTaskCreateRequest(BaseModel):
+    objective: str
+    project_id: str = ""
+    executor: str = "codex"
+    timeout_seconds: int = 900
+
+
+class ExecutionProjectRequest(BaseModel):
+    project_id: str = ""
+
+
+class ExecutionApprovalRequest(BaseModel):
+    project_id: str = ""
+    approval_id: int | None = None
+
+
+class ExecutionStartRequest(BaseModel):
+    project_id: str = ""
+    test_commands: list[list[str]] = []
+
+
 def _normalize_project_id(project_id: str | None) -> str:
     return (project_id or "").strip() or gate.CORE_SCOPE
 
@@ -362,6 +383,20 @@ def _resolve_session(project_id: str, session_id: str = "", create_if_missing: b
 def _session_error_response(error: dict):
     code = 404 if error.get("status") == "not_found" else 403
     return JSONResponse(error, status_code=code)
+
+
+def _execution_facade():
+    from execution.execution_facade import ExecutionFacade
+    return ExecutionFacade()
+
+
+def _execution_response(payload: dict, ok_code: int = 200):
+    status = payload.get("status", "")
+    if status == "not_found":
+        return JSONResponse(payload, status_code=404)
+    if status in ("blocked", "failed", "timed_out", "review_rejected"):
+        return JSONResponse(payload, status_code=403)
+    return JSONResponse(payload, status_code=ok_code)
 
 
 @app.get("/")
@@ -991,6 +1026,189 @@ async def exec_status():
         return JSONResponse({"running": False, "task": "", "pasta": None,
                              "started_at": None, "exit_code": None,
                              "lines": [], "total_lines": 0, "error": str(e)})
+
+
+@app.get("/execution/tasks")
+async def execution_tasks_list(
+    project_id: str = "",
+    status: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _local_auth_gate(x_javes_local_token, "execution.tasks.list")
+    if blocked:
+        return _gate_json(blocked)
+    pid = _normalize_project_id(project_id)
+    blocked = gate.require_project_scope(pid, scope=[gate.CORE_SCOPE, gate.CEREBRO_JAMPA_SCOPE])
+    if blocked:
+        return _gate_json(blocked)
+    items = _execution_facade().list_tasks(pid, status=status or None)
+    return JSONResponse({
+        "tasks": items,
+        "total": len(items),
+        "project_id": pid,
+        "supervised_execution_enabled": safe_config.supervised_execution_enabled(),
+    })
+
+
+@app.post("/execution/tasks")
+async def execution_tasks_create(
+    req: ExecutionTaskCreateRequest,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _local_auth_gate(x_javes_local_token, "execution.tasks.create")
+    if blocked:
+        return _gate_json(blocked)
+    pid = _normalize_project_id(req.project_id)
+    blocked = gate.require_project_scope(pid, scope=[gate.CORE_SCOPE, gate.CEREBRO_JAMPA_SCOPE])
+    if blocked:
+        return _gate_json(blocked)
+    try:
+        out = _execution_facade().create_task(
+            objective=req.objective,
+            project_id=pid,
+            executor=req.executor,
+            timeout_seconds=req.timeout_seconds,
+        )
+    except Exception as exc:
+        return _execution_response({"status": "blocked", "reason": str(exc)})
+    return _execution_response(out, ok_code=201)
+
+
+@app.get("/execution/tasks/{task_id}")
+async def execution_tasks_get(
+    task_id: str,
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _local_auth_gate(x_javes_local_token, "execution.tasks.get")
+    if blocked:
+        return _gate_json(blocked)
+    pid = _normalize_project_id(project_id)
+    return _execution_response(_execution_facade().get_task(task_id, pid))
+
+
+@app.get("/execution/tasks/{task_id}/result")
+async def execution_tasks_result(
+    task_id: str,
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _local_auth_gate(x_javes_local_token, "execution.tasks.result")
+    if blocked:
+        return _gate_json(blocked)
+    pid = _normalize_project_id(project_id)
+    return _execution_response(_execution_facade().result_summary(task_id, pid))
+
+
+@app.post("/execution/tasks/{task_id}/request-start-approval")
+async def execution_request_start_approval(
+    task_id: str,
+    req: ExecutionProjectRequest,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _local_auth_gate(x_javes_local_token, "execution.start.request")
+    if blocked:
+        return _gate_json(blocked)
+    pid = _normalize_project_id(req.project_id)
+    try:
+        out = _execution_facade().request_start_approval(task_id, pid)
+    except Exception as exc:
+        return _execution_response({"status": "blocked", "reason": str(exc)})
+    return _execution_response(out)
+
+
+@app.post("/execution/tasks/{task_id}/approve-start")
+async def execution_approve_start(
+    task_id: str,
+    req: ExecutionApprovalRequest,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _local_auth_gate(x_javes_local_token, "execution.start.approve")
+    if blocked:
+        return _gate_json(blocked)
+    if not req.approval_id:
+        return _execution_response({"status": "blocked", "reason": "approval_id_required"})
+    pid = _normalize_project_id(req.project_id)
+    try:
+        out = _execution_facade().approve_start(task_id, pid, int(req.approval_id))
+    except Exception as exc:
+        return _execution_response({"status": "blocked", "reason": str(exc)})
+    return _execution_response(out)
+
+
+@app.post("/execution/tasks/{task_id}/start")
+async def execution_start(
+    task_id: str,
+    req: ExecutionStartRequest,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _local_auth_gate(x_javes_local_token, "execution.start")
+    if blocked:
+        return _gate_json(blocked)
+    pid = _normalize_project_id(req.project_id)
+    return _execution_response(_execution_facade().start_execution(task_id, pid, req.test_commands))
+
+
+@app.post("/execution/tasks/{task_id}/request-merge-approval")
+async def execution_request_merge_approval(
+    task_id: str,
+    req: ExecutionProjectRequest,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _local_auth_gate(x_javes_local_token, "execution.merge.request")
+    if blocked:
+        return _gate_json(blocked)
+    pid = _normalize_project_id(req.project_id)
+    try:
+        out = _execution_facade().request_merge_approval(task_id, pid)
+    except Exception as exc:
+        return _execution_response({"status": "blocked", "reason": str(exc)})
+    return _execution_response(out)
+
+
+@app.post("/execution/tasks/{task_id}/approve-merge")
+async def execution_approve_merge(
+    task_id: str,
+    req: ExecutionApprovalRequest,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _local_auth_gate(x_javes_local_token, "execution.merge.approve")
+    if blocked:
+        return _gate_json(blocked)
+    if not req.approval_id:
+        return _execution_response({"status": "blocked", "reason": "approval_id_required"})
+    pid = _normalize_project_id(req.project_id)
+    try:
+        out = _execution_facade().approve_merge(task_id, pid, int(req.approval_id))
+    except Exception as exc:
+        return _execution_response({"status": "blocked", "reason": str(exc)})
+    return _execution_response(out)
+
+
+@app.post("/execution/tasks/{task_id}/merge")
+async def execution_merge(
+    task_id: str,
+    req: ExecutionProjectRequest,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _local_auth_gate(x_javes_local_token, "execution.merge")
+    if blocked:
+        return _gate_json(blocked)
+    pid = _normalize_project_id(req.project_id)
+    return _execution_response(_execution_facade().perform_merge(task_id, pid))
+
+
+@app.post("/execution/tasks/{task_id}/cancel")
+async def execution_cancel(
+    task_id: str,
+    req: ExecutionProjectRequest,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _local_auth_gate(x_javes_local_token, "execution.cancel")
+    if blocked:
+        return _gate_json(blocked)
+    pid = _normalize_project_id(req.project_id)
+    return _execution_response(_execution_facade().cancel_task(task_id, pid))
 
 
 @app.get("/stats")
@@ -2268,6 +2486,21 @@ def _brain(
                 "brain": "main", "status": res.get("status", "ok"),
                 "tools": [intent], "route": route, "orch": None}
 
+    try:
+        from delegacao import should_delegate as _deleg_match
+        if _deleg_match(text):
+            resp, _ = orchestrator._run_exec(text, "", project_id=project_id)
+            task = getattr(orchestrator, "_last_exec_task", {}) or {}
+            return {"text": resp or "Tarefa criada e aguardando aprovação para execução.",
+                    "intent": "programar", "brain": "exec",
+                    "status": "pending_approval", "tools": ["execution_task"],
+                    "route": route, "orch": None,
+                    "task_id": task.get("task_id"),
+                    "project_id": task.get("project_id", project_id),
+                    "approval_id": task.get("approval_id")}
+    except Exception:
+        pass
+
     if not safe_config.external_adapters_enabled():
         return {"text": safe_config.disabled_message(
                     "external_adapters",
@@ -2293,10 +2526,10 @@ def _brain(
     #      audita depois via _audit_after_codex. Falha → cai no fluxo normal.
     try:
         from delegacao import enabled as _deleg_on, should_delegate as _deleg_match
-        if _deleg_on() and _deleg_match(text) and safe_config.codex_exec_enabled():
-            resp, _ = orchestrator._run_exec(text, "")
+        if _deleg_on() and _deleg_match(text):
+            resp, _ = orchestrator._run_exec(text, "", project_id=project_id)
             return {"text": resp or "Codex despachado, senhor.", "intent": intent,
-                    "brain": "exec", "status": "codex", "tools": ["codex"],
+                    "brain": "exec", "status": "pending_approval", "tools": ["execution_task"],
                     "route": route, "orch": None}
     except Exception:
         pass  # delegação nunca deve derrubar o chat — segue pro agente
@@ -2355,6 +2588,9 @@ def _entry_from_brain(text: str, out: dict, start: datetime) -> dict:
     entry["response"] = out["text"]
     entry["intent"]   = out["intent"]
     entry["brain"]    = out["brain"]
+    for key in ("task_id", "project_id", "approval_id"):
+        if out.get(key) not in ("", None):
+            entry[key] = out.get(key)
     return entry
 
 

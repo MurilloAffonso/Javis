@@ -246,3 +246,96 @@ O doctor mostra somente contagens: `approved_for_merge`, `merge_conflicts`, `com
 ## Próximo passo
 
 R4.2C2 — integração segura com orchestrator e Command Center. R4 ainda não está concluída.
+---
+
+# R4.2C2 — Integração segura com Orchestrator e Command Center
+
+A R4.2C2 conecta o fluxo supervisionado ao Javes sem execução automática. Pedidos
+de programação deixam de chamar `brain_switch.dispatch`, `code_agent` ou
+`claude_exec`; o Orchestrator cria uma `execution_task`, solicita o gate
+`execution.start` e para em `pending_approval`.
+
+## Fachada única
+
+`execution/execution_facade.py` é o ponto único usado por API, Orchestrator e
+Command Center. Toda operação exige `task_id` + `project_id`; string vazia nunca
+significa “todos”. A fachada não recebe `repository_path`, `worktree_path` ou
+branch vindos do frontend.
+
+Operações expostas:
+
+- criar/listar/consultar task;
+- solicitar e consumir approval `execution.start`;
+- iniciar execução somente via `ExecutionService`;
+- solicitar e consumir approval `execution.merge`;
+- chamar `ControlledMergeService`;
+- cancelar estados permitidos sem apagar evidência;
+- ler somente resumo/diff/testes sanitizados do `ResultCollector`.
+
+## Orchestrator
+
+Pedidos detectados como programação seguem:
+
+```
+pedido do usuário → execution_task draft → approval execution.start → pending_approval → parar
+```
+
+Não há chamada direta para Codex, Claude Code, `brain_switch.dispatch`,
+`code_agent.dispatch` ou `claude_exec.dispatch`. `JAVIS_ENABLE_SUPERVISED_EXEC`
+continua `False`; mesmo após approval, `/execution/tasks/{task_id}/start`
+retorna `blocked/supervised_execution_disabled` até a flag ser habilitada em teste
+controlado.
+
+## API
+
+Rotas supervisionadas:
+
+- `GET /execution/tasks`
+- `POST /execution/tasks`
+- `GET /execution/tasks/{task_id}`
+- `GET /execution/tasks/{task_id}/result`
+- `POST /execution/tasks/{task_id}/request-start-approval`
+- `POST /execution/tasks/{task_id}/approve-start`
+- `POST /execution/tasks/{task_id}/start`
+- `POST /execution/tasks/{task_id}/request-merge-approval`
+- `POST /execution/tasks/{task_id}/approve-merge`
+- `POST /execution/tasks/{task_id}/merge`
+- `POST /execution/tasks/{task_id}/cancel`
+
+Todas exigem token local e `project_id`. Outro projeto recebe bloqueio genérico
+ou `not_found`, sem revelar objetivo, prompt, paths, stdout, stderr ou diff bruto.
+
+## Command Center
+
+A aba **Execução** mostra apenas dados sanitizados:
+
+- `task_id` resumido, projeto, executor, status e datas;
+- status dos approvals de execução/merge;
+- status de testes e contagem de arquivos alterados;
+- risco e ações permitidas pelo estado;
+- resumo, diff sanitizado e relatório de testes via endpoint de resultado.
+
+O botão **Executar** fica desabilitado enquanto
+`JAVIS_ENABLE_SUPERVISED_EXEC=False`. O frontend não envia `repository_path`,
+`worktree_path` ou branches.
+
+## Doctor (R4.2C2)
+
+Novas contagens passivas:
+
+- `execution_api_present`
+- `execution_command_center_present`
+- `legacy_direct_execution_callers`
+- `supervised_tasks_total`
+- `pending_execution_approvals`
+- `awaiting_review`
+- `approved_for_merge`
+- `completed_execution_tasks`
+
+O doctor segue sem mostrar objective, prompt, diff, stdout, stderr ou paths
+completos.
+
+## Próximo passo
+
+R4.3 — teste controlado do executor supervisionado e hardening. Modo Madrugada
+somente depois de teste real controlado e aprovado. R4 ainda não está concluída.
