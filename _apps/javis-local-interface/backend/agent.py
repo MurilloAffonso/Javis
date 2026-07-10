@@ -10,9 +10,33 @@ import os
 import json
 import re
 import time
+import contextvars
 
 import actions
 import safe_config
+
+# project_id da conversa em curso (R2.1). Normalizado para "javes-core" por padrão
+# e propagado às ferramentas (ex.: buscar_conhecimento) via contextvar, sem
+# precisar passar o argumento por todas as assinaturas dos provedores.
+_DEFAULT_PROJECT_ID = "javes-core"
+_PROJECT_CTX: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "javis_project_id", default=_DEFAULT_PROJECT_ID
+)
+
+
+def _normalize_project_id(project_id: str | None) -> str:
+    """project_id nunca fica indefinido: vazio/None → 'javes-core'."""
+    return (project_id or "").strip() or _DEFAULT_PROJECT_ID
+
+
+def _current_project_id() -> str:
+    return _normalize_project_id(_PROJECT_CTX.get())
+
+
+# Mensagens amigáveis (nunca vazam traceback, credencial, token ou chave).
+_PROVIDER_UNAVAILABLE_MSG = (
+    "Provider externo indisponível. O modo local pode ser ativado com Ollama."
+)
 
 # Decisão 21/06 — Haiku 4.5 como default do tool-use (era sonnet-4-6).
 # Sonnet/Opus continuam acessíveis via env JAVIS_CLAUDE_MODEL e via `pensar_profundo`.
@@ -556,7 +580,7 @@ def _exec_tool(name: str, inp: dict, history: list[dict] | None = None) -> str:
         return integrations.whatsapp_send(inp.get("numero") or "", inp.get("mensagem") or "").get("message", "Feito, senhor.")
     if name == "buscar_conhecimento":
         import knowledge
-        ctx = knowledge.answer_context(inp.get("pergunta") or "", escopo=knowledge.scope_for_project(project_id))
+        ctx = knowledge.answer_context(inp.get("pergunta") or "", escopo=knowledge.scope_for_project(_current_project_id()))
         return ctx or "Não encontrei nada nos seus arquivos sobre isso, senhor."
     if name == "pesquisar_redes":
         import social_reader
@@ -1159,6 +1183,20 @@ def _is_heavy_request(text: str) -> bool:
     return any(h in t for h in _HEAVY_HINTS)
 
 
+def _respond_ollama(user_text: str, history: list[dict]) -> dict | None:
+    """Cérebro LOCAL (Ollama). RAG local (buscar via escopo) sem tocar em nuvem.
+    Retorna {text, tools} ou None se o Ollama não estiver disponível."""
+    import ollama_brain
+    if not ollama_brain.available():
+        return None
+    ctx = _history_context(history)
+    out = ollama_brain.answer(user_text, context=ctx, system=_system())
+    # answer() nunca lança: em falha devolve texto "Ollama indisponível...".
+    if not out or out.startswith("Ollama indisponível"):
+        return None
+    return {"text": out, "tools": []}
+
+
 def respond(
     user_text: str,
     history: list[dict] | None = None,
@@ -1172,6 +1210,25 @@ def respond(
     Claude Code headless); pedido pesado e fallback continuam no Claude assinatura.
     Retorna {text, tools} ou None se nenhum provedor disponível."""
     history = history or []
+    # project_id nunca fica indefinido: normaliza e propaga às tools (R2.1).
+    _PROJECT_CTX.set(_normalize_project_id(project_id))
+
+    # R2.1 — modo de provider (local | cloud | auto).
+    mode = safe_config.provider_mode()
+    if mode in ("local", "auto"):
+        local_out = _respond_ollama(user_text, history)
+        if local_out is not None:
+            return local_out
+        if mode == "local":
+            # Modo local NÃO cai silenciosamente em provider externo.
+            return {
+                "status": "provider_unavailable",
+                "reason": "ollama_unavailable_or_model_missing",
+                "text": _PROVIDER_UNAVAILABLE_MSG,
+                "tools": [],
+            }
+        # mode == "auto": Ollama indisponível → segue para a cadeia cloud abaixo.
+
     if not safe_config.external_adapters_enabled():
         return {
             "text": safe_config.disabled_message(
@@ -1231,7 +1288,7 @@ def respond(
             safe_error = _sanitize_telemetry_error(e) or type(e).__name__
             _log(f"OpenRouter (tool-use) falhou: {safe_error}")
             return {
-                "text": "Tive um problema no provedor de fallback, senhor. O erro foi registrado sem credenciais.",
+                "text": _PROVIDER_UNAVAILABLE_MSG,
                 "tools": [],
             }
 

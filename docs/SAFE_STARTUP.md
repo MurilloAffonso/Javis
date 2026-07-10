@@ -219,6 +219,52 @@ claude_exec.py
 browser_agent.py
 ```
 
+## R2.1 — Provider fallback e modo local
+
+O chat tinha uma cascata de providers que, ao falhar em todos (Gemini 401,
+OpenAI `project_id`, Claude sem crédito, OpenRouter 429), vazava erro cru. O
+R2.1 torna o comportamento previsível e adiciona um modo local seguro.
+
+### Variável `JAVES_PROVIDER_MODE`
+
+- `local` — usa **apenas o Ollama**. Se o Ollama estiver indisponível ou sem o
+  modelo, o chat responde com `status: provider_unavailable` /
+  `reason: ollama_unavailable_or_model_missing` e **não** cai em provider externo.
+- `cloud` — cadeia externa (Gemini → Claude assinatura → OpenAI → Claude API →
+  Gemini → OpenRouter), como antes. Requer `JAVIS_ENABLE_EXTERNAL_ADAPTERS`.
+- `auto` (**default**) — tenta o Ollama primeiro; a nuvem só entra se o Ollama
+  não responder **e** os adaptadores externos estiverem habilitados.
+
+### Como evitar fallback externo
+
+Defina `JAVES_PROVIDER_MODE=local`. Nesse modo nenhuma chamada sai para
+Gemini/OpenAI/Claude/OpenRouter, mesmo que as chaves existam no ambiente. O RAG
+local (busca por escopo) roda sem depender de provider externo.
+
+### project_id sempre definido
+
+Toda chamada de chat normaliza `project_id` para `javes-core` quando vazio
+(corrige o `NameError: name 'project_id' is not defined` da tool
+`buscar_conhecimento`). Rotas VP/Jampa continuam exigindo `project_id`
+explícito (gate `require_project_scope`, R1/R2).
+
+### Mensagens de erro
+
+Falha de provider externo devolve mensagem amigável — nunca traceback,
+credencial, token ou chave:
+
+> Provider externo indisponível. O modo local pode ser ativado com Ollama.
+
+### Como testar sem credenciais
+
+```
+python -m pytest -q _apps/javis-local-interface/tests/test_provider_fallback.py \
+                    _apps/javis-local-interface/tests/test_project_id_default.py
+```
+
+Os testes usam mocks de Ollama e dos providers; não abrem `.env`, não sobem
+servidor e nenhuma credencial é impressa.
+
 ## O que falta antes de iniciar o servidor
 
 - Implementar UI/politica operacional para token local.
