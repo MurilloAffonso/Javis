@@ -26,7 +26,7 @@ class ExecutionService:
                  enabled: bool | None = None):
         self.repository = repository
         self.worktree_manager = worktree_manager or WorktreeManager()
-        self.result_collector = result_collector or ResultCollector(repository)
+        self.result_collector = result_collector or ResultCollector()
         self.test_runner = test_runner or TestRunner()
         self.adapters = adapters or {
             "codex": CodexAdapter(),

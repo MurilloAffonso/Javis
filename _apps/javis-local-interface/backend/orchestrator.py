@@ -90,16 +90,21 @@ class Orchestrator:
     def __init__(self, model: str = DEFAULT_MODEL):
         self.model = model
 
-    def process(self, user_input: str, history: list[dict] | None = None) -> OrchestrationResult:
+    def process(
+        self,
+        user_input: str,
+        history: list[dict] | None = None,
+        project_id: str = "javes-core",
+    ) -> OrchestrationResult:
         result = OrchestrationResult()
 
         # Atalho determinístico: se should_delegate, roteia pro Codex sem classificar
         import delegacao
         if delegacao.enabled() and delegacao.should_delegate(user_input):
-            response, _ = self._run_exec(user_input, "")
+            response, _ = self._run_exec(user_input, "", project_id=project_id)
             result.response = response
             result.brain = "exec"
-            result.exec_running = True
+            result.exec_running = False
             return result
 
         plan = self._classify(user_input)
@@ -125,7 +130,11 @@ class Orchestrator:
         brain = result.brain
 
         if brain == "exec":
-            result.response, result.exec_running = self._run_exec(user_input, result.plan)
+            result.response, result.exec_running = self._run_exec(
+                user_input,
+                result.plan,
+                project_id=project_id,
+            )
 
         elif brain == "memory":
             result.response = self._memory_brain(user_input, result)
@@ -198,29 +207,32 @@ class Orchestrator:
         except Exception as e:
             return f"Cérebro indisponível: {e}"
 
-    def _run_exec(self, text: str, plano: str = "") -> tuple[str, bool]:
-        """Roteia pra Codex via brain_switch com guardrails.
+    def _run_exec(self, text: str, plano: str = "", project_id: str = "javes-core") -> tuple[str, bool]:
+        """Cria uma execution_task supervisionada e para em approval humano.
 
-        O Codex roda em segundo plano (code_agent dispara uma thread e retorna na
-        hora). Aqui devolvemos uma mensagem LIMPA pro usuário — sem ecoar o brief
-        com o preâmbulo de guardrails — apontando pra aba Execução. Quando o Codex
-        termina, o próprio code_agent notifica (fila de lembretes + Telegram) e o
-        brain_switch dispara a auditoria do Claude.
+        R4.2C2 desativa o caminho direto para code_agent/claude_exec/brain_switch:
+        o Orchestrator apenas registra a tarefa e solicita o gate execution.start.
         """
         import delegacao
-        import brain_switch
 
-        brief = delegacao.montar_brief(text, plano)
-        raw = brain_switch.dispatch(brief, engine="codex")  # assíncrono
-        # Sucesso do disparo → mensagem amigável; senão (ex.: Codex indisponível,
-        # fallback) repassa a mensagem crua do motor.
-        if raw and str(raw).startswith("Codex rodando"):
-            msg = (f"🛠️ Codex assumiu a execução: **{text}**\n\n"
-                   "Está rodando em segundo plano — acompanhe ao vivo na aba "
-                   "**Execução**. Quando terminar, o Claude audita o resultado e "
-                   "eu te aviso, senhor.")
-            return msg, True
-        return (raw, True)
+        from execution.execution_facade import ExecutionFacade
+
+        objective = delegacao.montar_brief(text, plano)
+        out = ExecutionFacade().create_task_and_request_start(
+            objective=objective,
+            project_id=project_id,
+            executor="codex",
+        )
+        self._last_exec_task = out
+        if out.get("status") == "blocked":
+            return (f"Execução supervisionada bloqueada: {out.get('reason', 'blocked')}", False)
+        msg = (
+            "Tarefa criada e aguardando aprovação para execução.\n"
+            f"task_id: {out.get('task_id')}\n"
+            f"project_id: {out.get('project_id')}\n"
+            f"approval_id: {out.get('approval_id')}"
+        )
+        return msg, False
 
     # ── Classify ──────────────────────────────────────────────
 

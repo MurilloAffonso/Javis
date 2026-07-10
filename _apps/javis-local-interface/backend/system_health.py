@@ -49,10 +49,39 @@ def _execution_stats() -> dict:
         "merge_conflicts": 0,
         "completed_execution_tasks": 0,
         "preserved_worktrees": 0,
+        # R4.2C2 — integração API/Command Center (só presença/contagens)
+        "execution_api_present": False,
+        "execution_command_center_present": False,
+        "legacy_direct_execution_callers": 0,
+        "supervised_tasks_total": 0,
+        "pending_execution_approvals": 0,
     }
     try:
         from execution.executor_adapter import CodexAdapter, ClaudeCodeAdapter  # noqa: F401
         stats["supervised_adapters_present"] = True
+    except Exception:
+        pass
+    try:
+        from execution.execution_facade import ExecutionFacade  # noqa: F401
+        stats["execution_api_present"] = True
+    except Exception:
+        pass
+    try:
+        stats["execution_command_center_present"] = (
+            JAVIS_ROOT / "_apps" / "javis-local-interface" / "frontend" /
+            "command-center" / "js" / "views" / "exec.js"
+        ).exists()
+        legacy_sources = [
+            JAVIS_ROOT / "_apps" / "javis-local-interface" / "backend" / "orchestrator.py",
+            JAVIS_ROOT / "_apps" / "javis-local-interface" / "backend" / "server.py",
+        ]
+        forbidden = ("brain_switch.dispatch", "code_agent.dispatch", "claude_exec.dispatch")
+        stats["legacy_direct_execution_callers"] = sum(
+            text.count(term)
+            for path in legacy_sources if path.exists()
+            for text in [path.read_text(encoding="utf-8", errors="ignore")]
+            for term in forbidden
+        )
     except Exception:
         pass
     try:
@@ -85,6 +114,12 @@ def _execution_stats() -> dict:
             stats["approved_for_merge"] = et.count_by_status("approved_for_merge")
             stats["merge_conflicts"] = db.count("execution_tasks", "last_error=?", ("merge_conflict",))
             stats["completed_execution_tasks"] = et.count_by_status("completed")
+            stats["supervised_tasks_total"] = db.count("execution_tasks")
+            stats["pending_execution_approvals"] = db.count(
+                "approvals",
+                "status=? AND action=?",
+                ("pending", "execution.start"),
+            )
             preserved = db.query(
                 "SELECT task_id FROM execution_tasks "
                 "WHERE status IN ('failed','timed_out','review_rejected') "
@@ -218,6 +253,11 @@ def render_text(data: dict) -> str:
         f"- merge_conflicts: {data.get('merge_conflicts', 0)}",
         f"- completed_execution_tasks: {data.get('completed_execution_tasks', 0)}",
         f"- preserved_worktrees: {data.get('preserved_worktrees', 0)}",
+        f"- execution_api_present: {data.get('execution_api_present', False)}",
+        f"- execution_command_center_present: {data.get('execution_command_center_present', False)}",
+        f"- legacy_direct_execution_callers: {data.get('legacy_direct_execution_callers', 0)}",
+        f"- supervised_tasks_total: {data.get('supervised_tasks_total', 0)}",
+        f"- pending_execution_approvals: {data.get('pending_execution_approvals', 0)}",
         "- providers:",
     ]
     for item in data["providers"]:

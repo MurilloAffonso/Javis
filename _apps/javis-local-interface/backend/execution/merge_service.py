@@ -24,7 +24,7 @@ class ControlledMergeService:
                  result_collector=None, git_runner=None, timeout_seconds: int = _TIMEOUT):
         self.repository = repository
         self.worktree_manager = worktree_manager or WorktreeManager()
-        self.result_collector = result_collector or ResultCollector(repository)
+        self.result_collector = result_collector or ResultCollector()
         self.git_runner = git_runner or subprocess.run
         self.timeout_seconds = timeout_seconds
 
