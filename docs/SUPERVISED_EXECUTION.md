@@ -463,3 +463,61 @@ O Doctor não mostra paths completos, conteúdo, prompt, diff bruto ou hash comp
 ## Próximo passo
 
 Repetir o smoke real com uma nova task. Modo Madrugada continua bloqueado.
+
+---
+
+# R4.3C — CLI de revisão e merge controlado do smoke
+
+A R4.3C fecha o ciclo manual de revisão do smoke sem executar Codex ou Claude e
+sem habilitar `JAVIS_ENABLE_SUPERVISED_EXEC`. Os comandos usam a
+`ExecutionFacade`, o gate persistido `execution.merge` e o
+`ControlledMergeService`; nenhum deles faz push.
+
+## CLI
+
+```text
+python scripts/javes_execution_smoke.py request-merge --task-id <task_id>
+python scripts/javes_execution_smoke.py approve-merge --task-id <task_id> --approval-id <approval_id> --confirm "APROVAR MERGE CONTROLADO"
+python scripts/javes_execution_smoke.py merge --task-id <task_id> --confirm "EXECUTAR MERGE CONTROLADO"
+```
+
+O `project_id` é sempre `javes-core` e não pode ser informado pelo operador.
+
+## Revisão e aprovação
+
+`request-merge` aceita somente task smoke em `awaiting_review`, exige evidência
+persistida de testes aprovados, worktree limpa e sem untracked, branch esperada,
+`source_commit` válido e pelo menos um commit novo. Em seguida cria um approval
+novo de ação `execution.merge`, retorna seu id e para sem merge.
+
+`approve-merge` exige a frase exata, valida `task_id + project_id + action`,
+impede o reuso do approval `execution.start`, decide o approval persistido e o
+consome uma única vez pelo gate existente. A única transição é
+`awaiting_review → approved_for_merge`; nenhum merge ocorre nesse comando.
+
+## Merge controlado
+
+`merge` exige a frase exata e `approved_for_merge`, então delega exclusivamente
+ao `ControlledMergeService`. O serviço recusa:
+
+- `source_commit` ausente, inválido ou diferente do HEAD atual da source branch;
+- repositório principal ou worktree com alterações staged/unstaged, untracked
+  ou operação Git em andamento;
+- worktree/branch fora do escopo da task ou sem commit novo;
+- approval de merge ausente, incorreto ou não consumido.
+
+Em sucesso, o fluxo é `approved_for_merge → merged → completed`, o relatório e
+os resultados persistidos são preservados, somente a worktree reconstruída a
+partir do `task_id` é removida e a resposta contém apenas status e commit final,
+sem paths sensíveis. Em conflito, o merge é abortado e worktree/evidências são
+preservadas para revisão. Todos os subprocessos Git usam argv estruturado,
+`shell=False`, e não existe chamada a `push`.
+
+## Validação
+
+Os testes usam apenas repositórios e worktrees temporários. Não executam agentes,
+providers, servidor ou rede e mantêm `JAVIS_ENABLE_SUPERVISED_EXEC=False`.
+
+## Próximo passo
+
+R4.3D — executar o primeiro merge real controlado e validar o ciclo completo.

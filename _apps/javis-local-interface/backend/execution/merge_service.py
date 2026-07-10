@@ -102,6 +102,15 @@ class ControlledMergeService:
         for marker in ("rebase-merge", "rebase-apply"):
             if (git_dir / marker).exists():
                 return "git_operation_in_progress"
+        rc, out, err = self._run_git(
+            repository_path, ["status", "--porcelain", "--untracked-files=normal"]
+        )
+        if rc != 0:
+            return sanitize(err, 200) or "git_status_unavailable"
+        if any(line.startswith("??") for line in out.splitlines()):
+            return "untracked_files_present"
+        if out.strip():
+            return "worktree_not_clean"
         return ""
 
     def merge(self, task_id: str, project_id: str) -> dict:
@@ -137,9 +146,20 @@ class ControlledMergeService:
             if clean_reason:
                 return self._blocked(clean_reason)
 
+            clean_reason = self._assert_clean_repo(worktree_path)
+            if clean_reason:
+                return self._blocked(clean_reason)
+
             expected_source_commit = (task.get("source_commit") or "").strip()
+            if not expected_source_commit:
+                return self._blocked("source_commit_required")
+            rc, verified_commit, _ = self._run_git(
+                repository_path, ["rev-parse", "--verify", f"{expected_source_commit}^{{commit}}"]
+            )
+            if rc != 0 or verified_commit.strip() != expected_source_commit:
+                return self._blocked("source_commit_invalid")
             current_source_commit = self.worktree_manager.branch_head(repository_path, source_branch)
-            if expected_source_commit and current_source_commit != expected_source_commit:
+            if current_source_commit != expected_source_commit:
                 return self._blocked("source_branch_moved")
 
             rc, out, err = self._run_git(repository_path, ["rev-list", "--count", f"{source_branch}..{work_branch}"])
@@ -164,6 +184,15 @@ class ControlledMergeService:
                     stderr=err,
                 )
 
+            rc, final_commit, commit_err = self._run_git(repository_path, ["rev-parse", "HEAD"])
+            if rc != 0 or not final_commit.strip():
+                return self._fail(
+                    task,
+                    "final_commit_unavailable",
+                    worktree_path=str(worktree_path),
+                    stderr=commit_err,
+                )
+
             et.validate_transition(task["status"], et.MERGED, merge_approval_id=task.get("merge_approval_id"))
             self.repository.execution_tasks.update_status(tid, pid, et.MERGED)
             task["status"] = et.MERGED
@@ -178,7 +207,12 @@ class ControlledMergeService:
             et.validate_transition(et.MERGED, et.COMPLETED, merge_approval_id=task.get("merge_approval_id"))
             self.repository.execution_tasks.update_status(tid, pid, et.COMPLETED)
             self.worktree_manager.remove(tid, status=et.COMPLETED)
-            return {"status": et.COMPLETED, "reason": "", "task_id": tid}
+            return {
+                "status": et.COMPLETED,
+                "reason": "",
+                "task_id": tid,
+                "commit": sanitize(final_commit.strip(), 80),
+            }
         except Exception as exc:
             worktree_path = task.get("worktree_path") or ""
             return self._fail(task, str(exc), worktree_path=worktree_path)

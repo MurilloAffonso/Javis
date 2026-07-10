@@ -18,9 +18,12 @@ if str(SCRIPTS) not in sys.path:
 import db  # noqa: E402
 import repositories as repo  # noqa: E402
 import javes_execution_smoke as smoke  # noqa: E402
+from execution import execution_approvals as ea  # noqa: E402
 from execution import execution_task as et  # noqa: E402
 from execution.execution_facade import ExecutionFacade  # noqa: E402
+from execution.merge_service import ControlledMergeService  # noqa: E402
 from execution.result_collector import ResultCollector  # noqa: E402
+from execution.worktree_manager import WorktreeManager  # noqa: E402
 
 CORE = "javes-core"
 
@@ -534,3 +537,258 @@ def test_status_failed_deriva_tests_failed(monkeypatch, tmp_path, capsys):
     body = _out(capsys)
 
     assert body["tests"] == "failed"
+
+
+def _git_run(cwd: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", *args], cwd=str(cwd), shell=False, check=False,
+        capture_output=True, text=True,
+    )
+
+
+def _merge_ready_task(monkeypatch, tmp_path, *, status=et.AWAITING_REVIEW):
+    repo_path = tmp_path / "merge-repo"
+    repo_path.mkdir()
+    assert _git_run(repo_path, "init").returncode == 0
+    assert _git_run(repo_path, "config", "user.email", "smoke@example.test").returncode == 0
+    assert _git_run(repo_path, "config", "user.name", "Smoke Test").returncode == 0
+    (repo_path / "base.txt").write_text("base\n", encoding="utf-8")
+    assert _git_run(repo_path, "add", "--", "base.txt").returncode == 0
+    assert _git_run(repo_path, "commit", "-m", "base").returncode == 0
+    source_branch = _git_run(repo_path, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
+
+    tid = et.new_task_id()
+    manager = WorktreeManager(
+        allowed_repo_roots=[repo_path], worktree_root=tmp_path / "merge-worktrees"
+    )
+    meta = manager.create(tid, repo_path, source_branch, project_id=CORE)
+    worktree = Path(meta["worktree_path"])
+    (worktree / "smoke.txt").write_text("controlled smoke\n", encoding="utf-8")
+    assert _git_run(worktree, "add", "--", "smoke.txt").returncode == 0
+    assert _git_run(worktree, "commit", "-m", "smoke result").returncode == 0
+
+    start_approval_id = repo.approvals.add(
+        subject="start", kind="execution_gate", task_id=tid, project_id=CORE,
+        action=ea.ACTION_START, risk_level="high",
+    )
+    repo.approvals.decide(start_approval_id, True)
+    assert repo.approvals.consume(start_approval_id) == 1
+    repo.execution_tasks.create(
+        task_id=tid,
+        project_id=CORE,
+        executor="claude",
+        objective=smoke.SMOKE_OBJECTIVE,
+        repository_path=str(repo_path),
+        source_branch=source_branch,
+        source_commit=meta["source_commit"],
+        work_branch=meta["work_branch"],
+        worktree_path=meta["worktree_path"],
+        status=status,
+        approval_id=start_approval_id,
+        timeout_seconds=300,
+    )
+    collector = ResultCollector(results_root=tmp_path / "merge-results")
+    collector.collect(tid, CORE, worktree, test_report="passed")
+    merge_service = ControlledMergeService(
+        worktree_manager=manager, result_collector=collector
+    )
+    facade = ExecutionFacade(
+        repository_path=repo_path,
+        merge_service=merge_service,
+        result_collector=collector,
+    )
+    monkeypatch.setattr(smoke, "make_facade", lambda: facade)
+    return {
+        "task_id": tid,
+        "repo_path": repo_path,
+        "worktree": worktree,
+        "manager": manager,
+        "facade": facade,
+        "start_approval_id": start_approval_id,
+    }
+
+
+def _request_merge(task_id: str, capsys) -> dict:
+    assert smoke.main(["request-merge", "--task-id", task_id]) == 0
+    return _out(capsys)
+
+
+def _approve_merge(task_id: str, approval_id: int, capsys) -> dict:
+    assert smoke.main([
+        "approve-merge", "--task-id", task_id,
+        "--approval-id", str(approval_id),
+        "--confirm", smoke.APPROVE_MERGE_PHRASE,
+    ]) == 0
+    return _out(capsys)
+
+
+def test_request_merge_somente_awaiting_review(monkeypatch, tmp_path, capsys):
+    ctx = _merge_ready_task(monkeypatch, tmp_path, status=et.APPROVED)
+
+    code = smoke.main(["request-merge", "--task-id", ctx["task_id"]])
+
+    assert code == 2
+    assert _out(capsys)["reason"] == "task_not_awaiting_review"
+
+
+def test_request_merge_bloqueia_testes_sem_evidencia(monkeypatch, tmp_path, capsys):
+    ctx = _merge_ready_task(monkeypatch, tmp_path)
+    task = repo.execution_tasks.get(ctx["task_id"], CORE)
+    Path(task["test_report_path"]).unlink()
+
+    code = smoke.main(["request-merge", "--task-id", ctx["task_id"]])
+
+    assert code == 2
+    assert _out(capsys)["reason"] == "tests_not_passed"
+
+
+def test_request_merge_cria_gate_separado_sem_merge(monkeypatch, tmp_path, capsys):
+    ctx = _merge_ready_task(monkeypatch, tmp_path)
+    body = _request_merge(ctx["task_id"], capsys)
+    approval = repo.approvals.get(body["approval_id"])
+
+    assert body["status"] == et.AWAITING_REVIEW
+    assert body["merge"] == "not_executed"
+    assert body["approval_id"] != ctx["start_approval_id"]
+    assert approval["action"] == ea.ACTION_MERGE
+    assert approval["status"] == "pending"
+    assert ctx["worktree"].exists()
+
+
+def test_approve_merge_exige_frase_exata(monkeypatch, tmp_path, capsys):
+    ctx = _merge_ready_task(monkeypatch, tmp_path)
+    requested = _request_merge(ctx["task_id"], capsys)
+
+    code = smoke.main([
+        "approve-merge", "--task-id", ctx["task_id"],
+        "--approval-id", str(requested["approval_id"]), "--confirm", "sim",
+    ])
+
+    assert code == 2
+    assert _out(capsys)["reason"] == "confirmation_phrase_required"
+
+
+@pytest.mark.parametrize("wrong_scope", ["task", "project"])
+def test_approve_merge_bloqueia_approval_de_outro_escopo(
+    monkeypatch, tmp_path, capsys, wrong_scope
+):
+    ctx = _merge_ready_task(monkeypatch, tmp_path)
+    wrong_task = et.new_task_id() if wrong_scope == "task" else ctx["task_id"]
+    wrong_project = "project:outro" if wrong_scope == "project" else CORE
+    approval_id = repo.approvals.add(
+        subject="wrong", kind="execution_gate", task_id=wrong_task,
+        project_id=wrong_project, action=ea.ACTION_MERGE, risk_level="high",
+    )
+
+    code = smoke.main([
+        "approve-merge", "--task-id", ctx["task_id"],
+        "--approval-id", str(approval_id),
+        "--confirm", smoke.APPROVE_MERGE_PHRASE,
+    ])
+
+    assert code == 2
+    assert _out(capsys)["reason"] == "approval_scope_mismatch"
+
+
+def test_approve_merge_single_use(monkeypatch, tmp_path, capsys):
+    ctx = _merge_ready_task(monkeypatch, tmp_path)
+    requested = _request_merge(ctx["task_id"], capsys)
+    _approve_merge(ctx["task_id"], requested["approval_id"], capsys)
+
+    code = smoke.main([
+        "approve-merge", "--task-id", ctx["task_id"],
+        "--approval-id", str(requested["approval_id"]),
+        "--confirm", smoke.APPROVE_MERGE_PHRASE,
+    ])
+
+    assert code == 2
+    assert _out(capsys)["reason"] == "approval_not_pending"
+    assert repo.approvals.get(requested["approval_id"])["consumed_at"]
+
+
+def test_merge_exige_approved_for_merge(monkeypatch, tmp_path, capsys):
+    ctx = _merge_ready_task(monkeypatch, tmp_path)
+
+    code = smoke.main([
+        "merge", "--task-id", ctx["task_id"], "--confirm", smoke.MERGE_PHRASE,
+    ])
+
+    assert code == 2
+    assert _out(capsys)["reason"] == "task_not_approved_for_merge"
+
+
+def test_merge_source_branch_moved_bloqueia(monkeypatch, tmp_path, capsys):
+    ctx = _merge_ready_task(monkeypatch, tmp_path)
+    requested = _request_merge(ctx["task_id"], capsys)
+    _approve_merge(ctx["task_id"], requested["approval_id"], capsys)
+    (ctx["repo_path"] / "moved.txt").write_text("moved\n", encoding="utf-8")
+    assert _git_run(ctx["repo_path"], "add", "--", "moved.txt").returncode == 0
+    assert _git_run(ctx["repo_path"], "commit", "-m", "source moved").returncode == 0
+
+    code = smoke.main([
+        "merge", "--task-id", ctx["task_id"], "--confirm", smoke.MERGE_PHRASE,
+    ])
+
+    assert code == 2
+    assert _out(capsys)["reason"] == "source_branch_moved"
+
+
+@pytest.mark.parametrize("kind", ["dirty", "untracked"])
+def test_merge_worktree_suja_ou_untracked_bloqueia(monkeypatch, tmp_path, capsys, kind):
+    ctx = _merge_ready_task(monkeypatch, tmp_path)
+    requested = _request_merge(ctx["task_id"], capsys)
+    _approve_merge(ctx["task_id"], requested["approval_id"], capsys)
+    target = ctx["worktree"] / ("smoke.txt" if kind == "dirty" else "untracked.txt")
+    target.write_text("dirty\n", encoding="utf-8")
+
+    code = smoke.main([
+        "merge", "--task-id", ctx["task_id"], "--confirm", smoke.MERGE_PHRASE,
+    ])
+    body = _out(capsys)
+
+    assert code == 2
+    assert body["reason"] == (
+        "tracked_changes_unstaged" if kind == "dirty" else "untracked_files_present"
+    )
+    assert ctx["worktree"].exists()
+
+
+def test_merge_limpo_completa_sem_push_remove_so_worktree_da_task(
+    monkeypatch, tmp_path, capsys
+):
+    ctx = _merge_ready_task(monkeypatch, tmp_path)
+    other_tid = et.new_task_id()
+    other_meta = ctx["manager"].create(
+        other_tid,
+        ctx["repo_path"],
+        _git_run(ctx["repo_path"], "rev-parse", "--abbrev-ref", "HEAD").stdout.strip(),
+        project_id=CORE,
+    )
+    seen = []
+
+    def runner(argv, **kwargs):
+        seen.append(argv)
+        return subprocess.run(argv, **kwargs)
+
+    ctx["facade"].merge_service.git_runner = runner
+    requested = _request_merge(ctx["task_id"], capsys)
+    _approve_merge(ctx["task_id"], requested["approval_id"], capsys)
+    result_paths = {
+        key: repo.execution_tasks.get(ctx["task_id"], CORE)[key]
+        for key in ("result_path", "diff_path", "test_report_path")
+    }
+
+    code = smoke.main([
+        "merge", "--task-id", ctx["task_id"], "--confirm", smoke.MERGE_PHRASE,
+    ])
+    body = _out(capsys)
+
+    assert code == 0
+    assert body["status"] == et.COMPLETED
+    assert body["commit"] == _git_run(ctx["repo_path"], "rev-parse", "HEAD").stdout.strip()
+    assert repo.execution_tasks.get(ctx["task_id"], CORE)["status"] == et.COMPLETED
+    assert not ctx["worktree"].exists()
+    assert Path(other_meta["worktree_path"]).exists()
+    assert all(Path(path).exists() for path in result_paths.values())
+    assert not any("push" in argv for argv in seen)
+    assert str(ctx["repo_path"]) not in json.dumps(body)
