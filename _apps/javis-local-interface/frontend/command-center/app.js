@@ -18,7 +18,7 @@ import { viewMaquina } from "./js/views/maquina.js";
 import { viewConteudo } from "./js/views/conteudo.js";
 import { viewIngestao } from "./js/views/ingestao.js";
 // Helpers do núcleo que as telas-módulo consomem (live bindings):
-export { _esc, h, $, state, BACKEND, CORE_PROJECT_ID, VP_PROJECT_ID, tryJson, withProjectId, withLocalAuth, renderCanvas, renderRightPanel, setView, opToast, opSend, opEsc, confirmStrong, activeAgent, pct, sc, projName, tele };
+export { _esc, h, $, state, BACKEND, CORE_PROJECT_ID, VP_PROJECT_ID, tryJson, withProjectId, withLocalAuth, renderCanvas, renderRightPanel, setView, opToast, opSend, opEsc, confirmStrong, activeAgent, pct, sc, projName, tele, projectIdForAgent, getChatSessionId, setChatSessionId };
 
 const DATA_BASE = "../../data/";
 const BACKEND = (location.port === "8000") ? "/" : "http://localhost:8000/";
@@ -75,6 +75,7 @@ const state = {
   activeAgentId: null, rpTab: "status",
   lastBrain: null, lastTools: null,
   chats: {}, // por agente: [{role, text}]
+  chatSessions: {}, // por project_id::agent_id → session_id
   activeProjectId: "vempassear",
   cfgTab: "memorias",
   useTts: false, useConclave: false,
@@ -151,6 +152,19 @@ function tele() {
 
 const projName = (id) => (state.projects.find((p) => p.id === id) || {}).nome || id;
 const activeAgent = () => state.agents.find((a) => a.id === state.activeAgentId) || state.agents.find((a) => a.tipo === "orquestrador") || state.agents[0] || {};
+function projectIdForAgent(a = activeAgent()) {
+  const raw = String(a.projeto || state.activeProjectId || "").toLowerCase();
+  return (raw.includes("vempassear") || raw.includes("jampa") || raw.includes("cerebro")) ? VP_PROJECT_ID : CORE_PROJECT_ID;
+}
+function _chatSessionKey(projectId, agentId) {
+  return `${projectId}::${agentId || "default"}`;
+}
+function getChatSessionId(a = activeAgent(), projectId = projectIdForAgent(a)) {
+  return state.chatSessions[_chatSessionKey(projectId, a.id)] || "";
+}
+function setChatSessionId(a = activeAgent(), projectId = projectIdForAgent(a), sessionId = "") {
+  if (sessionId) state.chatSessions[_chatSessionKey(projectId, a.id)] = sessionId;
+}
 
 // ---------- Sidebar ----------
 function matchQ(txt) { return !state.q || (txt || "").toLowerCase().includes(state.q.toLowerCase()); }
@@ -188,7 +202,7 @@ function fillAgentGroup(boxId, list) {
   if (!list.length) { box.appendChild(h(`<div class="li-sub" style="padding:6px 10px">—</div>`)); return; }
   list.forEach((a) => {
     const it = h(`<div class="list-item ${a.id === state.activeAgentId ? "active" : ""}"><span class="dot ${sc(a.status)}"></span><div class="li-main"><div class="li-name">${a.nome}</div><div class="li-sub">${(a.tags || []).join(" · ") || a.tipo}</div></div></div>`);
-    it.onclick = () => { state.activeAgentId = a.id; setView("chat"); };
+    it.onclick = () => { state.activeAgentId = a.id; state.activeProjectId = a.projeto || state.activeProjectId; setView("chat"); };
     box.appendChild(it);
   });
 }

@@ -6,7 +6,7 @@
 > (`estado-atual.md`, `proximos-passos.md`, `_logs/` datados ou `git log`).
 > Aqueles ficam como **histórico**; a decisão vigente é a daqui.
 
-**Atualizado:** 2026-07-09
+**Atualizado:** 2026-07-10
 **Mantido por:** hardening arc (R1 → R4)
 
 ---
@@ -21,29 +21,29 @@
 | **R2.2** | Consolidação de estado / hardening intermediário | ✅ **Concluído** |
 | **R2.2.1** | Fonte canônica de estado (este arquivo) + priorização | ✅ **Concluído** |
 | **R2.3** | Provider Registry + classificação de falhas + cooldown + `javes doctor` | ✅ **Concluído** |
+| **R3** | Sessões, histórico e memória isolados por `project_id` | ✅ **Concluído** |
 
 ---
 
 ## 🎯 PRÓXIMO PASSO OFICIAL
 
-**R3 — Sessões isoladas por `project_id`**
+**R4 — Codex supervisionado em worktree/sandbox**
 
-Histórico, escopo de RAG e approvals chaveados por `project_id` (`history_store.py` hoje é global).
+Execução do Codex em worktree/sandbox descartável, com aprovação humana e auditoria antes de qualquer merge no repo vivo.
 
 ---
 
 ## Fases seguintes (ordem oficial)
 
-1. **R3 — Sessões isoladas por `project_id`**
-   Histórico, escopo de RAG e approvals chaveados por `project_id`
-   (`history_store.py` hoje é global). Impede vazamento de contexto entre
-   `javes-core` e projetos externos (ex.: `cerebro-jampa`).
-
-2. **R4 — Codex supervisionado em worktree/sandbox**
+1. **R4 — Codex supervisionado em worktree/sandbox**
    Execução (`code_agent.py`/`claude_exec.py`) roda em **git worktree**
    descartável, não no repo vivo; merge só após aprovação. Codex como
    especialista atrás de approval + sandbox + auditoria Claude. Docker opcional,
    nunca default.
+
+2. **Integrações externas e canais**
+   Browser, Telegram, WhatsApp, MCP e automações externas só depois da R4,
+   sempre atrás de default-deny, approval e escopo explícito.
 
 ---
 
