@@ -308,6 +308,35 @@ O que não é indexado:
 - `_referencias/` e projetos externos fora do registro/escopo explícito.
 - Cérebro Jampa/VP no contexto `javes-core`; esse conteúdo só aparece com `project_id=project:cerebro-jampa`.
 
+## R2.3 — Provider Registry, cooldown e doctor
+
+R2.3 centraliza providers em `_apps/javis-local-interface/backend/provider_registry.py` e classifica falhas em `_apps/javis-local-interface/backend/provider_errors.py`.
+
+Providers iniciais:
+
+- `ollama` — local.
+- `gemini`, `claude`, `openai`, `openrouter` — cloud opcionais.
+
+Regras:
+
+- `local`: somente Ollama; zero cloud.
+- `cloud`: somente cloud habilitado, configurado e saudável.
+- `auto`: Ollama primeiro; cloud apenas se permitido por `JAVIS_ENABLE_EXTERNAL_ADAPTERS`.
+- providers em cooldown são pulados.
+- auth/billing/rate limit/timeout/unavailable/model-not-found têm classificação própria.
+- erros internos do Javes não viram rate limit nem bloqueio de provider.
+
+Doctor read-only:
+
+```powershell
+python scripts/javes_doctor.py --no-probe
+python scripts/javes_doctor.py --json --no-probe
+```
+
+O doctor não sobe servidor, não executa agente, não chama provider cloud e não imprime tokens/chaves. Sem `--no-probe`, ele pode testar apenas a porta local do Ollama.
+
+Detalhes: `docs/PROVIDER_REGISTRY.md`.
+
 ## O que falta antes de iniciar o servidor
 
 - Implementar UI/politica operacional para token local.

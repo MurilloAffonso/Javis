@@ -101,3 +101,4 @@ _logs/dumps/
 _apps/**/_data/vp_*.json
 
 _tmp/
+_apps/javis-local-interface/_data/provider_health.json

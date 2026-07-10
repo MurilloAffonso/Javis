@@ -290,54 +290,42 @@ def _register_idea(text: str) -> dict:
 
 
 def _system_status(_: str) -> dict:
-    import socket
-
     def onoff(value: bool) -> str:
         return "ligado" if value else "desligado"
 
-    def local_port_open(port: int, timeout: float = 0.2) -> bool:
-        try:
-            with socket.create_connection(("127.0.0.1", port), timeout=timeout):
-                return True
-        except OSError:
-            return False
+    import system_health
 
-    try:
-        import knowledge
-        embedder = knowledge._embedder_name()
-    except Exception:
-        embedder = os.environ.get("JAVIS_RAG_EMBEDDER", "ollama").strip().lower() or "ollama"
-
-    try:
-        import db
-        pending_approvals = db.count("approvals", "status=?", ("pending",))
-    except Exception:
-        pending_approvals = "indisponivel"
-
-    ollama_status = "disponivel" if local_port_open(11434) else "indisponivel"
+    data = system_health.snapshot(probe_ollama=True)
+    providers = {item["id"]: item for item in data["providers"]}
+    ollama_available = providers.get("ollama", {}).get("available")
+    ollama_status = "nao_verificado"
+    if ollama_available is True:
+        ollama_status = "disponivel"
+    elif ollama_available is False:
+        ollama_status = "indisponivel"
     lines = [
         "Status local do Javes:",
         "- backend: online",
-        f"- provider_mode: {safe_config.provider_mode()}",
-        f"- rag_embedder: {embedder}",
+        f"- provider_mode: {data['provider_mode']}",
+        f"- rag_embedder: {data['rag_embedder']}",
         f"- ollama: {ollama_status}",
-        f"- external_adapters: {onoff(safe_config.external_adapters_enabled())}",
-        f"- local_actions: {onoff(safe_config.local_actions_enabled())}",
-        f"- vp_effects: {onoff(safe_config.vp_effects_enabled())}",
-        f"- codex_exec: {onoff(safe_config.codex_exec_enabled())}",
-        f"- claude_headless: {onoff(safe_config.claude_exec_enabled())}",
-        f"- browser: {onoff(safe_config.browser_enabled())}",
-        f"- telegram: {onoff(safe_config.telegram_enabled())}",
-        f"- mcp: {onoff(safe_config.mcp_enabled())}",
-        f"- aprovacoes_pendentes: {pending_approvals}",
+        f"- external_adapters: {onoff(data['external_adapters'])}",
+        f"- local_actions: {onoff(data['local_actions'])}",
+        f"- vp_effects: {onoff(data['vp_effects'])}",
+        f"- codex_exec: {onoff(data['codex_exec'])}",
+        f"- claude_headless: {onoff(data['claude_headless'])}",
+        f"- browser: {onoff(data['browser'])}",
+        f"- telegram: {onoff(data['telegram'])}",
+        f"- mcp: {onoff(data['mcp'])}",
+        f"- aprovacoes_pendentes: {data['pending_approvals']}",
     ]
     return {
         "status": "ok",
         "message": "\n".join(lines),
-        "provider_mode": safe_config.provider_mode(),
-        "rag_embedder": embedder,
+        "provider_mode": data["provider_mode"],
+        "rag_embedder": data["rag_embedder"],
         "ollama": ollama_status,
-        "pending_approvals": pending_approvals,
+        "pending_approvals": data["pending_approvals"],
     }
 
 
