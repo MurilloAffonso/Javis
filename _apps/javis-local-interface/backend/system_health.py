@@ -26,6 +26,13 @@ def _git(args: list[str]) -> str:
 def snapshot(probe_ollama: bool = False) -> dict:
     sqlite_accessible = False
     pending_approvals = "indisponivel"
+    session_stats = {
+        "total_sessions": 0,
+        "sessions_by_project": {},
+        "javes_core_sessions": 0,
+        "legacy_history_found": False,
+        "session_project_inconsistencies": 0,
+    }
     if db.DB_PATH.exists():
         try:
             conn = sqlite3.connect(str(db.DB_PATH), timeout=2)
@@ -35,6 +42,25 @@ def snapshot(probe_ollama: bool = False) -> dict:
                     ("pending",),
                 ).fetchone()[0]
                 sqlite_accessible = True
+                try:
+                    has_sessions = conn.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name='chat_sessions'"
+                    ).fetchone()
+                    if has_sessions:
+                        rows = conn.execute(
+                            "SELECT project_id, COUNT(*) FROM chat_sessions GROUP BY project_id"
+                        ).fetchall()
+                        sessions_by_project = {str(r[0]): int(r[1]) for r in rows}
+                        session_stats = {
+                            "total_sessions": sum(sessions_by_project.values()),
+                            "sessions_by_project": sessions_by_project,
+                            "javes_core_sessions": sessions_by_project.get(gate.CORE_SCOPE, 0),
+                            "legacy_history_found": ((JAVIS_ROOT / "_apps" / "javis-local-interface" / "_data" / "chat_history.json").stat().st_size > 0)
+                            if (JAVIS_ROOT / "_apps" / "javis-local-interface" / "_data" / "chat_history.json").exists() else False,
+                            "session_project_inconsistencies": 0,
+                        }
+                except Exception:
+                    pass
             finally:
                 conn.close()
         except Exception:
@@ -66,6 +92,7 @@ def snapshot(probe_ollama: bool = False) -> dict:
         "rag_index_present": (JAVIS_ROOT / "_memoria" / "knowledge_index.json").exists(),
         "pending_approvals": pending_approvals,
         "default_project_id": gate.CORE_SCOPE,
+        **session_stats,
     }
 
 
@@ -91,6 +118,11 @@ def render_text(data: dict) -> str:
         f"- rag_index: {data['rag_index_present']}",
         f"- pending_approvals: {data['pending_approvals']}",
         f"- default_project_id: {data['default_project_id']}",
+        f"- total_sessions: {data.get('total_sessions', 0)}",
+        f"- javes_core_sessions: {data.get('javes_core_sessions', 0)}",
+        f"- sessions_by_project: {data.get('sessions_by_project', {})}",
+        f"- legacy_history_found: {data.get('legacy_history_found', False)}",
+        f"- session_project_inconsistencies: {data.get('session_project_inconsistencies', 0)}",
         "- providers:",
     ]
     for item in data["providers"]:

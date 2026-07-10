@@ -1,6 +1,6 @@
 // Chat — conversa com os agentes (texto, upload, voz). Extraído de app.js em
 // 2026-07-02. MESMO comportamento; agora módulo ES.
-import { h, $, state, BACKEND, CORE_PROJECT_ID, tryJson, withLocalAuth, _esc, activeAgent, pct } from "../../app.js";
+import { h, $, state, BACKEND, CORE_PROJECT_ID, tryJson, withLocalAuth, _esc, activeAgent, pct, projectIdForAgent, getChatSessionId, setChatSessionId } from "../../app.js";
 import { initVoiceStage } from "../voice.js";
 
 const CMD_SUGGEST = [
@@ -144,10 +144,14 @@ async function sendChat(a, explicitMsg, speak) {
 
   let full = "", meta = {};
   try {
+    const projectId = projectIdForAgent(a);
+    const sessionId = getChatSessionId(a, projectId);
+    const payload = { message: msg, project_id: CORE_PROJECT_ID, session_id: sessionId, use_conclave: !!state.useConclave, model: "claude" };
+    payload.project_id = projectId;
     const res = await fetch(BACKEND + "chat/stream", withLocalAuth({
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: msg, project_id: CORE_PROJECT_ID, use_conclave: !!state.useConclave, model: "claude" }),
+      body: JSON.stringify(payload),
     }));
     if (!res.ok || !res.body) {
       const err = await res.json().catch(() => ({}));
@@ -181,6 +185,7 @@ async function sendChat(a, explicitMsg, speak) {
           if (ev.text) full = ev.text;
           if (ev.brain) state.lastBrain = ev.brain;
           if (ev.intent) state.lastTools = ev.intent;
+          if (ev.session_id) setChatSessionId(a, ev.project_id || projectId, ev.session_id);
           meta = Object.assign(meta, ev);
         }
       }

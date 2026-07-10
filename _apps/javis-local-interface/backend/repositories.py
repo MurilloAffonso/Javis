@@ -15,14 +15,30 @@ import db
 
 # ── messages ──────────────────────────────────────────────────────────────
 class _Messages:
-    def add(self, role: str, content: str, brain: str = "", intent: str = "", source: str = "chat") -> int:
+    def add(
+        self,
+        role: str,
+        content: str,
+        brain: str = "",
+        intent: str = "",
+        source: str = "chat",
+        project_id: str = "javes-core",
+        session_id: str = "default",
+    ) -> int:
         return db.execute(
-            "INSERT INTO messages(role, content, brain, intent, source) VALUES(?,?,?,?,?)",
-            (role, content, brain, intent, source),
+            "INSERT INTO messages(role, content, brain, intent, source, project_id, session_id) VALUES(?,?,?,?,?,?,?)",
+            (role, content, brain, intent, source, project_id or "javes-core", session_id or "default"),
         )
 
-    def recent(self, limit: int = 50) -> list[dict]:
-        return db.query("SELECT * FROM messages ORDER BY id DESC LIMIT ?", (limit,))
+    def recent(self, limit: int = 50, project_id: str = "", session_id: str = "") -> list[dict]:
+        sql = "SELECT * FROM messages WHERE 1=1"
+        params: list = []
+        if project_id:
+            sql += " AND COALESCE(project_id,'javes-core')=?"; params.append(project_id)
+        if session_id:
+            sql += " AND COALESCE(session_id,'default')=?"; params.append(session_id)
+        sql += " ORDER BY id DESC LIMIT ?"; params.append(limit)
+        return db.query(sql, tuple(params))
 
     def count(self) -> int:
         return db.count("messages")
@@ -64,7 +80,7 @@ class _Tasks:
         if agent:
             sql += " AND COALESCE(t.agent,'')=?"; params.append(agent)
         if project_id:
-            sql += " AND t.project_id=?"; params.append(project_id)
+            sql += " AND COALESCE(t.project_id,'javes-core')=?"; params.append(project_id)
         sql += " ORDER BY t.id"
         return db.query(sql, tuple(params))
 
@@ -74,7 +90,12 @@ class _Tasks:
             (status, ext_id),
         )
 
-    def get_task(self, ext_id: str) -> dict | None:
+    def get_task(self, ext_id: str, project_id: str = "") -> dict | None:
+        if project_id:
+            return db.query_one(
+                "SELECT * FROM tasks WHERE ext_id=? AND COALESCE(project_id, 'javes-core')=?",
+                (ext_id, project_id),
+            )
         return db.query_one("SELECT * FROM tasks WHERE ext_id=?", (ext_id,))
 
     def complete_task(self, ext_id: str, actor: str = "system", note: str | None = None) -> int:
@@ -197,13 +218,25 @@ class _Approvals:
             return False
         return True
 
-    def pending(self) -> list[dict]:
+    def pending(self, project_id: str = "") -> list[dict]:
+        if project_id:
+            return db.query(
+                "SELECT * FROM approvals WHERE status='pending' AND COALESCE(project_id, 'javes-core')=? ORDER BY id DESC",
+                (project_id,),
+            )
         return db.query("SELECT * FROM approvals WHERE status='pending' ORDER BY id DESC")
 
-    def by_task(self, task_id: str) -> list[dict]:
+    def by_task(self, task_id: str, project_id: str = "") -> list[dict]:
+        if project_id:
+            return db.query(
+                "SELECT * FROM approvals WHERE task_id=? AND COALESCE(project_id, 'javes-core')=? ORDER BY id",
+                (task_id, project_id),
+            )
         return db.query("SELECT * FROM approvals WHERE task_id=? ORDER BY id", (task_id,))
 
-    def count_pending(self) -> int:
+    def count_pending(self, project_id: str = "") -> int:
+        if project_id:
+            return db.count("approvals", "status='pending' AND COALESCE(project_id, 'javes-core')=?", (project_id,))
         return db.count("approvals", "status='pending'")
 
 

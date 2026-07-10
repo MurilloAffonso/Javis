@@ -331,8 +331,37 @@ SERVICES = {
 class ChatRequest(BaseModel):
     message: str
     project_id: str = ""
+    session_id: str = ""
     use_conclave: bool = False
     model: str = "claude"
+
+
+def _normalize_project_id(project_id: str | None) -> str:
+    return (project_id or "").strip() or gate.CORE_SCOPE
+
+
+def _resolve_session(project_id: str, session_id: str = "", create_if_missing: bool = True) -> tuple[str, str, dict | None]:
+    pid = _normalize_project_id(project_id)
+    sid = (session_id or "").strip()
+    if sid:
+        row = history_store.get_session(sid)
+        if not row:
+            return pid, sid, {"status": "not_found", "reason": "session_not_found"}
+        if row.get("project_id") != pid:
+            return pid, sid, {"status": "blocked", "reason": "project_scope_mismatch"}
+        return pid, sid, None
+    if not create_if_missing:
+        return pid, "", None
+    sid = history_store.DEFAULT_SESSION_ID
+    ensured = history_store.ensure_session(pid, sid)
+    if ensured.get("status") != "ok":
+        return pid, sid, {"status": "blocked", "reason": "project_scope_mismatch"}
+    return pid, sid, None
+
+
+def _session_error_response(error: dict):
+    code = 404 if error.get("status") == "not_found" else 403
+    return JSONResponse(error, status_code=code)
 
 
 @app.get("/")
@@ -810,9 +839,13 @@ async def chat(
     blocked = _local_auth_gate(x_javes_local_token, "chat")
     if blocked:
         return _gate_json(blocked)
-    blocked = gate.require_project_scope(req.project_id, scope=[gate.CORE_SCOPE, gate.CEREBRO_JAMPA_SCOPE])
+    project_id = _normalize_project_id(req.project_id)
+    blocked = gate.require_project_scope(project_id, scope=[gate.CORE_SCOPE, gate.CEREBRO_JAMPA_SCOPE])
     if blocked:
         return _gate_json(blocked)
+    project_id, session_id, session_error = _resolve_session(project_id, req.session_id)
+    if session_error:
+        return _session_error_response(session_error)
 
     text  = req.message.strip()
     if not text:
@@ -829,12 +862,12 @@ async def chat(
         return JSONResponse({**entry, **payload})
 
     # Núcleo único (threadpool evita bloquear o event loop)
-    out = await run_in_threadpool(_brain, text, _get_history_messages(), req.use_conclave, req.project_id)
+    out = await run_in_threadpool(_brain, text, _get_history_messages(project_id, session_id), req.use_conclave, project_id)
     entry = _entry_from_brain(text, out, start)
+    entry["project_id"] = project_id
+    entry["session_id"] = session_id
     _save(entry)
-    history_store.append("user", text)
-    history_store.append("assistant", out["text"])
-    _persist_messages(text, out)  # dual-write SQLite (não quebra se falhar)
+    _persist_messages(text, out, project_id=project_id, session_id=session_id)  # dual-write SQLite (não quebra se falhar)
     return JSONResponse(entry)
 
 
@@ -985,10 +1018,11 @@ async def tasks_list(status: str = "", workflow: str = "", agent: str = "", proj
     Filtros opcionais: status, workflow (=mission), agent, project_id."""
     try:
         import repositories as repo
+        pid = _normalize_project_id(project_id)  # ausente → javes-core; nunca "todos"
         if repo.tasks.count() == 0:           # fallback: popula do Markdown
             import db_sync
             db_sync.sync_tasks()
-        rows = repo.tasks.for_board(status=status, workflow=workflow, agent=agent, project_id=project_id)
+        rows = repo.tasks.for_board(status=status, workflow=workflow, agent=agent, project_id=pid)
         out = []
         for r in rows:
             digest = (r.get("digest_text") or "").strip()
@@ -1007,12 +1041,15 @@ async def tasks_list(status: str = "", workflow: str = "", agent: str = "", proj
 
 
 @app.get("/tasks/{task_id}/events")
-async def task_events(task_id: str):
+async def task_events(task_id: str, project_id: str = ""):
     """Journey Log: timeline cronológica dos eventos de uma task (+ status/digest)."""
     try:
         import repositories as repo
+        pid = _normalize_project_id(project_id)  # ausente → javes-core; nunca "todos"
+        task = repo.tasks.get_task(task_id, project_id=pid)
+        if not task:
+            return JSONResponse({"status": "not_found", "reason": "task_not_found", "events": [], "total": 0}, status_code=404)
         evs = repo.task_events.list_by_task(task_id)
-        task = repo.tasks.get_task(task_id) or {}
         return JSONResponse({
             "task_id": task_id, "events": evs, "total": len(evs),
             "task_status": task.get("status"),
@@ -1103,13 +1140,14 @@ async def task_complete(
 
 
 @app.get("/tasks/{task_id}/digest")
-async def task_digest(task_id: str):
+async def task_digest(task_id: str, project_id: str = ""):
     """Digest final da task (resumo da jornada)."""
     try:
         import repositories as repo
-        t = repo.tasks.get_task(task_id)
+        pid = _normalize_project_id(project_id)  # ausente → javes-core; nunca "todos"
+        t = repo.tasks.get_task(task_id, project_id=pid)
         if not t:
-            return JSONResponse({"error": "task não encontrada"}, status_code=404)
+            return JSONResponse({"status": "not_found", "reason": "task_not_found"}, status_code=404)
         return JSONResponse({
             "task_id": task_id, "status": t.get("status"),
             "completed_at": t.get("completed_at"), "killed_at": t.get("killed_at"),
@@ -1120,12 +1158,13 @@ async def task_digest(task_id: str):
 
 
 @app.get("/approvals/pending")
-async def approvals_pending():
+async def approvals_pending(project_id: str = ""):
     """Aprovações pendentes (Gate humano) — do SQLite."""
     try:
         import repositories as repo
-        rows = repo.approvals.pending()
-        return JSONResponse({"approvals": rows, "total": len(rows)})
+        pid = _normalize_project_id(project_id)  # ausente → javes-core; nunca "todos"
+        rows = repo.approvals.pending(project_id=pid)
+        return JSONResponse({"approvals": rows, "total": len(rows), "project_id": pid})
     except Exception as e:
         return JSONResponse({"error": str(e), "approvals": [], "total": 0}, status_code=500)
 
@@ -1563,17 +1602,36 @@ async def history(
 
 @app.get("/history")
 async def get_history(
+    project_id: str = "",
+    session_id: str = "",
     x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
 ):
     """Retorna histórico de chat persistido em disco."""
     blocked = _local_auth_gate(x_javes_local_token, "history.read")
     if blocked:
         return _gate_json(blocked)
-    return JSONResponse(history_store.load())
+    project_id, session_id, session_error = _resolve_session(project_id, session_id)
+    if session_error:
+        return _session_error_response(session_error)
+    return JSONResponse(history_store.load(project_id, session_id))
+
+
+@app.get("/history/sessions")
+async def history_sessions(
+    project_id: str = "",
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    blocked = _local_auth_gate(x_javes_local_token, "history.sessions")
+    if blocked:
+        return _gate_json(blocked)
+    pid = _normalize_project_id(project_id)
+    return JSONResponse({"project_id": pid, "sessions": history_store.list_sessions(pid)})
 
 
 @app.delete("/history")
 async def clear_history(
+    project_id: str = "",
+    session_id: str = "",
     x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
 ):
     """Limpa o histórico de chat."""
@@ -1583,8 +1641,12 @@ async def clear_history(
     blocked = gate.require_local_actions("history.clear")
     if blocked:
         return _gate_json(blocked)
-    history_store.clear()
-    return JSONResponse({"status": "ok"})
+    project_id, session_id, session_error = _resolve_session(project_id, session_id, create_if_missing=False)
+    if session_error:
+        return _session_error_response(session_error)
+    sid = session_id or history_store.DEFAULT_SESSION_ID
+    history_store.clear(project_id, sid)
+    return JSONResponse({"status": "ok", "project_id": project_id, "session_id": sid})
 
 
 # ── Streaming chat ────────────────────────────────────────
@@ -1600,9 +1662,13 @@ async def chat_stream(
     blocked = _local_auth_gate(x_javes_local_token, "chat.stream")
     if blocked:
         return _gate_json(blocked)
-    blocked = gate.require_project_scope(req.project_id, scope=[gate.CORE_SCOPE, gate.CEREBRO_JAMPA_SCOPE])
+    project_id = _normalize_project_id(req.project_id)
+    blocked = gate.require_project_scope(project_id, scope=[gate.CORE_SCOPE, gate.CEREBRO_JAMPA_SCOPE])
     if blocked:
         return _gate_json(blocked)
+    project_id, session_id, session_error = _resolve_session(project_id, req.session_id)
+    if session_error:
+        return _session_error_response(session_error)
 
     text = req.message.strip()
     if not text:
@@ -1636,24 +1702,21 @@ async def chat_stream(
                        "status": res.get("status", "ok"), "tools": [intent0], "route": route}
                 entry = _entry_from_brain(text, out, start)
                 _save(entry)
-                history_store.append("user", text)
-                history_store.append("assistant", full)
-                yield f"data: {_j.dumps({'type':'done','brain':'main','intent':intent0,'ms':entry['ms']})}\n\n"
+                _persist_messages(text, out, project_id=project_id, session_id=session_id)
+                yield f"data: {_j.dumps({'type':'done','brain':'main','intent':intent0,'ms':entry['ms'],'project_id':project_id,'session_id':session_id})}\n\n"
                 yield "data: [DONE]\n\n"
                 return
 
             # 2) Conversa OU ação → cérebro com FERRAMENTAS (raciocínio real:
             #    busca nas notas, lembra fatos, encadeia ações), depois fake-stream.
             #    O padding acima já deu feedback instantâneo — não perdemos UX.
-            out = _brain(text, _get_history_messages(), req.use_conclave, req.project_id)
+            out = _brain(text, _get_history_messages(project_id, session_id), req.use_conclave, project_id)
             for word in (out["text"] or "Pronto, senhor.").split(" "):
                 yield f"data: {_j.dumps({'type':'token','text':word + ' '})}\n\n"
             entry = _entry_from_brain(text, out, start)
             _save(entry)
-            history_store.append("user", text)
-            history_store.append("assistant", out["text"])
-            _persist_messages(text, out)  # dual-write SQLite
-            yield f"data: {_j.dumps({'type':'done','brain':out['brain'],'intent':out['intent'],'ms':entry['ms']})}\n\n"
+            _persist_messages(text, out, project_id=project_id, session_id=session_id)  # dual-write SQLite
+            yield f"data: {_j.dumps({'type':'done','brain':out['brain'],'intent':out['intent'],'ms':entry['ms'],'project_id':project_id,'session_id':session_id})}\n\n"
         except Exception as e:
             yield f"data: {_j.dumps({'type':'done','text':f'⚠️ Erro interno: {e}','brain':brain0,'intent':intent0,'ms':0})}\n\n"
         yield "data: [DONE]\n\n"
@@ -2266,13 +2329,20 @@ def _brain(
             "tools": [], "route": route, "orch": None}
 
 
-def _persist_messages(user_text: str, out: dict) -> None:
+def _persist_messages(
+    user_text: str,
+    out: dict,
+    project_id: str = gate.CORE_SCOPE,
+    session_id: str = history_store.DEFAULT_SESSION_ID,
+) -> None:
     """Dual-write das mensagens no SQLite. Nunca quebra o chat se falhar."""
     try:
         import repositories as repo
-        repo.messages.add("user", user_text, source="chat")
+        history_store.ensure_session(project_id, session_id)
+        repo.messages.add("user", user_text, source="chat", project_id=project_id, session_id=session_id)
         repo.messages.add("assistant", out.get("text", ""), brain=out.get("brain", ""),
-                          intent=out.get("intent", ""), source="chat")
+                          intent=out.get("intent", ""), source="chat",
+                          project_id=project_id, session_id=session_id)
     except Exception:
         pass
 
@@ -2288,7 +2358,14 @@ def _entry_from_brain(text: str, out: dict, start: datetime) -> dict:
     return entry
 
 
-def _get_history_messages() -> list[dict]:
+def _get_history_messages(project_id: str | None = None, session_id: str | None = None) -> list[dict]:
+    if project_id is not None or session_id is not None:
+        rows = history_store.load(project_id, session_id)
+        return [
+            {"role": row.get("role", ""), "content": row.get("content", "")}
+            for row in rows[-6:]
+            if row.get("role") and row.get("content") is not None
+        ]
     msgs = []
     for h in _history[-6:]:
         msgs.append({"role": "user",      "content": h.get("user", "")})

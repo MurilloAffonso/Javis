@@ -54,7 +54,19 @@ CREATE TABLE IF NOT EXISTS messages (
     brain      TEXT,
     intent     TEXT,
     source     TEXT DEFAULT 'chat',               -- chat | voice
+    project_id TEXT DEFAULT 'javes-core',
+    session_id TEXT DEFAULT 'default',
     created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS chat_sessions (
+    session_id    TEXT PRIMARY KEY,
+    project_id    TEXT NOT NULL,
+    title         TEXT,
+    status        TEXT DEFAULT 'active',
+    metadata_json TEXT,
+    created_at    TEXT DEFAULT (datetime('now')),
+    updated_at    TEXT DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS approvals (
@@ -126,6 +138,8 @@ CREATE TABLE IF NOT EXISTS task_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_project_session ON messages(project_id, session_id, id);
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_project ON chat_sessions(project_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_tasks_status     ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_approvals_status ON approvals(status);
 CREATE INDEX IF NOT EXISTS idx_logs_created     ON action_logs(created_at);

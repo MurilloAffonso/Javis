@@ -61,6 +61,8 @@ def init_db() -> None:
                 "ALTER TABLE tasks ADD COLUMN digest_text TEXT",
                 "ALTER TABLE tasks ADD COLUMN agent TEXT",
                 "ALTER TABLE tasks ADD COLUMN project_id TEXT",
+                "ALTER TABLE messages ADD COLUMN project_id TEXT",
+                "ALTER TABLE messages ADD COLUMN session_id TEXT",
                 "ALTER TABLE knowledge_chunks ADD COLUMN categoria TEXT",
             ):
                 try:

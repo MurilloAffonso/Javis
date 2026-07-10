@@ -770,16 +770,20 @@ def _system_dynamic() -> str:
     n = datetime.now()
     hora = f"{n.strftime('%H:%M')}, {dias[n.weekday()]}, {n.day} de {meses[n.month-1]} de {n.year}"
     out = f"Hora atual: {hora}"
-    try:
-        import briefing
-        estado = briefing.estado_resumido()
-        if estado:
-            out += (
-                "\n\n## Estado atual do projeto Javis (use para responder o que foi "
-                "feito e o que está pendente; não invente nada fora disto):\n" + estado
-            )
-    except Exception:
-        pass
+    # R3.1 — o estado interno do Javes (CURRENT_STATE.md, roadmap, fases R1..R4)
+    # SÓ entra no contexto do núcleo javes-core. Projetos conectados (ex.:
+    # project:cerebro-jampa) não recebem o briefing interno do núcleo.
+    if _current_project_id() == _DEFAULT_PROJECT_ID:
+        try:
+            import briefing
+            estado = briefing.estado_resumido()
+            if estado:
+                out += (
+                    "\n\n## Estado atual do projeto Javis (use para responder o que foi "
+                    "feito e o que está pendente; não invente nada fora disto):\n" + estado
+                )
+        except Exception:
+            pass
     return out
 
 

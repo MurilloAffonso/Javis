@@ -337,11 +337,35 @@ O doctor não sobe servidor, não executa agente, não chama provider cloud e n�
 
 Detalhes: `docs/PROVIDER_REGISTRY.md`.
 
+## R3 — Sessões, histórico e memória por project_id
+
+R3 isola sessões, histórico e leituras operacionais por `project_id`.
+
+Regras:
+
+- `javes-core` é o padrão seguro para chamadas antigas.
+- `project:cerebro-jampa` exige envio explícito em rotas VP/Jampa.
+- cada `session_id` pertence a exatamente um `project_id`.
+- sessão de outro projeto retorna `blocked/project_scope_mismatch`.
+- sessão inexistente retorna `not_found/session_not_found`.
+- histórico legado global é tratado como `javes-core/default` e não é apagado.
+- `/chat` e `/chat/stream` passam apenas o histórico da sessão/projeto atual ao agente.
+- RAG do núcleo exclui VP/Jampa; RAG Jampa usa escopo `vp` somente com `project_id` explícito.
+
+Doctor:
+
+```powershell
+python scripts/javes_doctor.py --no-probe
+```
+
+O doctor mostra contagem de sessões e inconsistências sem imprimir mensagens do histórico.
+
+Detalhes: `docs/SESSION_AND_PROJECT_SCOPE.md`.
+
 ## O que falta antes de iniciar o servidor
 
 - Implementar UI/politica operacional para token local.
 - Auditar Chainlit/app_ui antes de usar `iniciar-javis.bat`.
 - Classificar rotas restantes de chat/voice/agents/train/browser por risco: read-only, mutacao local, rede externa, execucao local.
-- Separar ou isolar VP/Jampa do core Javis.
 - Decidir politica de limpeza para caches/runtime/logs com aprovacao explicita.
 - Rodar testes offline apenas depois da autenticacao e das flags serem revisadas.
