@@ -31,6 +31,8 @@ MAX_TIMEOUT_SECONDS = 300
 APPROVE_PHRASE = "APROVAR TESTE CONTROLADO"
 RUN_PHRASE = "EXECUTAR TESTE CONTROLADO"
 REJECT_PHRASE = "REJEITAR TESTE CONTROLADO"
+APPROVE_MERGE_PHRASE = "APROVAR MERGE CONTROLADO"
+MERGE_PHRASE = "EXECUTAR MERGE CONTROLADO"
 SMOKE_FILE = "docs/EXECUTION_SMOKE_TEST.md"
 SMOKE_CONTENT = """# Javes Supervised Execution Smoke Test
 
@@ -194,6 +196,61 @@ def _repo_clean(repository_path: str) -> str:
         if (git_path / marker).exists():
             return "git_operation_in_progress"
     return ""
+
+
+def _merge_review_preflight(task: dict, facade: ExecutionFacade) -> dict:
+    if task.get("project_id") != CORE_PROJECT_ID:
+        return _blocked("project_id_mismatch")
+    if task.get("objective") != SMOKE_OBJECTIVE:
+        return _blocked("not_smoke_task")
+    if task.get("status") != et.AWAITING_REVIEW:
+        return _blocked("task_not_awaiting_review")
+
+    result = facade.result_summary(task["task_id"], CORE_PROJECT_ID)
+    summary = result.get("summary") or {}
+    if (
+        _derive_tests_status(task, summary) != "passed"
+        or not _evidence_present(task.get("test_report_path"))
+    ):
+        return _blocked("tests_not_passed")
+
+    worktree_path = Path(task.get("worktree_path") or "").resolve()
+    if not worktree_path.is_dir():
+        return _blocked("worktree_missing")
+    expected_branch = task.get("work_branch") or ""
+    try:
+        et.validate_work_branch(expected_branch)
+    except Exception:
+        return _blocked("work_branch_invalid")
+    branch = _git(["rev-parse", "--abbrev-ref", "HEAD"], worktree_path)
+    if branch.returncode != 0 or branch.stdout.strip() != expected_branch:
+        return _blocked("unexpected_worktree_branch")
+
+    status = _git(["status", "--porcelain", "--untracked-files=normal"], worktree_path)
+    if status.returncode != 0:
+        return _blocked("worktree_status_unavailable")
+    if any(line.startswith("??") for line in status.stdout.splitlines()):
+        return _blocked("untracked_files_present")
+    if status.stdout.strip():
+        return _blocked("worktree_not_clean")
+
+    source_commit = (task.get("source_commit") or "").strip()
+    if not source_commit:
+        return _blocked("source_commit_required")
+    verified = _git(["rev-parse", "--verify", f"{source_commit}^{{commit}}"], worktree_path)
+    if verified.returncode != 0 or verified.stdout.strip() != source_commit:
+        return _blocked("source_commit_invalid")
+    new_commits = _git(
+        ["rev-list", "--count", f"{source_commit}..{expected_branch}"], worktree_path
+    )
+    if new_commits.returncode != 0:
+        return _blocked("work_branch_unreadable")
+    try:
+        if int(new_commits.stdout.strip() or "0") < 1:
+            return _blocked("work_branch_without_new_commit")
+    except ValueError:
+        return _blocked("work_branch_unreadable")
+    return {"status": "ok"}
 
 
 def _approval_consumed(task: dict) -> bool:
@@ -441,6 +498,116 @@ def cmd_reject(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_request_merge(args: argparse.Namespace) -> int:
+    task = _load_task(args.task_id)
+    if not task:
+        _print_json(_blocked("task_not_found"))
+        return 2
+    facade = make_facade()
+    preflight = _merge_review_preflight(task, facade)
+    if preflight.get("status") != "ok":
+        _print_json(preflight)
+        return 2
+    try:
+        out = facade.request_merge_approval(task["task_id"], CORE_PROJECT_ID)
+    except execution_approvals.ApprovalDenied:
+        _print_json(_blocked("merge_approval_request_denied"))
+        return 2
+    approval_id = out.get("merge_approval_id")
+    _print_json({
+        "status": out.get("status"),
+        "task_id": task["task_id"],
+        "project_id": CORE_PROJECT_ID,
+        "approval_id": approval_id,
+        "merge": "not_executed",
+        "next": (
+            "python scripts/javes_execution_smoke.py approve-merge "
+            f"--task-id {task['task_id']} --approval-id {approval_id} "
+            f"--confirm \"{APPROVE_MERGE_PHRASE}\""
+        ),
+    })
+    return 0
+
+
+def cmd_approve_merge(args: argparse.Namespace) -> int:
+    if args.confirm != APPROVE_MERGE_PHRASE:
+        _print_json(_blocked("confirmation_phrase_required"))
+        return 2
+    task = _load_task(args.task_id)
+    if not task:
+        _print_json(_blocked("task_not_found"))
+        return 2
+    approval = repo.approvals.get(int(args.approval_id))
+    if not approval or approval.get("status") != "pending":
+        _print_json(_blocked("approval_not_pending"))
+        return 2
+    if (
+        approval.get("task_id") != task["task_id"]
+        or approval.get("project_id") != CORE_PROJECT_ID
+    ):
+        _print_json(_blocked("approval_scope_mismatch"))
+        return 2
+    if approval.get("action") != execution_approvals.ACTION_MERGE:
+        _print_json(_blocked("approval_action_mismatch"))
+        return 2
+    if task.get("approval_id") and int(args.approval_id) == int(task["approval_id"]):
+        _print_json(_blocked("execution_start_approval_not_allowed"))
+        return 2
+    if task.get("status") != et.AWAITING_REVIEW:
+        _print_json(_blocked("task_not_awaiting_review"))
+        return 2
+
+    repo.approvals.decide(
+        int(args.approval_id),
+        True,
+        note="R4.3C smoke CLI",
+        approved_by="smoke_cli",
+    )
+    try:
+        out = make_facade().approve_merge(
+            task["task_id"], CORE_PROJECT_ID, int(args.approval_id)
+        )
+    except execution_approvals.ApprovalDenied:
+        _print_json(_blocked("merge_approval_denied"))
+        return 2
+    _print_json({
+        "status": out.get("status"),
+        "task_id": task["task_id"],
+        "project_id": CORE_PROJECT_ID,
+        "approval_id": int(args.approval_id),
+        "merge": "not_executed",
+        "next": (
+            "python scripts/javes_execution_smoke.py merge "
+            f"--task-id {task['task_id']} --confirm \"{MERGE_PHRASE}\""
+        ),
+    })
+    return 0
+
+
+def cmd_merge(args: argparse.Namespace) -> int:
+    if args.confirm != MERGE_PHRASE:
+        _print_json(_blocked("confirmation_phrase_required"))
+        return 2
+    task = _load_task(args.task_id)
+    if not task:
+        _print_json(_blocked("task_not_found"))
+        return 2
+    if task.get("status") != et.APPROVED_FOR_MERGE:
+        _print_json(_blocked("task_not_approved_for_merge"))
+        return 2
+    out = make_facade().perform_merge(task["task_id"], CORE_PROJECT_ID)
+    _print_json({
+        "status": out.get("status"),
+        "reason": out.get("reason", ""),
+        "task_id": task["task_id"],
+        "project_id": CORE_PROJECT_ID,
+        "commit": out.get("commit", ""),
+    })
+    if out.get("status") == et.COMPLETED:
+        return 0
+    return 2 if out.get("status") == "blocked" else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Smoke test manual do executor supervisionado R4.3A.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -469,6 +636,25 @@ def build_parser() -> argparse.ArgumentParser:
     reject.add_argument("--task-id", required=True)
     reject.add_argument("--confirm", required=True)
     reject.set_defaults(func=cmd_reject)
+
+    request_merge = sub.add_parser(
+        "request-merge", help="Valida a revisão e solicita approval execution.merge."
+    )
+    request_merge.add_argument("--task-id", required=True)
+    request_merge.set_defaults(func=cmd_request_merge)
+
+    approve_merge = sub.add_parser(
+        "approve-merge", help="Consome approval execution.merge sem executar merge."
+    )
+    approve_merge.add_argument("--task-id", required=True)
+    approve_merge.add_argument("--approval-id", type=int, required=True)
+    approve_merge.add_argument("--confirm", required=True)
+    approve_merge.set_defaults(func=cmd_approve_merge)
+
+    merge = sub.add_parser("merge", help="Executa merge local via ControlledMergeService.")
+    merge.add_argument("--task-id", required=True)
+    merge.add_argument("--confirm", required=True)
+    merge.set_defaults(func=cmd_merge)
     return parser
 
 

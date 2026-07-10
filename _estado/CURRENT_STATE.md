@@ -30,26 +30,27 @@
 | **R4.2C2** | Integracao segura com Orchestrator e Command Center: cria `execution_task`, solicita approval e para sem execucao automatica | Concluido |
 | **R4.3A** | CLI para smoke test controlado do executor supervisionado, sem executar agente real durante a implementacao | Concluido |
 | **R4.3B1** | Correcao do fechamento da execucao: remove prompt interno, cria commit local controlado e coleta diff de arquivos novos | Concluido |
+| **R4.3C** | CLI de revisao e merge controlado do smoke com gate `execution.merge`, approval single-use e `ControlledMergeService` | Concluido |
 
-> **Executor ainda DESLIGADO.** R4.1/R4.2A/R4.2B/R4.2C1/R4.2C2/R4.3A/R4.3B1 sao fundacao + gates + adapters + merge local
-> controlado + integracao supervisionada + CLI de smoke + fechamento com commit local controlado: nenhum agente real roda por default, fluxo legado direto foi desativado, e
+> **Executor ainda DESLIGADO.** R4.1/R4.2A/R4.2B/R4.2C1/R4.2C2/R4.3A/R4.3B1/R4.3C sao fundacao + gates + adapters + merge local
+> controlado + integracao supervisionada + CLI de smoke + fechamento com commit local controlado + CLI de revisao/merge: nenhum agente real roda por default, fluxo legado direto foi desativado, e
 > `JAVIS_ENABLE_SUPERVISED_EXEC` continua `False`.
 ---
 
 ## PROXIMO PASSO OFICIAL
 
-**Repetir o smoke real manual com Claude Code em nova task**
+**R4.3D — executar o primeiro merge real controlado e validar o ciclo completo**
 
-Executar novamente o smoke test controlado usando Claude Code, validar que a
-worktree cria commit local na work_branch, que arquivos novos entram no diff
-sanitizado e que o prompt interno nao aparece como alteracao.
+Usar uma task smoke real já revisada para solicitar e consumir o gate
+`execution.merge`, executar o merge local controlado e validar task concluida,
+commit final, resultados preservados e remocao exclusiva da worktree da task.
 ---
 
 ## Fases seguintes (ordem oficial)
 
-1. **Repetir smoke real manual com Claude Code** (proximo passo acima).
+1. **R4.3D — primeiro merge real controlado** (proximo passo acima).
 
-2. **R4.3C/R4.4 - Endurecimento adicional / sandbox opcional**
+2. **R4.4 - Endurecimento adicional / sandbox opcional**
    Bloqueio de rede real (Docker `--network none` opcional, nunca default),
    limites de recurso e hardening extra do executor.
 

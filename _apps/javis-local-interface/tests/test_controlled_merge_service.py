@@ -195,6 +195,16 @@ def test_source_branch_mudou_bloqueia(git_repo):
     assert result["reason"] == "source_branch_moved"
 
 
+def test_source_commit_ausente_bloqueia(git_repo):
+    _, _, _, manager = git_repo
+    tid, _ = _prepared_task(git_repo, source_commit="")
+
+    result = _service(manager).merge(tid, CORE)
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "source_commit_required"
+
+
 def test_repo_com_alteracao_rastreada_bloqueia(git_repo):
     repo_path, _, _, manager = git_repo
     tid, _ = _prepared_task(git_repo)
@@ -234,16 +244,18 @@ def test_merge_nao_faz_push_e_usa_shell_false(git_repo):
 def test_conflito_e_abortado_e_preserva_worktree(git_repo):
     repo_path, _, _, manager = git_repo
     tid, meta = _prepared_task(git_repo)
+    collector = FakeCollector()
     (repo_path / "file.txt").write_text("base\nmain conflict\n", encoding="utf-8")
     assert _git(repo_path, "add", "file.txt").returncode == 0
     assert _git(repo_path, "commit", "-m", "main conflict").returncode == 0
     repo.execution_tasks.set_source_commit(tid, CORE, manager.branch_head(repo_path, _git(repo_path, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip()))
 
-    result = _service(manager).merge(tid, CORE)
+    result = _service(manager, collector=collector).merge(tid, CORE)
     task = repo.execution_tasks.get(tid, CORE)
     assert result["status"] == et.REVIEW_REJECTED
     assert task["last_error"] == "merge_conflict"
     assert Path(meta["worktree_path"]).exists()
+    assert collector.calls
     assert not (repo_path / ".git" / "MERGE_HEAD").exists()
 
 
