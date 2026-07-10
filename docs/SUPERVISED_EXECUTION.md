@@ -339,3 +339,52 @@ completos.
 
 R4.3 — teste controlado do executor supervisionado e hardening. Modo Madrugada
 somente depois de teste real controlado e aprovado. R4 ainda não está concluída.
+
+---
+
+# R4.3A — CLI para smoke test controlado
+
+A R4.3A prepara um fluxo manual para o primeiro teste real do executor
+supervisionado. Durante a implementação e validação desta fase, nenhum Codex real
+e nenhum Claude Code real foram executados; os testes usam fakes/mocks.
+
+## CLI
+
+Entrada:
+
+```
+python scripts/javes_execution_smoke.py prepare --executor claude
+python scripts/javes_execution_smoke.py approve-start --task-id <task_id> --approval-id <approval_id> --confirm "APROVAR TESTE CONTROLADO"
+set JAVIS_ENABLE_SUPERVISED_EXEC=1
+python scripts/javes_execution_smoke.py run --task-id <task_id> --confirm "EXECUTAR TESTE CONTROLADO"
+python scripts/javes_execution_smoke.py status --task-id <task_id>
+```
+
+`project_id` fica fixo em `javes-core`. O objetivo é fixo e não aceita texto livre:
+criar/atualizar somente `docs/EXECUTION_SMOKE_TEST.md` na worktree com o conteúdo
+permitido do smoke test.
+
+## Segurança
+
+- timeout máximo de 300 segundos;
+- somente uma task smoke ativa por vez;
+- `approve-start` exige frase exata e consome approval `execution.start`;
+- `run` exige `JAVIS_ENABLE_SUPERVISED_EXEC=1` no processo atual e frase exata;
+- `run` recusa task sem approval consumido, task já executada e status diferente
+  de `approved`;
+- preflight valida schema, `CURRENT_STATE.md`, executor, repo limpo de alterações
+  rastreadas, work branch segura e ausência de outro smoke em execução;
+- não há merge, push, scheduler, browser, Telegram, MCP, WhatsApp ou Modo Madrugada;
+- status mostra somente resumo sanitizado, contagem de arquivos e se a worktree
+  está preservada, sem stdout/stderr bruto, segredos ou paths completos.
+
+## Executor inicial
+
+O primeiro teste real recomendado é com Claude Code. Claude continua limitado a
+Read/Edit/Write, sem Bash. Codex continua preparado, mas falha fechado enquanto o
+sandbox `workspace-write` não estiver validado explicitamente.
+
+## Próximo passo
+
+R4.3B — primeiro smoke test real manual com Claude Code. Modo Madrugada continua
+bloqueado.

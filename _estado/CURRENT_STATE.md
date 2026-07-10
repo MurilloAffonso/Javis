@@ -28,25 +28,26 @@
 | **R4.2B** | Adapters supervisionados (`CodexAdapter`/`ClaudeCodeAdapter`) + `execution_service` até `awaiting_review` (sem merge) | ✅ **Concluído** |
 | **R4.2C1** | Merge local controlado apos segundo approval persistido, com protecao `source_commit` (sem chat/orchestrator/Command Center) | Concluido |
 | **R4.2C2** | Integracao segura com Orchestrator e Command Center: cria `execution_task`, solicita approval e para sem execucao automatica | Concluido |
+| **R4.3A** | CLI para smoke test controlado do executor supervisionado, sem executar agente real durante a implementacao | Concluido |
 
-> **Executor ainda DESLIGADO.** R4.1/R4.2A/R4.2B/R4.2C1/R4.2C2 sao fundacao + gates + adapters + merge local
-> controlado + integracao supervisionada: nenhum agente real roda por default, fluxo legado direto foi desativado, e
+> **Executor ainda DESLIGADO.** R4.1/R4.2A/R4.2B/R4.2C1/R4.2C2/R4.3A sao fundacao + gates + adapters + merge local
+> controlado + integracao supervisionada + CLI de smoke: nenhum agente real roda por default, fluxo legado direto foi desativado, e
 > `JAVIS_ENABLE_SUPERVISED_EXEC` continua `False`.
 ---
 
 ## PROXIMO PASSO OFICIAL
 
-**R4.3 - teste controlado do executor supervisionado e hardening**
+**R4.3B - primeiro smoke test real manual com Claude Code**
 
-Executar teste real controlado do executor supervisionado, validar limites,
-resultados, evidencias e hardening antes de qualquer Modo Madrugada.
+Executar manualmente o smoke test controlado usando Claude Code, validar worktree,
+resultado sanitizado, evidencias preservadas e parada em `awaiting_review`.
 ---
 
 ## Fases seguintes (ordem oficial)
 
-1. **R4.3 - teste controlado do executor supervisionado e hardening** (proximo passo acima).
+1. **R4.3B - primeiro smoke test real manual com Claude Code** (proximo passo acima).
 
-2. **R4.4 - Endurecimento adicional / sandbox opcional**
+2. **R4.3C/R4.4 - Endurecimento adicional / sandbox opcional**
    Bloqueio de rede real (Docker `--network none` opcional, nunca default),
    limites de recurso e hardening extra do executor.
 
