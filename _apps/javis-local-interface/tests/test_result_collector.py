@@ -73,12 +73,13 @@ def worktree(tmp_path):
     return wt
 
 
-def _mk_task(project_id: str = CORE) -> str:
+def _mk_task(project_id: str = CORE, source_commit: str = "", worktree_path: str = "") -> str:
     tid = et.new_task_id()
     repo.execution_tasks.create(
         task_id=tid, project_id=project_id, executor="claude", objective="obj",
         repository_path="/repo", source_branch="main",
-        work_branch=f"javes/exec/{tid}", worktree_path=str(project_id), status="testing",
+        work_branch=f"javes/exec/{tid}", worktree_path=worktree_path or str(project_id),
+        status="testing", source_commit=source_commit,
     )
     return tid
 
@@ -146,3 +147,27 @@ def test_summary_nao_traz_conteudo_bruto(tmp_path, worktree):
     # o retorno traz só paths + contagens, nunca stdout/stderr/diff bruto
     assert "stdout" not in out and "stderr" not in out and "diff" not in out
     assert set(("result_path", "diff_path", "test_report_path", "changed_count")).issubset(out)
+
+
+def test_diff_de_source_commit_ate_head_inclui_arquivo_novo(tmp_path):
+    wt = tmp_path / "wt"
+    _make_repo(wt)
+    source_commit = _git(wt, "rev-parse", "HEAD").stdout.strip()
+    (wt / "docs").mkdir()
+    novo = wt / "docs" / "EXECUTION_SMOKE_TEST.md"
+    texto = "# Javes Supervised Execution Smoke Test\n\n- alteração válida\n"
+    novo.write_text(texto, encoding="utf-8")
+    assert novo.read_text(encoding="utf-8") == texto
+    _git(wt, "add", "docs/EXECUTION_SMOKE_TEST.md")
+    _git(wt, "commit", "-m", "javes smoke")
+
+    tid = _mk_task(CORE, source_commit=source_commit, worktree_path=str(wt))
+    coll = rc.ResultCollector(results_root=tmp_path / "results")
+    out = coll.collect(tid, CORE, wt, stdout="ok", stderr="", test_report="1 passed")
+
+    result = Path(out["result_path"]).read_text(encoding="utf-8")
+    diff = Path(out["diff_path"]).read_text(encoding="utf-8")
+    assert out["changed_count"] == 1
+    assert "docs/EXECUTION_SMOKE_TEST.md" in result
+    assert "docs/EXECUTION_SMOKE_TEST.md" in diff
+    assert "alteração válida" in diff

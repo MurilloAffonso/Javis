@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sys
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -35,6 +36,25 @@ def _mk(status: str, objective: str = "SEGREDO_OBJETIVO") -> str:
     return tid
 
 
+def _git(cwd: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", *args], cwd=str(cwd), shell=False, capture_output=True, text=True)
+
+
+def _mk_repo(path: Path) -> tuple[str, str]:
+    path.mkdir(parents=True, exist_ok=True)
+    assert _git(path, "init").returncode == 0
+    assert _git(path, "config", "user.email", "tester@example.local").returncode == 0
+    assert _git(path, "config", "user.name", "Javes Test").returncode == 0
+    (path / "a.txt").write_text("a\n", encoding="utf-8")
+    assert _git(path, "add", "a.txt").returncode == 0
+    assert _git(path, "commit", "-m", "initial").returncode == 0
+    source_commit = _git(path, "rev-parse", "HEAD").stdout.strip()
+    (path / "b.txt").write_text("b\n", encoding="utf-8")
+    assert _git(path, "add", "b.txt").returncode == 0
+    assert _git(path, "commit", "-m", "work").returncode == 0
+    return source_commit, _git(path, "rev-parse", "HEAD").stdout.strip()
+
+
 def test_doctor_conta_filas():
     _mk("pending_approval")
     _mk("awaiting_review")
@@ -61,6 +81,34 @@ def test_doctor_conta_filas():
     assert stats["merge_conflicts"] == 1
     assert stats["completed_execution_tasks"] == 1
     assert "preserved_worktrees" in stats
+    assert "awaiting_review_without_commit" in stats
+    assert "internal_prompt_artifacts" in stats
+    assert "execution_commits_ready" in stats
+
+
+def test_doctor_conta_commit_ready_e_prompt_interno(tmp_path):
+    wt_ready = tmp_path / "ready"
+    source_commit, _ = _mk_repo(wt_ready)
+    ready = _mk("awaiting_review")
+    repo.execution_tasks.set_workspace(
+        ready, CORE, work_branch=f"javes/exec/{ready}",
+        worktree_path=str(wt_ready), source_commit=source_commit,
+    )
+
+    wt_stale = tmp_path / "stale"
+    source_stale, _ = _mk_repo(wt_stale)
+    (wt_stale / ".javes_execution_prompt.txt").write_text("interno", encoding="utf-8")
+    stale = _mk("awaiting_review")
+    repo.execution_tasks.set_workspace(
+        stale, CORE, work_branch=f"javes/exec/{stale}",
+        worktree_path=str(wt_stale), source_commit=_git(wt_stale, "rev-parse", "HEAD").stdout.strip(),
+    )
+
+    stats = system_health._execution_stats()
+
+    assert stats["execution_commits_ready"] >= 1
+    assert stats["awaiting_review_without_commit"] >= 1
+    assert stats["internal_prompt_artifacts"] >= 1
 
 
 def test_doctor_render_so_contagens_sem_conteudo():
@@ -89,6 +137,9 @@ def test_doctor_render_so_contagens_sem_conteudo():
     assert "merge_conflicts:" in text
     assert "completed_execution_tasks:" in text
     assert "preserved_worktrees:" in text
+    assert "awaiting_review_without_commit:" in text
+    assert "internal_prompt_artifacts:" in text
+    assert "execution_commits_ready:" in text
     # nunca imprime objetivo/stdout/diff
     assert "NAO_DEVE_VAZAR" not in text
     assert "objective" not in text.lower()

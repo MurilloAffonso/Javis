@@ -55,6 +55,10 @@ def _execution_stats() -> dict:
         "legacy_direct_execution_callers": 0,
         "supervised_tasks_total": 0,
         "pending_execution_approvals": 0,
+        # R4.3B1 — fechamento da execução (só contagens; sem paths/hashes)
+        "awaiting_review_without_commit": 0,
+        "internal_prompt_artifacts": 0,
+        "execution_commits_ready": 0,
     }
     try:
         from execution.executor_adapter import CodexAdapter, ClaudeCodeAdapter  # noqa: F401
@@ -126,6 +130,34 @@ def _execution_stats() -> dict:
                 "AND COALESCE(worktree_path,'')<>''"
             )
             stats["preserved_worktrees"] = len({r["task_id"] for r in preserved} & disk_ids)
+            review_rows = db.query(
+                "SELECT task_id, status, source_commit, worktree_path FROM execution_tasks "
+                "WHERE status IN ('awaiting_review','approved_for_merge','completed')"
+            )
+            for row in review_rows:
+                worktree_path = Path(row.get("worktree_path") or "")
+                if not worktree_path.exists():
+                    continue
+                if (worktree_path / ".javes_execution_prompt.txt").exists():
+                    stats["internal_prompt_artifacts"] += 1
+                source_commit = (row.get("source_commit") or "").strip()
+                if not source_commit:
+                    if row.get("status") == "awaiting_review":
+                        stats["awaiting_review_without_commit"] += 1
+                    continue
+                try:
+                    head = subprocess.check_output(
+                        ["git", "rev-parse", "HEAD"],
+                        cwd=str(worktree_path),
+                        text=True,
+                        stderr=subprocess.DEVNULL,
+                    ).strip()
+                except Exception:
+                    head = ""
+                if head and head != source_commit:
+                    stats["execution_commits_ready"] += 1
+                elif row.get("status") == "awaiting_review":
+                    stats["awaiting_review_without_commit"] += 1
             db_ids = {r["task_id"] for r in db.query("SELECT task_id FROM execution_tasks")}
             stats["orphan_worktrees"] = len(disk_ids - db_ids)
     except Exception:
@@ -258,6 +290,9 @@ def render_text(data: dict) -> str:
         f"- legacy_direct_execution_callers: {data.get('legacy_direct_execution_callers', 0)}",
         f"- supervised_tasks_total: {data.get('supervised_tasks_total', 0)}",
         f"- pending_execution_approvals: {data.get('pending_execution_approvals', 0)}",
+        f"- awaiting_review_without_commit: {data.get('awaiting_review_without_commit', 0)}",
+        f"- internal_prompt_artifacts: {data.get('internal_prompt_artifacts', 0)}",
+        f"- execution_commits_ready: {data.get('execution_commits_ready', 0)}",
         "- providers:",
     ]
     for item in data["providers"]:
