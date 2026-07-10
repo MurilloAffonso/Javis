@@ -38,7 +38,18 @@ def _execution_stats() -> dict:
         "awaiting_merge_approval": 0,
         "awaiting_review": 0,
         "failed_execution_tasks": 0,
+        # R4.2B — adapters presentes + estados do fluxo real (só contagens)
+        "supervised_adapters_present": False,
+        "executions_running": 0,
+        "executions_testing": 0,
+        "executions_timed_out": 0,
+        "executions_awaiting_review": 0,
     }
+    try:
+        from execution.executor_adapter import CodexAdapter, ClaudeCodeAdapter  # noqa: F401
+        stats["supervised_adapters_present"] = True
+    except Exception:
+        pass
     try:
         from execution import worktree_manager as wm
         root = wm.WorktreeManager().worktree_root
@@ -62,6 +73,10 @@ def _execution_stats() -> dict:
             stats["awaiting_review"] = et.count_by_status("awaiting_review")
             stats["awaiting_merge_approval"] = et.count_by_status("approved_for_merge")
             stats["failed_execution_tasks"] = et.count_by_statuses(("failed", "timed_out"))
+            stats["executions_running"] = et.count_by_status("running")
+            stats["executions_testing"] = et.count_by_status("testing")
+            stats["executions_timed_out"] = et.count_by_status("timed_out")
+            stats["executions_awaiting_review"] = et.count_by_status("awaiting_review")
             db_ids = {r["task_id"] for r in db.query("SELECT task_id FROM execution_tasks")}
             stats["orphan_worktrees"] = len(disk_ids - db_ids)
     except Exception:
@@ -180,6 +195,11 @@ def render_text(data: dict) -> str:
         f"- awaiting_merge_approval: {data.get('awaiting_merge_approval', 0)}",
         f"- awaiting_review: {data.get('awaiting_review', 0)}",
         f"- failed_execution_tasks: {data.get('failed_execution_tasks', 0)}",
+        f"- supervised_adapters_present: {data.get('supervised_adapters_present', False)}",
+        f"- executions_running: {data.get('executions_running', 0)}",
+        f"- executions_testing: {data.get('executions_testing', 0)}",
+        f"- executions_timed_out: {data.get('executions_timed_out', 0)}",
+        f"- executions_awaiting_review: {data.get('executions_awaiting_review', 0)}",
         "- providers:",
     ]
     for item in data["providers"]:

@@ -38,6 +38,8 @@ def _mk(status: str, objective: str = "SEGREDO_OBJETIVO") -> str:
 def test_doctor_conta_filas():
     _mk("pending_approval")
     _mk("awaiting_review")
+    _mk("running")
+    _mk("testing")
     _mk("approved_for_merge")
     _mk("failed")
     _mk("timed_out")
@@ -48,6 +50,11 @@ def test_doctor_conta_filas():
     assert stats["awaiting_merge_approval"] == 1
     assert stats["failed_execution_tasks"] == 2  # failed + timed_out
     assert stats["execution_schema_present"] is True
+    assert stats["supervised_adapters_present"] is True
+    assert stats["executions_running"] == 1
+    assert stats["executions_testing"] == 1
+    assert stats["executions_timed_out"] == 1
+    assert stats["executions_awaiting_review"] == 1
 
 
 def test_doctor_render_so_contagens_sem_conteudo():
@@ -67,6 +74,11 @@ def test_doctor_render_so_contagens_sem_conteudo():
     text = system_health.render_text(data)
     assert "awaiting_execution_approval:" in text
     assert "failed_execution_tasks:" in text
+    assert "supervised_adapters_present:" in text
+    assert "executions_running:" in text
+    assert "executions_testing:" in text
+    assert "executions_timed_out:" in text
+    assert "executions_awaiting_review:" in text
     # nunca imprime objetivo/stdout/diff
     assert "NAO_DEVE_VAZAR" not in text
     assert "objective" not in text.lower()

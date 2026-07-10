@@ -25,33 +25,34 @@
 | **R3.1** | Fechamento do escopo: tasks/approvals sempre por `project_id` + estado interno fora do prompt do Jampa | ✅ **Concluído** |
 | **R4.1** | Fundação do executor supervisionado: `execution_task` + `worktree_manager` + `execution_policy` (nenhum agente roda) | ✅ **Concluído** |
 | **R4.2A** | Dois gates de aprovação (`execution.start`/`execution.merge`, single-use, escopados) + `result_collector` sanitizado/truncado (sem adapters, sem merge) | ✅ **Concluído** |
+| **R4.2B** | Adapters supervisionados (`CodexAdapter`/`ClaudeCodeAdapter`) + `execution_service` até `awaiting_review` (sem merge) | ✅ **Concluído** |
 
-> **Executor ainda DESLIGADO.** R4.1/R4.2A são fundação + gates: nenhum agente é
-> executado, nenhum merge é feito, o fluxo atual de execução não foi alterado, e
+> **Executor ainda DESLIGADO.** R4.1/R4.2A/R4.2B são fundação + gates + adapters
+> supervisionados: nenhum agente real roda por default, nenhum merge é feito, o fluxo atual de execução não foi alterado, e
 > `JAVIS_ENABLE_SUPERVISED_EXEC` continua `False`.
 
 ---
 
 ## 🎯 PRÓXIMO PASSO OFICIAL
 
-**R4.2B — Adapters supervisionados + merge real**
+**R4.2C — revisão, merge controlado e Command Center**
 
-`CodexAdapter`/`ClaudeCodeAdapter` sobre a fundação R4.1 (mesmo contrato),
-executando na worktree isolada e ligando os gates da R4.2A ao fluxo real; merge
-da work_branch **só** após `approved_for_merge`. Nada roda no repo vivo.
+Revisar resultados em `awaiting_review`, implementar merge controlado somente
+após aprovação humana específica e conectar o Command Center ao fluxo seguro.
 
 ---
 
 ## Fases seguintes (ordem oficial)
 
-1. **R4.2B — Adapters supervisionados + merge real** (próximo passo acima).
+1. **R4.2C — revisão, merge controlado e Command Center** (próximo passo acima).
 
 2. **R4.3 — Endurecimento adicional / sandbox opcional**
    Bloqueio de rede real (Docker `--network none` opcional, nunca default),
    limites de recurso e hardening extra do executor.
 
-3. **Integrações externas e canais**
-   Browser, Telegram, WhatsApp, MCP e automações externas só depois da R4,
+3. **Modo Madrugada e integrações externas/canais**
+   Modo Madrugada somente depois da R4.2C e testes controlados; browser,
+   Telegram, WhatsApp, MCP e automações externas só depois da R4,
    sempre atrás de default-deny, approval e escopo explícito.
 
 ---
