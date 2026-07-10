@@ -10,6 +10,7 @@ import safe_config
 
 from . import execution_task as et
 from ._sanitize import sanitize
+from .commit_service import ControlledCommitService
 from .executor_adapter import AdapterRequest, CodexAdapter, ClaudeCodeAdapter
 from .result_collector import ResultCollector
 from .test_runner import TestRunner
@@ -23,11 +24,13 @@ def _utc_now() -> str:
 class ExecutionService:
     def __init__(self, *, repository=repo, worktree_manager=None,
                  result_collector=None, test_runner=None, adapters=None,
+                 commit_service=None,
                  enabled: bool | None = None):
         self.repository = repository
         self.worktree_manager = worktree_manager or WorktreeManager()
         self.result_collector = result_collector or ResultCollector()
         self.test_runner = test_runner or TestRunner()
+        self.commit_service = commit_service or ControlledCommitService()
         self.adapters = adapters or {
             "codex": CodexAdapter(),
             "claude": ClaudeCodeAdapter(),
@@ -62,6 +65,10 @@ class ExecutionService:
         self.repository.execution_tasks.update_status(task["task_id"], task["project_id"], status)
         self.repository.execution_tasks.set_error(task["task_id"], task["project_id"], sanitize(reason, 1000))
         if worktree_path and Path(worktree_path).exists():
+            try:
+                self.commit_service.cleanup_internal_prompt(task["task_id"], task["project_id"], worktree_path)
+            except Exception:
+                pass
             self.result_collector.collect(
                 task["task_id"],
                 task["project_id"],
@@ -104,6 +111,9 @@ class ExecutionService:
                 source_commit=workspace.get("source_commit", ""),
                 started_at=_utc_now(),
             )
+            task["work_branch"] = workspace["work_branch"]
+            task["worktree_path"] = worktree_path
+            task["source_commit"] = workspace.get("source_commit", "")
             self._transition(task, et.RUNNING)
 
             prompt_path = Path(worktree_path).resolve() / ".javes_execution_prompt.txt"
@@ -145,7 +155,15 @@ class ExecutionService:
                                   stderr=adapter_result.stderr,
                                   test_report=test_report.report)
 
-            self.result_collector.collect(
+            self.commit_service.cleanup_internal_prompt(tid, pid, worktree_path)
+            commit_result = self.commit_service.commit_task_changes(task)
+            if commit_result.status != "committed" or not commit_result.commit_hash:
+                return self._fail(task, et.FAILED, commit_result.reason or "commit_failed",
+                                  worktree_path=worktree_path,
+                                  stdout=adapter_result.stdout,
+                                  stderr=adapter_result.stderr,
+                                  test_report=test_report.report)
+            collected = self.result_collector.collect(
                 tid,
                 pid,
                 worktree_path,
@@ -153,6 +171,12 @@ class ExecutionService:
                 stderr=adapter_result.stderr,
                 test_report=test_report.report,
             )
+            if int(collected.get("changed_count") or 0) < 1 or int(collected.get("diff_chars") or 0) < 1:
+                return self._fail(task, et.FAILED, "diff_unavailable_after_commit",
+                                  worktree_path=worktree_path,
+                                  stdout=adapter_result.stdout,
+                                  stderr=adapter_result.stderr,
+                                  test_report=test_report.report)
             self._transition(task, et.AWAITING_REVIEW)
             return {"status": et.AWAITING_REVIEW, "reason": "", "task_id": tid}
         except Exception as exc:

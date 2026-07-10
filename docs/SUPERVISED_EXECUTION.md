@@ -388,3 +388,78 @@ sandbox `workspace-write` não estiver validado explicitamente.
 
 R4.3B — primeiro smoke test real manual com Claude Code. Modo Madrugada continua
 bloqueado.
+
+---
+
+# R4.3B1 — Commit controlado e diff de arquivos novos
+
+O primeiro smoke real com Claude Code alcançou `awaiting_review`, mas revelou que
+arquivos novos permaneciam apenas untracked na worktree: `git diff --stat` ficava
+vazio, `HEAD` não avançava e `.javes_execution_prompt.txt` aparecia como artefato
+interno.
+
+## Fechamento correto
+
+Após o adapter editar e os testes passarem, `execution/execution_service.py` segue:
+
+```
+running → testing → testes aprovados → remover prompt temporário
+→ commit local controlado → result_collector → awaiting_review
+```
+
+`awaiting_review` só é alcançado quando existe commit novo na `work_branch`,
+`HEAD != source_commit` e o `ResultCollector` consegue coletar diff sanitizado.
+
+## Commit local controlado
+
+`execution/commit_service.py` coleta alterações válidas com:
+
+- `git diff --name-only`;
+- `git diff --cached --name-only`;
+- `git ls-files --others --exclude-standard`.
+
+Cada arquivo é validado como relativo, dentro da worktree, não ignorado e não
+sensível. O stage usa somente:
+
+```
+git add -- <arquivo explícito>
+```
+
+Nunca usa `git add .`, `git add -A`, `git add --all`, merge ou push. A mensagem
+do commit é fixa:
+
+```
+javes(<task_id>): resultado da execução supervisionada
+```
+
+## Artefatos internos
+
+`.javes_execution_prompt.txt` é reconstruído dentro da worktree e removido após o
+adapter terminar, inclusive em falha/timeout. Ele não entra no diff, na contagem
+de arquivos, no stage, no commit nem chega à master.
+
+## ResultCollector
+
+Quando há `source_commit`, o pacote de revisão usa:
+
+```
+git diff --stat <source_commit>..HEAD
+git diff <source_commit>..HEAD
+```
+
+Assim arquivos originalmente untracked entram no diff e no diff stat depois do
+commit local controlado. Conteúdo e paths continuam sanitizados/truncados.
+
+## Doctor
+
+Novas contagens passivas:
+
+- `awaiting_review_without_commit`;
+- `internal_prompt_artifacts`;
+- `execution_commits_ready`.
+
+O Doctor não mostra paths completos, conteúdo, prompt, diff bruto ou hash completo.
+
+## Próximo passo
+
+Repetir o smoke real com uma nova task. Modo Madrugada continua bloqueado.

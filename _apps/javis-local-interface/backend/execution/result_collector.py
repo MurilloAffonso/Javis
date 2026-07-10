@@ -22,6 +22,7 @@ from datetime import datetime
 from pathlib import Path
 
 from . import execution_task as et
+from .commit_service import INTERNAL_PREFIX, SENSITIVE_MARKERS
 from ._gitcmd import run_git
 from ._sanitize import sanitize_truncated
 
@@ -68,21 +69,58 @@ class ResultCollector:
             return False
         return True
 
-    def _changed_files(self, worktree: Path) -> list[str]:
-        rc, out, _ = run_git(worktree, ["status", "--porcelain"])
+    def _valid_relative_change(self, raw: str, worktree: Path) -> str:
+        rel = (raw or "").strip().strip('"').replace("\\", "/")
+        if not rel:
+            return ""
+        rel_path = Path(rel)
+        if rel_path.is_absolute() or ".." in rel_path.parts:
+            return ""
+        lowered_parts = tuple(part.lower() for part in rel_path.parts)
+        joined = "/".join(lowered_parts)
+        if any(part.startswith(INTERNAL_PREFIX) for part in lowered_parts):
+            return ""
+        if any(marker in lowered_parts or marker in joined for marker in SENSITIVE_MARKERS):
+            return ""
+        target = _resolve(worktree / rel_path)
+        if target.exists() and not self.within_worktree(target, worktree):
+            return ""
+        if not self.within_worktree(target.parent, worktree):
+            return ""
+        return rel
+
+    def _changed_files(self, worktree: Path, diff_range: str = "") -> list[str]:
+        if diff_range:
+            rc, out, _ = run_git(worktree, ["diff", "--name-only", diff_range])
+        else:
+            rc, out, _ = run_git(worktree, ["status", "--porcelain"])
         files: list[str] = []
         if rc != 0:
             return files
         for line in out.splitlines():
-            if len(line) < 4:
-                continue
-            raw = line[3:].strip()
+            raw = line
+            if not diff_range:
+                if len(line) < 4:
+                    continue
+                raw = line[3:].strip()
             if " -> " in raw:  # rename: pega o destino
                 raw = raw.split(" -> ", 1)[1]
-            raw = raw.strip().strip('"')
-            if raw and self.within_worktree(worktree / raw, worktree):
-                files.append(raw)
+            rel = self._valid_relative_change(raw, worktree)
+            if rel:
+                files.append(rel)
         return files
+
+    def _diff_range(self, task: dict | None, worktree: Path) -> str:
+        source_commit = ((task or {}).get("source_commit") or "").strip()
+        if not source_commit:
+            return ""
+        rc, head, _ = run_git(worktree, ["rev-parse", "HEAD"])
+        if rc != 0 or not head.strip() or head.strip() == source_commit:
+            return ""
+        rc, _, _ = run_git(worktree, ["merge-base", "--is-ancestor", source_commit, "HEAD"])
+        if rc != 0:
+            return ""
+        return f"{source_commit}..HEAD"
 
     # ── coleta ─────────────────────────────────────────────────────────────
     def collect(self, task_id: str, project_id: str, worktree_path,
@@ -94,6 +132,7 @@ class ResultCollector:
         wt = _resolve(worktree_path)
         if not wt.is_dir():
             raise ResultError("worktree inexistente")
+        task = repo.execution_tasks.get(tid, pid)
 
         rdir = self.results_dir_for(tid)
         rdir.mkdir(parents=True, exist_ok=True)
@@ -102,13 +141,18 @@ class ResultCollector:
         err_txt = sanitize_truncated(stderr, MAX_STREAM_CHARS)
         tests_txt = sanitize_truncated(test_report, MAX_STREAM_CHARS)
 
+        diff_range = self._diff_range(task, wt)
         _, status_out, _ = run_git(wt, ["status", "--short", "--branch"])
-        _, diffstat_out, _ = run_git(wt, ["diff", "--stat"])
-        _, diff_out, _ = run_git(wt, ["diff"])
+        if diff_range:
+            _, diffstat_out, _ = run_git(wt, ["diff", "--stat", diff_range])
+            _, diff_out, _ = run_git(wt, ["diff", diff_range])
+        else:
+            _, diffstat_out, _ = run_git(wt, ["diff", "--stat"])
+            _, diff_out, _ = run_git(wt, ["diff"])
         status_txt = sanitize_truncated(status_out, MAX_STREAM_CHARS)
         diffstat_txt = sanitize_truncated(diffstat_out, MAX_STREAM_CHARS)
         diff_txt = sanitize_truncated(diff_out, MAX_DIFF_CHARS)
-        changed = self._changed_files(wt)
+        changed = self._changed_files(wt, diff_range=diff_range)
 
         # arquivos do pacote (nomes fixos → sem input livre no path)
         stdout_path = rdir / "stdout.txt"
@@ -127,6 +171,7 @@ class ResultCollector:
             "project_id": pid,
             "git_status": status_txt,
             "diff_stat": diffstat_txt,
+            "diff_range": sanitize_truncated(diff_range, 200),
             "changed_files": changed,
             "changed_count": len(changed),
             "stdout_chars": len(out_txt),

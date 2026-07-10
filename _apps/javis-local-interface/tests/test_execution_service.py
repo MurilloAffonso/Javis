@@ -74,7 +74,34 @@ class FakeCollector:
 
     def collect(self, task_id, project_id, worktree_path, stdout="", stderr="", test_report=""):
         self.calls.append((task_id, project_id, worktree_path, stdout, stderr, test_report))
-        return {"result_path": "fake"}
+        return {"result_path": "fake", "changed_count": 1, "diff_chars": 10}
+
+
+class FakeCommitService:
+    def __init__(self, *, fail_reason: str = ""):
+        self.fail_reason = fail_reason
+        self.commits = []
+        self.cleanups = []
+
+    def cleanup_internal_prompt(self, task_id, project_id, worktree_path):
+        self.cleanups.append((task_id, project_id, worktree_path))
+        prompt = Path(worktree_path) / ".javes_execution_prompt.txt"
+        if prompt.exists():
+            prompt.unlink()
+        return {"removed": True, "reason": ""}
+
+    def commit_task_changes(self, task):
+        self.commits.append(dict(task))
+        if self.fail_reason:
+            from execution.commit_service import CommitError
+            raise CommitError(self.fail_reason)
+        return type("CommitResult", (), {
+            "status": "committed",
+            "commit_hash": "abc123",
+            "changed_count": 1,
+            "changed_files": ("docs/EXECUTION_SMOKE_TEST.md",),
+            "reason": "",
+        })()
 
 
 def _proc(status="success", exit_code=0, timed_out=False):
@@ -102,20 +129,23 @@ def _task(status=et.APPROVED, project_id=CORE, approval_id=123, executor="codex"
     return tid
 
 
-def _service(tmp_path, *, enabled=True, adapter_result=None, test_report=None, collector=None):
+def _service(tmp_path, *, enabled=True, adapter_result=None, test_report=None,
+             collector=None, commit_service=None):
     collector = collector or FakeCollector()
+    commit_service = commit_service or FakeCommitService()
     return ExecutionService(
         worktree_manager=FakeWorktreeManager(tmp_path / "worktrees"),
         result_collector=collector,
         test_runner=FakeTestRunner(test_report or _report()),
+        commit_service=commit_service,
         adapters={"codex": FakeAdapter(adapter_result or _proc()), "claude": FakeAdapter(adapter_result or _proc())},
         enabled=enabled,
-    ), collector
+    ), collector, commit_service
 
 
 def test_flag_false_impede_execucao_real(tmp_path):
     tid = _task()
-    service, _ = _service(tmp_path, enabled=False)
+    service, _, _ = _service(tmp_path, enabled=False)
     result = service.run(tid, CORE, test_commands=[["python", "-m", "pytest", "-q", "tests/test_x.py"]])
     assert result == {"status": "blocked", "reason": "supervised_execution_disabled"}
     assert repo.execution_tasks.get(tid, CORE)["status"] == et.APPROVED
@@ -123,7 +153,7 @@ def test_flag_false_impede_execucao_real(tmp_path):
 
 def test_tarefa_sem_approved_bloqueada(tmp_path):
     tid = _task(status=et.PENDING_APPROVAL)
-    service, _ = _service(tmp_path)
+    service, _, _ = _service(tmp_path)
     result = service.run(tid, CORE, test_commands=[["python", "-m", "pytest", "-q", "tests/test_x.py"]])
     assert result["status"] == "blocked"
     assert result["reason"] == "task_not_approved"
@@ -131,7 +161,7 @@ def test_tarefa_sem_approved_bloqueada(tmp_path):
 
 def test_project_id_errado_recusado(tmp_path):
     tid = _task(project_id=CORE)
-    service, _ = _service(tmp_path)
+    service, _, _ = _service(tmp_path)
     result = service.run(tid, JAMPA, test_commands=[["python", "-m", "pytest", "-q", "tests/test_x.py"]])
     assert result["status"] == "blocked"
     assert result["reason"] == "project_scope_mismatch"
@@ -139,27 +169,31 @@ def test_project_id_errado_recusado(tmp_path):
 
 def test_sucesso_percorre_ate_awaiting_review(tmp_path):
     tid = _task()
-    service, collector = _service(tmp_path)
+    service, collector, commit_service = _service(tmp_path)
     result = service.run(tid, CORE, test_commands=[["python", "-m", "pytest", "-q", "tests/test_x.py"]])
     assert result["status"] == et.AWAITING_REVIEW
     assert repo.execution_tasks.get(tid, CORE)["status"] == et.AWAITING_REVIEW
     assert collector.calls
+    assert commit_service.commits
+    assert commit_service.cleanups
 
 
 def test_erro_do_adapter_vira_failed_e_preserva_worktree(tmp_path):
     tid = _task()
-    service, collector = _service(tmp_path, adapter_result=_proc(status="failed", exit_code=1))
+    service, collector, commit_service = _service(tmp_path, adapter_result=_proc(status="failed", exit_code=1))
     result = service.run(tid, CORE, test_commands=[["python", "-m", "pytest", "-q", "tests/test_x.py"]])
     task = repo.execution_tasks.get(tid, CORE)
     assert result["status"] == et.FAILED
     assert task["status"] == et.FAILED
     assert Path(task["worktree_path"]).exists()
     assert collector.calls
+    assert commit_service.cleanups
+    assert not (Path(task["worktree_path"]) / ".javes_execution_prompt.txt").exists()
 
 
 def test_timeout_do_adapter_vira_timed_out(tmp_path):
     tid = _task()
-    service, _ = _service(tmp_path, adapter_result=_proc(status="timed_out", exit_code=-9, timed_out=True))
+    service, _, _ = _service(tmp_path, adapter_result=_proc(status="timed_out", exit_code=-9, timed_out=True))
     result = service.run(tid, CORE, test_commands=[["python", "-m", "pytest", "-q", "tests/test_x.py"]])
     assert result["status"] == et.TIMED_OUT
     assert repo.execution_tasks.get(tid, CORE)["status"] == et.TIMED_OUT
@@ -167,8 +201,20 @@ def test_timeout_do_adapter_vira_timed_out(tmp_path):
 
 def test_testes_falhando_impedem_awaiting_review(tmp_path):
     tid = _task()
-    service, collector = _service(tmp_path, test_report=_report(ok=False, status="failed"))
+    service, collector, _ = _service(tmp_path, test_report=_report(ok=False, status="failed"))
     result = service.run(tid, CORE, test_commands=[["python", "-m", "pytest", "-q", "tests/test_x.py"]])
     assert result["status"] == et.FAILED
     assert repo.execution_tasks.get(tid, CORE)["status"] == et.FAILED
+    assert collector.calls
+
+
+def test_commit_falhando_vira_failed_e_preserva_worktree(tmp_path):
+    tid = _task()
+    failing_commit = FakeCommitService(fail_reason="no_valid_changes")
+    service, collector, _ = _service(tmp_path, commit_service=failing_commit)
+    result = service.run(tid, CORE, test_commands=[["python", "-m", "pytest", "-q", "tests/test_x.py"]])
+    task = repo.execution_tasks.get(tid, CORE)
+    assert result["status"] == et.FAILED
+    assert result["reason"] == "no_valid_changes"
+    assert Path(task["worktree_path"]).exists()
     assert collector.calls

@@ -27,6 +27,7 @@ def run_git(cwd, args: list[str], timeout: int = _GIT_TIMEOUT) -> tuple[int, str
     """Executa `git <args>` em cwd. Retorna (returncode, stdout, stderr)."""
     proc = subprocess.run(
         ["git", *args], cwd=str(cwd), shell=False, env=clean_git_env(),
-        capture_output=True, text=True, timeout=timeout,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        timeout=timeout,
     )
     return proc.returncode, (proc.stdout or ""), (proc.stderr or "")
