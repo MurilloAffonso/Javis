@@ -23,6 +23,40 @@ def _git(args: list[str]) -> str:
         return ""
 
 
+def _execution_stats() -> dict:
+    """Fundação passiva do executor (R4.1). Só contagens/flags — nunca objetivo,
+    stdout, stderr, diff ou paths sensíveis completos."""
+    stats = {
+        "execution_schema_present": False,
+        "supervised_execution_enabled": safe_config.supervised_execution_enabled(),
+        "active_execution_tasks": 0,
+        "active_worktrees": 0,
+        "orphan_worktrees": 0,
+        "worktree_root_configured": False,
+    }
+    try:
+        from execution import worktree_manager as wm
+        root = wm.WorktreeManager().worktree_root
+        stats["worktree_root_configured"] = True
+        disk_ids = {d.name for d in root.iterdir() if d.is_dir()} if root.exists() else set()
+        stats["active_worktrees"] = len(disk_ids)
+    except Exception:
+        disk_ids = set()
+    try:
+        has_tbl = db.query_one(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='execution_tasks'"
+        )
+        if has_tbl:
+            stats["execution_schema_present"] = True
+            import repositories as repo
+            stats["active_execution_tasks"] = repo.execution_tasks.count_active()
+            db_ids = {r["task_id"] for r in db.query("SELECT task_id FROM execution_tasks")}
+            stats["orphan_worktrees"] = len(disk_ids - db_ids)
+    except Exception:
+        pass
+    return stats
+
+
 def snapshot(probe_ollama: bool = False) -> dict:
     sqlite_accessible = False
     pending_approvals = "indisponivel"
@@ -68,6 +102,7 @@ def snapshot(probe_ollama: bool = False) -> dict:
 
     providers = provider_registry.all_providers(probe_ollama=probe_ollama)
     return {
+        **_execution_stats(),
         "branch": _git(["branch", "--show-current"]) or "unknown",
         "git_status": _git(["status", "--short", "--branch"]),
         "python": sys.version.split()[0],
@@ -123,6 +158,12 @@ def render_text(data: dict) -> str:
         f"- sessions_by_project: {data.get('sessions_by_project', {})}",
         f"- legacy_history_found: {data.get('legacy_history_found', False)}",
         f"- session_project_inconsistencies: {data.get('session_project_inconsistencies', 0)}",
+        f"- supervised_execution_enabled: {data.get('supervised_execution_enabled', False)}",
+        f"- execution_schema_present: {data.get('execution_schema_present', False)}",
+        f"- active_execution_tasks: {data.get('active_execution_tasks', 0)}",
+        f"- worktree_root_configured: {data.get('worktree_root_configured', False)}",
+        f"- active_worktrees: {data.get('active_worktrees', 0)}",
+        f"- orphan_worktrees: {data.get('orphan_worktrees', 0)}",
         "- providers:",
     ]
     for item in data["providers"]:

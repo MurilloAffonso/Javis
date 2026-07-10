@@ -205,3 +205,29 @@ CREATE TABLE IF NOT EXISTS kg_edges (
 );
 CREATE INDEX IF NOT EXISTS idx_kg_edges_src ON kg_edges(src);
 CREATE INDEX IF NOT EXISTS idx_kg_edges_dst ON kg_edges(dst);
+
+-- R4.1 — Executor supervisionado (fundação). Cada linha é uma tarefa de
+-- execução que roda (no futuro) numa worktree Git isolada, com approval humano.
+-- Nesta fase nenhum agente é executado; a tabela só guarda o ciclo de vida.
+CREATE TABLE IF NOT EXISTS execution_tasks (
+    task_id           TEXT PRIMARY KEY,          -- exec_<hex>
+    project_id        TEXT NOT NULL,             -- escopo R3 (default javes-core)
+    executor          TEXT NOT NULL,             -- 'codex' | 'claude'
+    objective         TEXT NOT NULL,
+    repository_path   TEXT NOT NULL,             -- validado contra allowed roots
+    source_branch     TEXT NOT NULL,
+    work_branch       TEXT NOT NULL,             -- javes/exec/<task_id>
+    worktree_path     TEXT NOT NULL,             -- <worktree_root>/<task_id>
+    approval_id       INTEGER,                   -- FK approvals.id (consumido na R4.2)
+    merge_approval_id INTEGER,                   -- 2o gate (revisão do diff)
+    status            TEXT NOT NULL DEFAULT 'draft',
+    created_at        TEXT DEFAULT (datetime('now')),
+    started_at        TEXT,
+    finished_at       TEXT,
+    timeout_seconds   INTEGER DEFAULT 900,
+    result_path       TEXT,
+    diff_path         TEXT,
+    test_report_path  TEXT,
+    last_error        TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_execution_tasks_project_status ON execution_tasks(project_id, status);
