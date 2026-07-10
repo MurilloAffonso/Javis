@@ -33,6 +33,25 @@ def _read(path: Path) -> str:
         return ""
 
 
+# R2.2.1 — CURRENT_STATE.md é a FONTE CANÔNICA do estado. Quando existe, prevalece
+# sobre os roadmaps antigos (estado-atual.md / proximos-passos.md / _logs) ao
+# responder "estado atual / próximas fases / o que falta / próximo passo".
+def _current_state(max_chars: int = 1100) -> str:
+    """Conteúdo canônico de _estado/CURRENT_STATE.md (ou '' se não existir)."""
+    txt = _read(ESTADO_DIR / "CURRENT_STATE.md").strip()
+    return txt[:max_chars] if txt else ""
+
+
+def _proximo_passo_oficial() -> str:
+    """Extrai o 'PRÓXIMO PASSO OFICIAL' do CURRENT_STATE.md (linha em negrito
+    logo após o cabeçalho). '' se o arquivo/seção não existir."""
+    txt = _read(ESTADO_DIR / "CURRENT_STATE.md")
+    if not txt:
+        return ""
+    m = re.search(r"PR(Ó|O)XIMO PASSO OFICIAL.*?\n+\s*\*\*(.+?)\*\*", txt, re.S | re.I)
+    return m.group(2).strip() if m else ""
+
+
 def _ultimas_sessoes(n: int = 3) -> list[str]:
     """As N linhas mais recentes da seção 'Sessões recentes' do estado-atual."""
     txt = _read(ESTADO_DIR / "estado-atual.md")
@@ -90,13 +109,25 @@ def _periodo() -> str:
     return "Boa noite"
 
 
-def estado_resumido(max_chars: int = 1400) -> str:
+def estado_resumido(max_chars: int = 2200) -> str:
     """Resumo factual do estado do projeto para injetar no contexto do cérebro."""
     now = time.time()
     if now - float(_CACHE["ts"]) < _TTL and _CACHE["estado"]:
         return str(_CACHE["estado"])
 
     partes: list[str] = []
+
+    # FONTE CANÔNICA primeiro: prevalece sobre os roadmaps antigos abaixo.
+    canonico = _current_state()
+    if canonico:
+        partes.append(
+            "ESTADO CANÔNICO (fonte de verdade — _estado/CURRENT_STATE.md; "
+            "prevalece sobre roadmaps antigos ao dizer estado atual / próximas "
+            "fases / o que falta / próximo passo):"
+        )
+        partes.append(canonico)
+        partes.append("--- Contexto histórico (secundário; só se o canônico não cobrir) ---")
+
     titulo, data = _ultimo_log()
     if titulo:
         partes.append(f"Último registro de trabalho ({data}): {titulo}.")
@@ -121,9 +152,14 @@ def saudacao_proativa() -> str:
     base = f"{_periodo()}, senhor."
     if titulo:
         base += f" No nosso último trabalho ({data}), {titulo[0].lower() + titulo[1:]}."
-    pend = _pendencias(2)
-    if pend:
-        base += f" Em aberto: {pend[0]}."
+    # Próximo passo: o canônico (CURRENT_STATE.md) prevalece sobre pendências antigas.
+    passo = _proximo_passo_oficial()
+    if passo:
+        base += f" Próximo passo oficial: {passo}."
+    else:
+        pend = _pendencias(2)
+        if pend:
+            base += f" Em aberto: {pend[0]}."
     return base
 
 
