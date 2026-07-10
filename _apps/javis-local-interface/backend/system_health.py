@@ -44,6 +44,11 @@ def _execution_stats() -> dict:
         "executions_testing": 0,
         "executions_timed_out": 0,
         "executions_awaiting_review": 0,
+        # R4.2C1 — merge local controlado (só contagens)
+        "approved_for_merge": 0,
+        "merge_conflicts": 0,
+        "completed_execution_tasks": 0,
+        "preserved_worktrees": 0,
     }
     try:
         from execution.executor_adapter import CodexAdapter, ClaudeCodeAdapter  # noqa: F401
@@ -77,6 +82,15 @@ def _execution_stats() -> dict:
             stats["executions_testing"] = et.count_by_status("testing")
             stats["executions_timed_out"] = et.count_by_status("timed_out")
             stats["executions_awaiting_review"] = et.count_by_status("awaiting_review")
+            stats["approved_for_merge"] = et.count_by_status("approved_for_merge")
+            stats["merge_conflicts"] = db.count("execution_tasks", "last_error=?", ("merge_conflict",))
+            stats["completed_execution_tasks"] = et.count_by_status("completed")
+            preserved = db.query(
+                "SELECT task_id FROM execution_tasks "
+                "WHERE status IN ('failed','timed_out','review_rejected') "
+                "AND COALESCE(worktree_path,'')<>''"
+            )
+            stats["preserved_worktrees"] = len({r["task_id"] for r in preserved} & disk_ids)
             db_ids = {r["task_id"] for r in db.query("SELECT task_id FROM execution_tasks")}
             stats["orphan_worktrees"] = len(disk_ids - db_ids)
     except Exception:
@@ -200,6 +214,10 @@ def render_text(data: dict) -> str:
         f"- executions_testing: {data.get('executions_testing', 0)}",
         f"- executions_timed_out: {data.get('executions_timed_out', 0)}",
         f"- executions_awaiting_review: {data.get('executions_awaiting_review', 0)}",
+        f"- approved_for_merge: {data.get('approved_for_merge', 0)}",
+        f"- merge_conflicts: {data.get('merge_conflicts', 0)}",
+        f"- completed_execution_tasks: {data.get('completed_execution_tasks', 0)}",
+        f"- preserved_worktrees: {data.get('preserved_worktrees', 0)}",
         "- providers:",
     ]
     for item in data["providers"]:

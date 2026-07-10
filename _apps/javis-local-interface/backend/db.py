@@ -64,6 +64,7 @@ def init_db() -> None:
                 "ALTER TABLE messages ADD COLUMN project_id TEXT",
                 "ALTER TABLE messages ADD COLUMN session_id TEXT",
                 "ALTER TABLE knowledge_chunks ADD COLUMN categoria TEXT",
+                "ALTER TABLE execution_tasks ADD COLUMN source_commit TEXT",
             ):
                 try:
                     conn.execute(col_sql)

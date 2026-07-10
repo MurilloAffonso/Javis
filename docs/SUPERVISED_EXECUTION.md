@@ -136,7 +136,7 @@ Invariantes: a aprovação precisa estar amarrada à **mesma task e ao mesmo
 
 Novas contagens (só números): `awaiting_execution_approval` (pending_approval),
 `awaiting_review`, `awaiting_merge_approval` (approved_for_merge, aguardando o
-merge da R4.2C) e `failed_execution_tasks` (failed + timed_out).
+merge da R4.2C1) e `failed_execution_tasks` (failed + timed_out).
 
 ---
 
@@ -152,7 +152,7 @@ Quando a flag for injetada explicitamente em ambiente de teste/controlado, o ser
 approved → preparing_workspace → running → testing → awaiting_review
 ```
 
-O fluxo para obrigatoriamente em `awaiting_review`. `approved_for_merge`, merge real e Command Center ficam para a R4.2C.
+O fluxo para obrigatoriamente em `awaiting_review`. `approved_for_merge` alimenta o merge local da R4.2C1; integra??o com Command Center fica para a R4.2C2.
 
 ## Adapters
 
@@ -196,3 +196,53 @@ O doctor mostra somente contagens passivas: `supervised_adapters_present`, `exec
 ## Caminhos antigos
 
 `code_agent.py`, `claude_exec.py`, `orchestrator.py`, `brain_switch.py` e `delegacao.py` não foram conectados ao novo serviço. Continuam atrás das flags existentes e serão aposentados/conectados somente na R4.2C.
+
+---
+
+# R4.2C1 — Merge local controlado
+
+A R4.2C1 adiciona `execution/merge_service.py` para integrar localmente uma `execution_task` em `approved_for_merge` à `source_branch` registrada. Não há integração com orchestrator, chat ou Command Center nesta fase.
+
+## Pré-condições
+
+O merge só roda quando:
+
+- a task é carregada por `task_id` + `project_id`;
+- `status == approved_for_merge`;
+- `merge_approval_id` existe, pertence à mesma task/projeto, tem ação `execution.merge`, está aprovado e já foi consumido pelo gate persistido;
+- `repository_path` passa pela allowlist do `WorktreeManager`;
+- `work_branch` é uma branch `javes/exec/<task_id>` e nunca `master`/`main`;
+- o repositório não tem mudanças rastreadas staged/unstaged nem operação Git em andamento;
+- a worktree reconstruída pelo `task_id` existe e está na branch esperada;
+- a `work_branch` tem pelo menos um commit novo sobre a `source_branch`.
+
+## Proteção `source_commit`
+
+`execution_tasks.source_commit` registra o HEAD da `source_branch` quando a workspace é preparada. Antes do merge, o serviço compara o HEAD atual da `source_branch` com esse valor. Se mudou, bloqueia com `source_branch_moved` e não tenta rebase, reset ou resolução automática.
+
+## Merge
+
+O serviço usa somente argv estruturado com `shell=False`:
+
+```
+git checkout <source_branch>
+git merge --no-ff --no-edit <work_branch>
+```
+
+Nunca executa `push`, `force`, `reset --hard`, `clean`, `rebase`, squash automático ou merge em branch diferente da `source_branch` registrada.
+
+## Estados e evidência
+
+Em sucesso: `approved_for_merge → merged → completed`, relatório sanitizado via `result_collector`, e remoção da worktree somente após o merge concluído.
+
+Em conflito: executa `git merge --abort`, preserva a worktree, registra `merge_conflict` sanitizado e marca `review_rejected`.
+
+Em erro: preserva a worktree, registra erro sanitizado e marca `failed`.
+
+## Doctor (R4.2C1)
+
+O doctor mostra somente contagens: `approved_for_merge`, `merge_conflicts`, `completed_execution_tasks`, `preserved_worktrees`. Não mostra paths, diff, objective, stdout, stderr nem mensagens de erro.
+
+## Próximo passo
+
+R4.2C2 — integração segura com orchestrator e Command Center. R4 ainda não está concluída.

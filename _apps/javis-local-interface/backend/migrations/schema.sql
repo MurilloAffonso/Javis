@@ -216,6 +216,7 @@ CREATE TABLE IF NOT EXISTS execution_tasks (
     objective         TEXT NOT NULL,
     repository_path   TEXT NOT NULL,             -- validado contra allowed roots
     source_branch     TEXT NOT NULL,
+    source_commit     TEXT,                      -- HEAD esperado da source_branch no preparo
     work_branch       TEXT NOT NULL,             -- javes/exec/<task_id>
     worktree_path     TEXT NOT NULL,             -- <worktree_root>/<task_id>
     approval_id       INTEGER,                   -- FK approvals.id (consumido na R4.2)
