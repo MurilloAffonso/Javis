@@ -47,7 +47,25 @@ SMOKE_OBJECTIVE = (
 SMOKE_TEST_COMMANDS = [
     ["python", "-m", "py_compile", "_apps/javis-local-interface/backend/execution/execution_task.py"],
 ]
-_ACTIVE_STATUSES = tuple(sorted(et.ALL_STATES - et.TERMINAL_STATES))
+# Estados realmente EM ANDAMENTO — só estes bloqueiam um novo prepare.
+# Explícitos de propósito: os terminais (completed, blocked, failed, timed_out,
+# canceled, review_rejected) NUNCA bloqueiam. Mantemos uma verificação defensiva
+# de que este conjunto é exatamente ALL_STATES - TERMINAL_STATES para pegar drift
+# da máquina de estados sem depender de derivação implícita.
+_ACTIVE_SMOKE_STATUSES = (
+    et.DRAFT,
+    et.PENDING_APPROVAL,
+    et.APPROVED,
+    et.PREPARING_WORKSPACE,
+    et.RUNNING,
+    et.TESTING,
+    et.AWAITING_REVIEW,
+    et.APPROVED_FOR_MERGE,
+    et.MERGED,
+)
+assert set(_ACTIVE_SMOKE_STATUSES) == (et.ALL_STATES - et.TERMINAL_STATES), (
+    "conjunto de estados ativos do smoke divergiu da máquina de estados"
+)
 _EXECUTED_STATUSES = {
     et.PREPARING_WORKSPACE,
     et.RUNNING,
@@ -87,6 +105,40 @@ def _load_task(task_id: str) -> dict | None:
     return repo.execution_tasks.get(et.validate_task_id(task_id), CORE_PROJECT_ID)
 
 
+# Estados só alcançáveis DEPOIS de os testes passarem (testing → awaiting_review).
+# review_rejected só vem de awaiting_review (ver máquina de estados), logo também
+# implica testes aprovados; o resultado persistido é preservado na rejeição.
+_TESTS_PASSED_STATES = frozenset({
+    et.AWAITING_REVIEW, et.APPROVED_FOR_MERGE, et.MERGED, et.COMPLETED, et.REVIEW_REJECTED,
+})
+
+
+def _worktree_preserved(task: dict) -> bool:
+    worktree_path = (task.get("worktree_path") or "").strip()
+    return bool(worktree_path and Path(worktree_path).exists())
+
+
+def _evidence_present(path_value: object) -> bool:
+    p = str(path_value or "").strip()
+    return bool(p and Path(p).exists())
+
+
+def _derive_tests_status(task: dict, summary: dict) -> str:
+    """Deriva passed/failed/not_run do RESULTADO PERSISTIDO, não só do estado vivo.
+
+    Uma rejeição (review_rejected) não pode esconder que os testes passaram: a
+    evidência (result.json/tests.txt) fica intacta e o estado só é alcançável
+    após testing aprovado.
+    """
+    status = task.get("status") or ""
+    if status in {et.FAILED, et.TIMED_OUT}:
+        return "failed"
+    has_result = bool(summary) or _evidence_present(task.get("result_path"))
+    if status in _TESTS_PASSED_STATES and has_result:
+        return "passed"
+    return "not_run"
+
+
 def _schema_present() -> bool:
     return bool(db.query_one(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='execution_tasks'"
@@ -94,11 +146,14 @@ def _schema_present() -> bool:
 
 
 def _active_smoke_tasks(exclude_task_id: str = "") -> list[dict]:
-    placeholders = ",".join("?" for _ in _ACTIVE_STATUSES)
+    # Escopo obrigatório: project_id = javes-core + objetivo fixo do smoke.
+    # Nunca consulta global nem com project_id vazio. Só estados EM ANDAMENTO
+    # contam como ativos; estados terminais não bloqueiam novo prepare.
+    placeholders = ",".join("?" for _ in _ACTIVE_SMOKE_STATUSES)
     rows = db.query(
         f"SELECT * FROM execution_tasks WHERE project_id=? AND objective=? "
         f"AND status IN ({placeholders}) ORDER BY created_at DESC",
-        (CORE_PROJECT_ID, SMOKE_OBJECTIVE, *_ACTIVE_STATUSES),
+        (CORE_PROJECT_ID, SMOKE_OBJECTIVE, *_ACTIVE_SMOKE_STATUSES),
     )
     return [row for row in rows if row.get("task_id") != exclude_task_id]
 
@@ -300,10 +355,8 @@ def cmd_status(args: argparse.Namespace) -> int:
     payload = facade.get_task(task["task_id"], CORE_PROJECT_ID)
     result = facade.result_summary(task["task_id"], CORE_PROJECT_ID)
     summary = result.get("summary") or {}
-    tests_status = payload.get("tests_status") or "not_run"
-    if task.get("status") in {et.FAILED, et.TIMED_OUT}:
-        tests_status = "failed"
-    worktree_path = task.get("worktree_path") or ""
+    # tests deriva do resultado persistido — review_rejected mantém passed.
+    tests_status = _derive_tests_status(task, summary)
     out = {
         "task_id": task["task_id"],
         "executor": task.get("executor") or "",
@@ -315,7 +368,13 @@ def cmd_status(args: argparse.Namespace) -> int:
             "diff_truncated": bool(summary.get("diff_truncated")),
             "collected_at": summary.get("collected_at") or "",
         },
-        "worktree_preservada": bool(worktree_path and Path(worktree_path).exists()),
+        # Presença das evidências (sem paths completos): preservadas após reject.
+        "evidencias_preservadas": {
+            "result_path": _evidence_present(task.get("result_path")),
+            "diff_path": _evidence_present(task.get("diff_path")),
+            "test_report_path": _evidence_present(task.get("test_report_path")),
+        },
+        "worktree_preservada": _worktree_preserved(task),
     }
     _print_json(out)
     return 0
@@ -332,15 +391,34 @@ def cmd_reject(args: argparse.Namespace) -> int:
     if task.get("project_id") != CORE_PROJECT_ID:
         _print_json(_blocked("project_id_mismatch"))
         return 2
-    if task.get("status") != et.AWAITING_REVIEW:
+    status = task.get("status") or ""
+    # Idempotência segura: já rejeitado → resposta coerente, sem novo evento,
+    # sem tocar em status/evidências. Nunca devolve blocked depois de rejeitado.
+    if status == et.REVIEW_REJECTED:
+        _print_json({
+            "status": et.REVIEW_REJECTED,
+            "reason": "already_rejected",
+            "task_id": task["task_id"],
+            "project_id": CORE_PROJECT_ID,
+            "worktree_preservada": _worktree_preserved(task),
+            "evidence_preserved": True,
+            "merge": "not_requested",
+        })
+        return 0
+    # Só awaiting_review pode transicionar; outros estados incompatíveis bloqueiam.
+    if status != et.AWAITING_REVIEW:
         _print_json(_blocked("task_not_awaiting_review"))
         return 2
     try:
-        et.validate_transition(task["status"], et.REVIEW_REJECTED)
+        et.validate_transition(status, et.REVIEW_REJECTED)
     except Exception as exc:
         _print_json(_blocked(str(exc)))
         return 2
-    repo.execution_tasks.update_status(task["task_id"], CORE_PROJECT_ID, et.REVIEW_REJECTED)
+    updated = repo.execution_tasks.update_status(task["task_id"], CORE_PROJECT_ID, et.REVIEW_REJECTED)
+    if not updated:
+        _print_json(_blocked("status_update_failed"))
+        return 2
+    # Evento append-only único, consistente com a transição persistida.
     try:
         repo.task_events.add_event(
             task["task_id"],
@@ -351,10 +429,12 @@ def cmd_reject(args: argparse.Namespace) -> int:
         )
     except Exception:
         pass
+    task = _load_task(args.task_id) or task
     _print_json({
         "status": et.REVIEW_REJECTED,
         "task_id": task["task_id"],
         "project_id": CORE_PROJECT_ID,
+        "worktree_preservada": _worktree_preserved(task),
         "evidence_preserved": True,
         "merge": "not_requested",
     })

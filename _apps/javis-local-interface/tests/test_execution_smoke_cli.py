@@ -379,3 +379,158 @@ def test_reject_nao_faz_merge_push_ou_execucao(monkeypatch, tmp_path, capsys):
 
     assert code == 0
     assert _out(capsys)["merge"] == "not_requested"
+
+
+# ── R4.3B3 — estados terminais do smoke ────────────────────────────────────
+
+def _status_facade(monkeypatch, tmp_path):
+    """Facade de status apontando para o results_root temporário do teste."""
+    collector = ResultCollector(results_root=tmp_path / "results")
+    facade = ExecutionFacade(
+        repository_path=tmp_path / "repo",
+        execution_service=FakeExecutionService(tmp_path, collector),
+        result_collector=collector,
+    )
+    monkeypatch.setattr(smoke, "make_facade", lambda: facade)
+    return facade
+
+
+def _prepare_facade(monkeypatch, tmp_path):
+    """Facade para prepare criar uma NOVA task smoke sem agente real."""
+    repo_path = _temp_repo(tmp_path)
+    facade = _facade(tmp_path, repo_path)
+    monkeypatch.setattr(smoke, "make_facade", lambda: facade)
+    return facade
+
+
+# Correção 1 — reject coerente e idempotente
+
+def test_reject_em_awaiting_review_retorna_review_rejected_e_estado_coincide(tmp_path, capsys):
+    tid, _ = _review_task(tmp_path)
+
+    code = smoke.main(["reject", "--task-id", tid, "--confirm", smoke.REJECT_PHRASE])
+    body = _out(capsys)
+
+    assert code == 0
+    assert body["status"] == et.REVIEW_REJECTED
+    assert body["worktree_preservada"] is True
+    # estado persistido coincide com a resposta
+    assert repo.execution_tasks.get(tid, CORE)["status"] == body["status"]
+
+
+def test_segundo_reject_idempotente_nao_duplica_evento(tmp_path, capsys):
+    tid, _ = _review_task(tmp_path)
+
+    assert smoke.main(["reject", "--task-id", tid, "--confirm", smoke.REJECT_PHRASE]) == 0
+    _out(capsys)
+    eventos_1 = [e for e in repo.task_events.list_by_task(tid)
+                 if e["event_type"] == "smoke_review_rejected"]
+
+    code = smoke.main(["reject", "--task-id", tid, "--confirm", smoke.REJECT_PHRASE])
+    body = _out(capsys)
+    eventos_2 = [e for e in repo.task_events.list_by_task(tid)
+                 if e["event_type"] == "smoke_review_rejected"]
+
+    assert code == 0
+    assert body["status"] == et.REVIEW_REJECTED
+    assert body["reason"] == "already_rejected"
+    assert body["worktree_preservada"] is True
+    assert len(eventos_1) == 1
+    assert len(eventos_2) == 1  # segundo reject não duplica evento
+    assert repo.execution_tasks.get(tid, CORE)["status"] == et.REVIEW_REJECTED
+
+
+# Correção 2 — active_smoke_exists só para estados em andamento
+
+@pytest.mark.parametrize("terminal", [
+    et.REVIEW_REJECTED, et.FAILED, et.TIMED_OUT, et.CANCELED, et.COMPLETED,
+])
+def test_estado_terminal_nao_bloqueia_novo_prepare(monkeypatch, tmp_path, capsys, terminal):
+    old_tid, old_worktree = _review_task(tmp_path, status=terminal)
+    _prepare_facade(monkeypatch, tmp_path)
+
+    code = smoke.main(["prepare", "--executor", "claude"])
+    body = _out(capsys)
+
+    assert code == 0
+    assert body["project_id"] == CORE
+    assert body.get("task_id") and body["task_id"] != old_tid
+    # a task terminal antiga permanece intocada
+    old = repo.execution_tasks.get(old_tid, CORE)
+    assert old["status"] == terminal
+    assert old_worktree.exists()
+
+
+@pytest.mark.parametrize("active", [
+    et.PENDING_APPROVAL, et.RUNNING, et.AWAITING_REVIEW,
+])
+def test_estado_em_andamento_bloqueia_novo_prepare(monkeypatch, tmp_path, capsys, active):
+    _review_task(tmp_path, status=active)
+    _prepare_facade(monkeypatch, tmp_path)
+
+    code = smoke.main(["prepare", "--executor", "claude"])
+
+    assert code == 2
+    assert _out(capsys)["reason"] == "active_smoke_exists"
+
+
+def test_active_query_escopada_por_javes_core(monkeypatch, tmp_path, capsys):
+    # task ativa em OUTRO project_id não pode bloquear smoke de javes-core
+    _review_task(tmp_path, status=et.AWAITING_REVIEW, project_id="project:cerebro-jampa")
+    _prepare_facade(monkeypatch, tmp_path)
+
+    code = smoke.main(["prepare", "--executor", "claude"])
+    body = _out(capsys)
+
+    assert code == 0
+    assert body["project_id"] == CORE
+
+
+# Correção 3 — reject preserva e apresenta o resultado dos testes
+
+def test_reject_preserva_tests_passed_e_evidencias_no_status(monkeypatch, tmp_path, capsys):
+    tid, worktree = _review_task(tmp_path)
+    _status_facade(monkeypatch, tmp_path)
+
+    smoke.main(["status", "--task-id", tid])
+    antes = _out(capsys)
+    assert antes["tests"] == "passed"
+
+    before_paths = {
+        k: repo.execution_tasks.get(tid, CORE)[k]
+        for k in ("result_path", "diff_path", "test_report_path")
+    }
+
+    assert smoke.main(["reject", "--task-id", tid, "--confirm", smoke.REJECT_PHRASE]) == 0
+    _out(capsys)
+
+    smoke.main(["status", "--task-id", tid])
+    depois = _out(capsys)
+
+    assert depois["status"] == et.REVIEW_REJECTED
+    assert depois["tests"] == "passed"  # não virou not_run
+    assert depois["changed_files_count"] == 1
+    assert depois["resultado_sanitizado"]["collected_at"] == antes["resultado_sanitizado"]["collected_at"]
+    assert depois["evidencias_preservadas"] == {
+        "result_path": True, "diff_path": True, "test_report_path": True,
+    }
+    assert depois["worktree_preservada"] is True
+    # paths de resultado não foram alterados nem apagados pelo reject
+    after_paths = {
+        k: repo.execution_tasks.get(tid, CORE)[k]
+        for k in ("result_path", "diff_path", "test_report_path")
+    }
+    assert before_paths == after_paths
+    for value in after_paths.values():
+        assert value and Path(value).exists()
+    assert worktree.exists()
+
+
+def test_status_failed_deriva_tests_failed(monkeypatch, tmp_path, capsys):
+    tid, _ = _review_task(tmp_path, status=et.FAILED)
+    _status_facade(monkeypatch, tmp_path)
+
+    smoke.main(["status", "--task-id", tid])
+    body = _out(capsys)
+
+    assert body["tests"] == "failed"
