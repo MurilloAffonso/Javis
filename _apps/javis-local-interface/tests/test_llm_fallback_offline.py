@@ -508,7 +508,8 @@ def test_erro_final_openrouter_nao_vaza_segredo_na_resposta(monkeypatch):
     result = agent.respond("teste")
 
     assert secret not in result["text"]
-    assert "registrado sem credenciais" in result["text"]
+    # R2.1: mensagem amigavel, sem traceback/credencial.
+    assert result["text"] == agent._PROVIDER_UNAVAILABLE_MSG
 
 
 def test_script_live_bloqueado_nao_imprime_prefixo(monkeypatch, capsys):

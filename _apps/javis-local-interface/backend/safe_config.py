@@ -28,6 +28,22 @@ def external_adapters_enabled() -> bool:
     return flag(JAVIS_ENABLE_EXTERNAL_ADAPTERS, False)
 
 
+JAVES_PROVIDER_MODE = "JAVES_PROVIDER_MODE"
+
+
+def provider_mode() -> str:
+    """Modo de provider do chat (R2.1). Valores: 'local' | 'cloud' | 'auto'.
+
+    - local: SÓ Ollama; nunca cai silenciosamente na nuvem. Se o Ollama estiver
+      indisponível, o chamador devolve provider_unavailable.
+    - cloud: cadeia externa (Gemini/OpenAI/Claude/OpenRouter), como antes.
+    - auto (default): tenta Ollama primeiro; a nuvem só entra se o Ollama não
+      responder E os adaptadores externos estiverem habilitados.
+    """
+    raw = (os.environ.get(JAVES_PROVIDER_MODE) or "auto").strip().lower()
+    return raw if raw in {"local", "cloud", "auto"} else "auto"
+
+
 def codex_exec_enabled() -> bool:
     return external_adapters_enabled() and flag(JAVIS_ENABLE_CODEX_EXEC, False)
 
