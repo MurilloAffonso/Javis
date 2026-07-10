@@ -1018,10 +1018,11 @@ async def tasks_list(status: str = "", workflow: str = "", agent: str = "", proj
     Filtros opcionais: status, workflow (=mission), agent, project_id."""
     try:
         import repositories as repo
+        pid = _normalize_project_id(project_id)  # ausente → javes-core; nunca "todos"
         if repo.tasks.count() == 0:           # fallback: popula do Markdown
             import db_sync
             db_sync.sync_tasks()
-        rows = repo.tasks.for_board(status=status, workflow=workflow, agent=agent, project_id=project_id)
+        rows = repo.tasks.for_board(status=status, workflow=workflow, agent=agent, project_id=pid)
         out = []
         for r in rows:
             digest = (r.get("digest_text") or "").strip()
@@ -1044,8 +1045,9 @@ async def task_events(task_id: str, project_id: str = ""):
     """Journey Log: timeline cronológica dos eventos de uma task (+ status/digest)."""
     try:
         import repositories as repo
-        task = repo.tasks.get_task(task_id, project_id=project_id) if project_id else (repo.tasks.get_task(task_id) or {})
-        if project_id and not task:
+        pid = _normalize_project_id(project_id)  # ausente → javes-core; nunca "todos"
+        task = repo.tasks.get_task(task_id, project_id=pid)
+        if not task:
             return JSONResponse({"status": "not_found", "reason": "task_not_found", "events": [], "total": 0}, status_code=404)
         evs = repo.task_events.list_by_task(task_id)
         return JSONResponse({
@@ -1142,7 +1144,8 @@ async def task_digest(task_id: str, project_id: str = ""):
     """Digest final da task (resumo da jornada)."""
     try:
         import repositories as repo
-        t = repo.tasks.get_task(task_id, project_id=project_id) if project_id else repo.tasks.get_task(task_id)
+        pid = _normalize_project_id(project_id)  # ausente → javes-core; nunca "todos"
+        t = repo.tasks.get_task(task_id, project_id=pid)
         if not t:
             return JSONResponse({"status": "not_found", "reason": "task_not_found"}, status_code=404)
         return JSONResponse({
@@ -1159,8 +1162,9 @@ async def approvals_pending(project_id: str = ""):
     """Aprovações pendentes (Gate humano) — do SQLite."""
     try:
         import repositories as repo
-        rows = repo.approvals.pending(project_id=project_id)
-        return JSONResponse({"approvals": rows, "total": len(rows), "project_id": project_id or ""})
+        pid = _normalize_project_id(project_id)  # ausente → javes-core; nunca "todos"
+        rows = repo.approvals.pending(project_id=pid)
+        return JSONResponse({"approvals": rows, "total": len(rows), "project_id": pid})
     except Exception as e:
         return JSONResponse({"error": str(e), "approvals": [], "total": 0}, status_code=500)
 

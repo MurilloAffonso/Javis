@@ -80,7 +80,7 @@ class _Tasks:
         if agent:
             sql += " AND COALESCE(t.agent,'')=?"; params.append(agent)
         if project_id:
-            sql += " AND t.project_id=?"; params.append(project_id)
+            sql += " AND COALESCE(t.project_id,'javes-core')=?"; params.append(project_id)
         sql += " ORDER BY t.id"
         return db.query(sql, tuple(params))
 

@@ -41,8 +41,9 @@ def test_tasks_do_sqlite() -> int:
     _fresh_db()
     import repositories as repo
     failures = 0
-    repo.tasks.upsert("a-1", "Tarefa A", status="pending", mission="wf1", project_id="p1")
-    repo.tasks.upsert("a-2", "Tarefa B", status="done", mission="wf1", project_id="p1")
+    # R3.1: GET /tasks sem project_id lê o escopo padrão javes-core.
+    repo.tasks.upsert("a-1", "Tarefa A", status="pending", mission="wf1", project_id="javes-core")
+    repo.tasks.upsert("a-2", "Tarefa B", status="done", mission="wf1", project_id="javes-core")
     body = _tasks_via_endpoint()
     if not check("total == 2", body.get("total") == 2):
         failures += 1
@@ -60,14 +61,17 @@ def test_filtros() -> int:
     _fresh_db()
     import repositories as repo
     failures = 0
-    repo.tasks.upsert("f-1", "T1", status="pending", mission="wfA", project_id="px")
-    repo.tasks.upsert("f-2", "T2", status="done", mission="wfA", project_id="px")
-    repo.tasks.upsert("f-3", "T3", status="pending", mission="wfB", project_id="py")
-    if not check("filtro status=pending → 2", _tasks_via_endpoint(status="pending")["total"] == 2):
+    # R3.1: filtros status/workflow sem project_id operam no escopo padrão
+    # javes-core; o filtro por projeto isola cerebro-jampa.
+    repo.tasks.upsert("f-1", "T1", status="pending", mission="wfA", project_id="javes-core")
+    repo.tasks.upsert("f-2", "T2", status="done", mission="wfA", project_id="javes-core")
+    repo.tasks.upsert("f-3", "T3", status="pending", mission="wfB", project_id="javes-core")
+    repo.tasks.upsert("f-4", "T4", status="pending", mission="wfB", project_id="project:cerebro-jampa")
+    if not check("filtro status=pending → 2 (javes-core)", _tasks_via_endpoint(status="pending")["total"] == 2):
         failures += 1
     if not check("filtro workflow=wfA → 2", _tasks_via_endpoint(workflow="wfA")["total"] == 2):
         failures += 1
-    if not check("filtro project_id=py → 1", _tasks_via_endpoint(project_id="py")["total"] == 1):
+    if not check("filtro project_id=cerebro-jampa → 1", _tasks_via_endpoint(project_id="project:cerebro-jampa")["total"] == 1):
         failures += 1
     return failures
 

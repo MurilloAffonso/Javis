@@ -130,6 +130,8 @@ def test_endpoint_eventos() -> int:
     import repositories as repo
     import server
     failures = 0
+    # R3.1: /tasks/{id}/events é escopado — a task precisa existir no projeto.
+    repo.tasks.upsert("tEnd", "Task End", project_id="javes-core")
     repo.task_events.add_event("tEnd", "task_created", "system", "oi")
     repo.task_events.add_event("tEnd", "agent_called", "agent", "chamou nova", agent_id="nova")
     resp = asyncio.run(server.task_events("tEnd"))
