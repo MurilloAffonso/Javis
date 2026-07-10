@@ -279,3 +279,103 @@ def test_codex_sem_sandbox_falha_fechado(monkeypatch, tmp_path, capsys):
 
     assert code == 2
     assert _out(capsys)["reason"] == "secure_codex_sandbox_unavailable"
+
+
+def _review_task(tmp_path: Path, *, status: str = et.AWAITING_REVIEW, project_id: str = CORE) -> tuple[str, Path]:
+    tid = et.new_task_id()
+    worktree = tmp_path / "worktree" / tid
+    result_dir = tmp_path / "results" / tid
+    worktree.mkdir(parents=True)
+    result_dir.mkdir(parents=True)
+    (worktree / ".git").write_text("gitdir: fake", encoding="utf-8")
+    (worktree / "docs").mkdir()
+    (worktree / "docs" / "EXECUTION_SMOKE_TEST.md").write_text("# smoke\n", encoding="utf-8")
+    result_path = result_dir / "result.json"
+    diff_path = result_dir / "diff.patch"
+    tests_path = result_dir / "tests.txt"
+    result_path.write_text(json.dumps({"changed_count": 1}), encoding="utf-8")
+    diff_path.write_text("diff", encoding="utf-8")
+    tests_path.write_text("ok", encoding="utf-8")
+    repo.execution_tasks.create(
+        task_id=tid,
+        project_id=project_id,
+        executor="claude",
+        objective=smoke.SMOKE_OBJECTIVE,
+        repository_path=str(tmp_path / "repo"),
+        source_branch="master",
+        work_branch=et.branch_for(tid),
+        worktree_path=str(worktree),
+        status=status,
+        timeout_seconds=300,
+        source_commit="abc",
+    )
+    repo.execution_tasks.set_result_paths(
+        tid,
+        project_id,
+        result_path=str(result_path),
+        diff_path=str(diff_path),
+        test_report_path=str(tests_path),
+    )
+    return tid, worktree
+
+
+def test_reject_exige_frase_exata(tmp_path, capsys):
+    tid, _ = _review_task(tmp_path)
+
+    code = smoke.main(["reject", "--task-id", tid, "--confirm", "rejeitar"])
+
+    assert code == 2
+    assert _out(capsys)["reason"] == "confirmation_phrase_required"
+    assert repo.execution_tasks.get(tid, CORE)["status"] == et.AWAITING_REVIEW
+
+
+def test_reject_task_inexistente_bloqueia(capsys):
+    code = smoke.main(["reject", "--task-id", "exec_deadbeef", "--confirm", smoke.REJECT_PHRASE])
+
+    assert code == 2
+    assert _out(capsys)["reason"] == "task_not_found"
+
+
+def test_reject_status_errado_bloqueia(tmp_path, capsys):
+    tid, worktree = _review_task(tmp_path, status=et.APPROVED)
+
+    code = smoke.main(["reject", "--task-id", tid, "--confirm", smoke.REJECT_PHRASE])
+
+    assert code == 2
+    assert _out(capsys)["reason"] == "task_not_awaiting_review"
+    assert repo.execution_tasks.get(tid, CORE)["status"] == et.APPROVED
+    assert worktree.exists()
+
+
+def test_reject_transiciona_para_review_rejected_e_preserva_evidencias(tmp_path, capsys):
+    tid, worktree = _review_task(tmp_path)
+    before_files = sorted(path.relative_to(worktree).as_posix() for path in worktree.rglob("*"))
+
+    code = smoke.main(["reject", "--task-id", tid, "--confirm", smoke.REJECT_PHRASE])
+    body = _out(capsys)
+    task = repo.execution_tasks.get(tid, CORE)
+    events = repo.task_events.list_by_task(tid)
+    after_files = sorted(path.relative_to(worktree).as_posix() for path in worktree.rglob("*"))
+
+    assert code == 0
+    assert body["status"] == et.REVIEW_REJECTED
+    assert body["evidence_preserved"] is True
+    assert task["status"] == et.REVIEW_REJECTED
+    assert task["result_path"] and Path(task["result_path"]).exists()
+    assert task["diff_path"] and Path(task["diff_path"]).exists()
+    assert task["test_report_path"] and Path(task["test_report_path"]).exists()
+    assert worktree.exists()
+    assert before_files == after_files
+    assert any(event["event_type"] == "smoke_review_rejected" for event in events)
+
+
+def test_reject_nao_faz_merge_push_ou_execucao(monkeypatch, tmp_path, capsys):
+    tid, _ = _review_task(tmp_path)
+    blocked_facade = object()
+    monkeypatch.setattr(smoke, "make_facade", lambda: blocked_facade)
+    monkeypatch.setattr(smoke, "_git", lambda *args, **kwargs: pytest.fail("git nao deveria ser chamado"))
+
+    code = smoke.main(["reject", "--task-id", tid, "--confirm", smoke.REJECT_PHRASE])
+
+    assert code == 0
+    assert _out(capsys)["merge"] == "not_requested"

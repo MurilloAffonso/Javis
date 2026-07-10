@@ -30,6 +30,7 @@ CORE_PROJECT_ID = "javes-core"
 MAX_TIMEOUT_SECONDS = 300
 APPROVE_PHRASE = "APROVAR TESTE CONTROLADO"
 RUN_PHRASE = "EXECUTAR TESTE CONTROLADO"
+REJECT_PHRASE = "REJEITAR TESTE CONTROLADO"
 SMOKE_FILE = "docs/EXECUTION_SMOKE_TEST.md"
 SMOKE_CONTENT = """# Javes Supervised Execution Smoke Test
 
@@ -320,6 +321,46 @@ def cmd_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_reject(args: argparse.Namespace) -> int:
+    if args.confirm != REJECT_PHRASE:
+        _print_json(_blocked("confirmation_phrase_required"))
+        return 2
+    task = _load_task(args.task_id)
+    if not task:
+        _print_json(_blocked("task_not_found"))
+        return 2
+    if task.get("project_id") != CORE_PROJECT_ID:
+        _print_json(_blocked("project_id_mismatch"))
+        return 2
+    if task.get("status") != et.AWAITING_REVIEW:
+        _print_json(_blocked("task_not_awaiting_review"))
+        return 2
+    try:
+        et.validate_transition(task["status"], et.REVIEW_REJECTED)
+    except Exception as exc:
+        _print_json(_blocked(str(exc)))
+        return 2
+    repo.execution_tasks.update_status(task["task_id"], CORE_PROJECT_ID, et.REVIEW_REJECTED)
+    try:
+        repo.task_events.add_event(
+            task["task_id"],
+            "smoke_review_rejected",
+            "smoke_cli",
+            "Smoke test rejeitado; evidências preservadas",
+            metadata={"status": et.REVIEW_REJECTED},
+        )
+    except Exception:
+        pass
+    _print_json({
+        "status": et.REVIEW_REJECTED,
+        "task_id": task["task_id"],
+        "project_id": CORE_PROJECT_ID,
+        "evidence_preserved": True,
+        "merge": "not_requested",
+    })
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Smoke test manual do executor supervisionado R4.3A.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -343,6 +384,11 @@ def build_parser() -> argparse.ArgumentParser:
     status = sub.add_parser("status", help="Mostra resumo sanitizado da execution_task smoke.")
     status.add_argument("--task-id", required=True)
     status.set_defaults(func=cmd_status)
+
+    reject = sub.add_parser("reject", help="Rejeita smoke em awaiting_review preservando evidências.")
+    reject.add_argument("--task-id", required=True)
+    reject.add_argument("--confirm", required=True)
+    reject.set_defaults(func=cmd_reject)
     return parser
 
 
