@@ -1,6 +1,6 @@
 # Executor supervisionado — R4.1 (fundação)
 
-Data: 2026-07-10
+Data: 2026-07-11
 
 ## Escopo desta fase
 
@@ -554,3 +554,48 @@ worktree, o commit, os resultados, o diff, os testes e o approval anterior são
 preservados. O evento `smoke_merge_rejected` é append-only; repetir o comando em
 `review_rejected` é idempotente e não duplica o evento. Nenhum Git, agente, rede,
 merge ou push é executado por esse comando.
+
+---
+
+# R4.3D — Ciclo supervisionado completo (CONCLUÍDA)
+
+A validação real ponta a ponta foi concluída com sucesso no projeto
+`javes-core`, comprovando o ciclo de execução, revisão e integração local sob os
+guardrails supervisionados.
+
+## Evidência da execução real
+
+- task: `exec_9b862b81208042f6`;
+- executor: `claude`;
+- approval de início: `16`;
+- approval separado de merge: `17`;
+- status final: `completed`;
+- testes: `passed`;
+- `changed_files_count`: `1`;
+- arquivo integrado: `docs/EXECUTION_SMOKE_TEST.md`;
+- commit final da master:
+  `eddb430f4f1ac1c6aa34fdaa5c272ce4d73ca29a`.
+
+## Invariantes confirmadas
+
+- os approvals de início e merge foram distintos;
+- a worktree da task foi removida somente após o merge bem-sucedido e a
+  transição para `completed`;
+- resultados, diff e relatório de testes permaneceram preservados;
+- arquivos untracked preexistentes da master permaneceram intactos e não foram
+  incluídos no merge;
+- nenhum push foi realizado;
+- tasks rejeitadas e suas worktrees permaneceram preservadas para auditoria.
+
+## Resultado
+
+**R4.3D — CONCLUÍDA.** O ciclo supervisionado real foi validado de ponta a ponta:
+task escopada por `project_id`, executor em worktree isolada, approval de início,
+testes, revisão, approval separado de merge, integração local controlada e
+conclusão sem push automático.
+
+## Próximo passo
+
+R4.4A — habilitação gradual de tarefas reais de programação pelo fluxo
+supervisionado, mantendo allowlist, `project_id`, dois approvals, worktree
+isolada, testes, revisão e merge local sem push automático.
