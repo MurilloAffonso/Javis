@@ -70,6 +70,12 @@ def test_merged_so_vem_de_approved_for_merge():
         et.validate_transition(et.RUNNING, et.MERGED)
 
 
+def test_approved_for_merge_pode_ser_rejeitado_sem_merge():
+    assert et.validate_transition(
+        et.APPROVED_FOR_MERGE, et.REVIEW_REJECTED
+    ) == et.REVIEW_REJECTED
+
+
 def test_completed_so_vem_de_merged():
     assert et.validate_transition(et.MERGED, et.COMPLETED) == et.COMPLETED
     with pytest.raises(et.InvalidTransition):

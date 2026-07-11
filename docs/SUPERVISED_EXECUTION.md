@@ -521,3 +521,36 @@ providers, servidor ou rede e mantêm `JAVIS_ENABLE_SUPERVISED_EXEC=False`.
 ## Próximo passo
 
 R4.3D — executar o primeiro merge real controlado e validar o ciclo completo.
+
+---
+
+# R4.3D1 — Preflight de source e encerramento de task obsoleta
+
+A R4.3D1 separa as regras de limpeza do repositório principal e da worktree da
+task. Arquivos untracked preexistentes na source não bloqueiam o merge e não são
+adicionados, modificados ou removidos. A source continua bloqueada por alterações
+rastreadas staged/unstaged, operação Git em andamento ou HEAD inválido.
+
+Na worktree da task, o preflight exige limpeza completa: alterações rastreadas
+staged/unstaged bloqueiam e untracked são detectados explicitamente com:
+
+```text
+git ls-files --others --exclude-standard
+```
+
+A comparação `HEAD(source_branch) == source_commit` ocorre antes das demais
+checagens de limpeza. Divergência retorna `source_branch_moved` sem tentar merge,
+rebase, reset, cherry-pick ou qualquer atualização automática da task.
+
+## Rejeição de merge já aprovado
+
+```text
+python scripts/javes_execution_smoke.py reject-merge --task-id <task_id> --confirm "REJEITAR MERGE CONTROLADO"
+```
+
+O comando aceita somente `javes-core` em `approved_for_merge`, valida a frase
+exata e faz `approved_for_merge → review_rejected` pela máquina de estados. A
+worktree, o commit, os resultados, o diff, os testes e o approval anterior são
+preservados. O evento `smoke_merge_rejected` é append-only; repetir o comando em
+`review_rejected` é idempotente e não duplica o evento. Nenhum Git, agente, rede,
+merge ou push é executado por esse comando.

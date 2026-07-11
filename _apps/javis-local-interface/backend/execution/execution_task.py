@@ -51,7 +51,7 @@ _ALLOWED: dict[str, frozenset[str]] = {
     RUNNING:             frozenset({TESTING, FAILED, TIMED_OUT, CANCELED}),
     TESTING:             frozenset({AWAITING_REVIEW, FAILED, TIMED_OUT, CANCELED}),
     AWAITING_REVIEW:     frozenset({APPROVED_FOR_MERGE, REVIEW_REJECTED, CANCELED}),
-    APPROVED_FOR_MERGE:  frozenset({MERGED, FAILED, CANCELED}),
+    APPROVED_FOR_MERGE:  frozenset({MERGED, REVIEW_REJECTED, FAILED, CANCELED}),
     MERGED:              frozenset({COMPLETED, FAILED}),
     # terminais → sem saída
     COMPLETED: frozenset(),
