@@ -22,6 +22,7 @@ import repositories as repo  # noqa: E402
 import safe_config  # noqa: E402
 from execution import execution_approvals  # noqa: E402
 from execution import execution_task as et  # noqa: E402
+from execution._gitcmd import clean_git_env  # noqa: E402
 from execution._sanitize import sanitize_truncated  # noqa: E402
 from execution.execution_facade import ExecutionFacade  # noqa: E402
 
@@ -33,6 +34,7 @@ RUN_PHRASE = "EXECUTAR TESTE CONTROLADO"
 REJECT_PHRASE = "REJEITAR TESTE CONTROLADO"
 APPROVE_MERGE_PHRASE = "APROVAR MERGE CONTROLADO"
 MERGE_PHRASE = "EXECUTAR MERGE CONTROLADO"
+REJECT_MERGE_PHRASE = "REJEITAR MERGE CONTROLADO"
 SMOKE_FILE = "docs/EXECUTION_SMOKE_TEST.md"
 SMOKE_CONTENT = """# Javes Supervised Execution Smoke Test
 
@@ -174,6 +176,7 @@ def _git(args: list[str], cwd: Path) -> subprocess.CompletedProcess:
         ["git", *args],
         cwd=str(cwd),
         shell=False,
+        env=clean_git_env(),
         capture_output=True,
         text=True,
         timeout=20,
@@ -608,6 +611,70 @@ def cmd_merge(args: argparse.Namespace) -> int:
     return 2 if out.get("status") == "blocked" else 1
 
 
+def cmd_reject_merge(args: argparse.Namespace) -> int:
+    if args.confirm != REJECT_MERGE_PHRASE:
+        _print_json(_blocked("confirmation_phrase_required"))
+        return 2
+    task = _load_task(args.task_id)
+    if not task:
+        _print_json(_blocked("task_not_found"))
+        return 2
+    if task.get("project_id") != CORE_PROJECT_ID:
+        _print_json(_blocked("project_id_mismatch"))
+        return 2
+
+    status = task.get("status") or ""
+    if status == et.REVIEW_REJECTED:
+        _print_json({
+            "status": et.REVIEW_REJECTED,
+            "reason": "already_rejected",
+            "task_id": task["task_id"],
+            "project_id": CORE_PROJECT_ID,
+            "worktree_preservada": _worktree_preserved(task),
+            "evidence_preserved": True,
+            "merge": "not_executed",
+        })
+        return 0
+    if status != et.APPROVED_FOR_MERGE:
+        _print_json(_blocked("task_not_approved_for_merge"))
+        return 2
+
+    try:
+        et.validate_transition(status, et.REVIEW_REJECTED)
+    except Exception as exc:
+        _print_json(_blocked(str(exc)))
+        return 2
+    updated = repo.execution_tasks.update_status(
+        task["task_id"], CORE_PROJECT_ID, et.REVIEW_REJECTED
+    )
+    if not updated:
+        _print_json(_blocked("status_update_failed"))
+        return 2
+    try:
+        repo.task_events.add_event(
+            task["task_id"],
+            "smoke_merge_rejected",
+            "smoke_cli",
+            "Merge controlado rejeitado; worktree e evidências preservadas",
+            metadata={
+                "status": et.REVIEW_REJECTED,
+                "merge_approval_id": task.get("merge_approval_id"),
+            },
+        )
+    except Exception:
+        pass
+    task = _load_task(args.task_id) or task
+    _print_json({
+        "status": et.REVIEW_REJECTED,
+        "task_id": task["task_id"],
+        "project_id": CORE_PROJECT_ID,
+        "worktree_preservada": _worktree_preserved(task),
+        "evidence_preserved": True,
+        "merge": "not_executed",
+    })
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Smoke test manual do executor supervisionado R4.3A.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -655,6 +722,14 @@ def build_parser() -> argparse.ArgumentParser:
     merge.add_argument("--task-id", required=True)
     merge.add_argument("--confirm", required=True)
     merge.set_defaults(func=cmd_merge)
+
+    reject_merge = sub.add_parser(
+        "reject-merge",
+        help="Rejeita merge já aprovado preservando worktree e evidências.",
+    )
+    reject_merge.add_argument("--task-id", required=True)
+    reject_merge.add_argument("--confirm", required=True)
+    reject_merge.set_defaults(func=cmd_reject_merge)
     return parser
 
 

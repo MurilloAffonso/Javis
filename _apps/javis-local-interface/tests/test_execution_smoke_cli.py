@@ -20,6 +20,7 @@ import repositories as repo  # noqa: E402
 import javes_execution_smoke as smoke  # noqa: E402
 from execution import execution_approvals as ea  # noqa: E402
 from execution import execution_task as et  # noqa: E402
+from execution._gitcmd import clean_git_env  # noqa: E402
 from execution.execution_facade import ExecutionFacade  # noqa: E402
 from execution.merge_service import ControlledMergeService  # noqa: E402
 from execution.result_collector import ResultCollector  # noqa: E402
@@ -542,7 +543,7 @@ def test_status_failed_deriva_tests_failed(monkeypatch, tmp_path, capsys):
 def _git_run(cwd: Path, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
         ["git", *args], cwd=str(cwd), shell=False, check=False,
-        capture_output=True, text=True,
+        capture_output=True, text=True, env=clean_git_env(),
     )
 
 
@@ -792,3 +793,100 @@ def test_merge_limpo_completa_sem_push_remove_so_worktree_da_task(
     assert all(Path(path).exists() for path in result_paths.values())
     assert not any("push" in argv for argv in seen)
     assert str(ctx["repo_path"]) not in json.dumps(body)
+
+
+def _approved_merge_task(tmp_path):
+    tid, worktree = _review_task(tmp_path, status=et.APPROVED_FOR_MERGE)
+    approval_id = repo.approvals.add(
+        subject="merge aprovado",
+        kind="execution_gate",
+        task_id=tid,
+        project_id=CORE,
+        action=ea.ACTION_MERGE,
+        risk_level="high",
+    )
+    repo.approvals.decide(approval_id, True)
+    assert repo.approvals.consume(approval_id) == 1
+    repo.execution_tasks.set_merge_approval(tid, CORE, approval_id)
+    return tid, worktree, approval_id
+
+
+def test_reject_merge_exige_frase_exata(tmp_path, capsys):
+    tid, _, _ = _approved_merge_task(tmp_path)
+
+    code = smoke.main(["reject-merge", "--task-id", tid, "--confirm", "rejeitar"])
+
+    assert code == 2
+    assert _out(capsys)["reason"] == "confirmation_phrase_required"
+    assert repo.execution_tasks.get(tid, CORE)["status"] == et.APPROVED_FOR_MERGE
+
+
+def test_reject_merge_so_aceita_approved_for_merge(tmp_path, capsys):
+    tid, worktree = _review_task(tmp_path, status=et.AWAITING_REVIEW)
+
+    code = smoke.main([
+        "reject-merge", "--task-id", tid, "--confirm", "REJEITAR MERGE CONTROLADO",
+    ])
+
+    assert code == 2
+    assert _out(capsys)["reason"] == "task_not_approved_for_merge"
+    assert repo.execution_tasks.get(tid, CORE)["status"] == et.AWAITING_REVIEW
+    assert worktree.exists()
+
+
+def test_reject_merge_preserva_worktree_e_evidencias_sem_git(
+    monkeypatch, tmp_path, capsys
+):
+    tid, worktree, approval_id = _approved_merge_task(tmp_path)
+    before_task = repo.execution_tasks.get(tid, CORE)
+    before_paths = {
+        key: before_task[key]
+        for key in ("result_path", "diff_path", "test_report_path")
+    }
+    before_files = sorted(path.relative_to(worktree).as_posix() for path in worktree.rglob("*"))
+    before_approval = dict(repo.approvals.get(approval_id))
+    monkeypatch.setattr(smoke, "_git", lambda *a, **k: pytest.fail("git nao deveria ser chamado"))
+    monkeypatch.setattr(smoke, "make_facade", lambda: pytest.fail("facade nao deveria ser chamada"))
+
+    code = smoke.main([
+        "reject-merge", "--task-id", tid,
+        "--confirm", "REJEITAR MERGE CONTROLADO",
+    ])
+    body = _out(capsys)
+    after_task = repo.execution_tasks.get(tid, CORE)
+
+    assert code == 0
+    assert body["status"] == et.REVIEW_REJECTED
+    assert body["merge"] == "not_executed"
+    assert after_task["status"] == et.REVIEW_REJECTED
+    assert after_task["merge_approval_id"] == approval_id
+    assert repo.approvals.get(approval_id) == before_approval
+    assert {key: after_task[key] for key in before_paths} == before_paths
+    assert all(Path(path).exists() for path in before_paths.values())
+    assert worktree.exists()
+    assert sorted(path.relative_to(worktree).as_posix() for path in worktree.rglob("*")) == before_files
+    assert any(
+        event["event_type"] == "smoke_merge_rejected"
+        for event in repo.task_events.list_by_task(tid)
+    )
+
+
+def test_reject_merge_idempotente_nao_duplica_evento(tmp_path, capsys):
+    tid, _, approval_id = _approved_merge_task(tmp_path)
+    argv = [
+        "reject-merge", "--task-id", tid,
+        "--confirm", "REJEITAR MERGE CONTROLADO",
+    ]
+    assert smoke.main(argv) == 0
+    _out(capsys)
+    assert smoke.main(argv) == 0
+    body = _out(capsys)
+    events = [
+        event for event in repo.task_events.list_by_task(tid)
+        if event["event_type"] == "smoke_merge_rejected"
+    ]
+
+    assert body["status"] == et.REVIEW_REJECTED
+    assert body["reason"] == "already_rejected"
+    assert len(events) == 1
+    assert repo.execution_tasks.get(tid, CORE)["merge_approval_id"] == approval_id

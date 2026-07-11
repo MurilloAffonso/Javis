@@ -195,6 +195,27 @@ def test_source_branch_mudou_bloqueia(git_repo):
     assert result["reason"] == "source_branch_moved"
 
 
+def test_source_branch_moved_precede_untracked_e_nao_tenta_integracao(git_repo):
+    repo_path, _, _, manager = git_repo
+    tid, _ = _prepared_task(git_repo)
+    (repo_path / "preexisting.tmp").write_text("preservar\n", encoding="utf-8")
+    (repo_path / "moved.txt").write_text("moved\n", encoding="utf-8")
+    assert _git(repo_path, "add", "moved.txt").returncode == 0
+    assert _git(repo_path, "commit", "-m", "source moved").returncode == 0
+    seen = []
+
+    def runner(argv, **kwargs):
+        seen.append(argv)
+        return subprocess.run(argv, **kwargs)
+
+    result = _service(manager, git_runner=runner).merge(tid, CORE)
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "source_branch_moved"
+    assert (repo_path / "preexisting.tmp").read_text(encoding="utf-8") == "preservar\n"
+    assert not any(argv[1] in {"merge", "rebase", "reset", "cherry-pick"} for argv in seen)
+
+
 def test_source_commit_ausente_bloqueia(git_repo):
     _, _, _, manager = git_repo
     tid, _ = _prepared_task(git_repo, source_commit="")
@@ -205,6 +226,24 @@ def test_source_commit_ausente_bloqueia(git_repo):
     assert result["reason"] == "source_commit_required"
 
 
+def test_untracked_na_source_nao_bloqueia_nem_e_modificado(git_repo):
+    repo_path, _, _, manager = git_repo
+    tid, _ = _prepared_task(git_repo)
+    untracked = repo_path / "preexisting.tmp"
+    untracked.write_text("preservar\n", encoding="utf-8")
+    seen = []
+
+    def runner(argv, **kwargs):
+        seen.append(argv)
+        return subprocess.run(argv, **kwargs)
+
+    result = _service(manager, git_runner=runner).merge(tid, CORE)
+
+    assert result["status"] == et.COMPLETED
+    assert untracked.read_text(encoding="utf-8") == "preservar\n"
+    assert not any(argv[1] == "status" for argv in seen)
+
+
 def test_repo_com_alteracao_rastreada_bloqueia(git_repo):
     repo_path, _, _, manager = git_repo
     tid, _ = _prepared_task(git_repo)
@@ -212,6 +251,18 @@ def test_repo_com_alteracao_rastreada_bloqueia(git_repo):
     result = _service(manager).merge(tid, CORE)
     assert result["status"] == "blocked"
     assert result["reason"] == "tracked_changes_unstaged"
+
+
+def test_repo_com_alteracao_staged_bloqueia(git_repo):
+    repo_path, _, _, manager = git_repo
+    tid, _ = _prepared_task(git_repo)
+    (repo_path / "file.txt").write_text("staged\n", encoding="utf-8")
+    assert _git(repo_path, "add", "file.txt").returncode == 0
+
+    result = _service(manager).merge(tid, CORE)
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "tracked_changes_staged"
 
 
 def test_merge_limpo_vai_merged_completed_e_remove_worktree(git_repo):

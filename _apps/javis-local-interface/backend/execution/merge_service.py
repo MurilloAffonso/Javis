@@ -84,14 +84,10 @@ class ControlledMergeService:
             )
         return {"status": status, "reason": sanitize(reason, 300), "task_id": task["task_id"]}
 
-    def _assert_clean_repo(self, repository_path: Path) -> str:
-        for args, reason in (
-            (["diff", "--quiet"], "tracked_changes_unstaged"),
-            (["diff", "--cached", "--quiet"], "tracked_changes_staged"),
-        ):
-            rc, _, _ = self._run_git(repository_path, args)
-            if rc != 0:
-                return reason
+    def _assert_git_state(self, repository_path: Path) -> str:
+        rc, _, err = self._run_git(repository_path, ["rev-parse", "--verify", "HEAD"])
+        if rc != 0:
+            return sanitize(err, 200) or "head_invalid"
         rc, out, err = self._run_git(repository_path, ["rev-parse", "--git-dir"])
         if rc != 0:
             return sanitize(err, 200) or "git_dir_unavailable"
@@ -102,15 +98,38 @@ class ControlledMergeService:
         for marker in ("rebase-merge", "rebase-apply"):
             if (git_dir / marker).exists():
                 return "git_operation_in_progress"
+        return ""
+
+    def _assert_tracked_clean(self, repository_path: Path) -> str:
+        for args, reason in (
+            (["diff", "--quiet"], "tracked_changes_unstaged"),
+            (["diff", "--cached", "--quiet"], "tracked_changes_staged"),
+        ):
+            rc, _, _ = self._run_git(repository_path, args)
+            if rc != 0:
+                return reason
+        return ""
+
+    def _assert_source_repository_ready(self, repository_path: Path) -> str:
+        state_reason = self._assert_git_state(repository_path)
+        if state_reason:
+            return state_reason
+        return self._assert_tracked_clean(repository_path)
+
+    def _assert_task_worktree_clean(self, worktree_path: Path) -> str:
+        state_reason = self._assert_git_state(worktree_path)
+        if state_reason:
+            return state_reason
+        tracked_reason = self._assert_tracked_clean(worktree_path)
+        if tracked_reason:
+            return tracked_reason
         rc, out, err = self._run_git(
-            repository_path, ["status", "--porcelain", "--untracked-files=normal"]
+            worktree_path, ["ls-files", "--others", "--exclude-standard"]
         )
         if rc != 0:
-            return sanitize(err, 200) or "git_status_unavailable"
-        if any(line.startswith("??") for line in out.splitlines()):
-            return "untracked_files_present"
+            return sanitize(err, 200) or "untracked_check_unavailable"
         if out.strip():
-            return "worktree_not_clean"
+            return "untracked_files_present"
         return ""
 
     def merge(self, task_id: str, project_id: str) -> dict:
@@ -142,14 +161,6 @@ class ControlledMergeService:
             if not expected.get("is_expected_branch"):
                 return self._blocked("unexpected_worktree_branch")
 
-            clean_reason = self._assert_clean_repo(repository_path)
-            if clean_reason:
-                return self._blocked(clean_reason)
-
-            clean_reason = self._assert_clean_repo(worktree_path)
-            if clean_reason:
-                return self._blocked(clean_reason)
-
             expected_source_commit = (task.get("source_commit") or "").strip()
             if not expected_source_commit:
                 return self._blocked("source_commit_required")
@@ -158,9 +169,22 @@ class ControlledMergeService:
             )
             if rc != 0 or verified_commit.strip() != expected_source_commit:
                 return self._blocked("source_commit_invalid")
-            current_source_commit = self.worktree_manager.branch_head(repository_path, source_branch)
+            rc, current_source_commit, _ = self._run_git(
+                repository_path, ["rev-parse", "--verify", f"{source_branch}^{{commit}}"]
+            )
+            if rc != 0 or not current_source_commit.strip():
+                return self._blocked("head_invalid")
+            current_source_commit = current_source_commit.strip()
             if current_source_commit != expected_source_commit:
                 return self._blocked("source_branch_moved")
+
+            clean_reason = self._assert_source_repository_ready(repository_path)
+            if clean_reason:
+                return self._blocked(clean_reason)
+
+            clean_reason = self._assert_task_worktree_clean(worktree_path)
+            if clean_reason:
+                return self._blocked(clean_reason)
 
             rc, out, err = self._run_git(repository_path, ["rev-list", "--count", f"{source_branch}..{work_branch}"])
             if rc != 0:

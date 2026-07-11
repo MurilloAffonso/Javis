@@ -6,7 +6,7 @@
 > (`estado-atual.md`, `proximos-passos.md`, `_logs/` datados ou `git log`).
 > Aqueles ficam como **histórico**; a decisão vigente é a daqui.
 
-**Atualizado:** 2026-07-10
+**Atualizado:** 2026-07-11
 **Mantido por:** hardening arc (R1 → R4)
 
 ---
@@ -31,24 +31,25 @@
 | **R4.3A** | CLI para smoke test controlado do executor supervisionado, sem executar agente real durante a implementacao | Concluido |
 | **R4.3B1** | Correcao do fechamento da execucao: remove prompt interno, cria commit local controlado e coleta diff de arquivos novos | Concluido |
 | **R4.3C** | CLI de revisao e merge controlado do smoke com gate `execution.merge`, approval single-use e `ControlledMergeService` | Concluido |
+| **R4.3D1** | Preflight separado para source/worktree, prioridade para `source_branch_moved` e `reject-merge` idempotente | Concluido |
 
-> **Executor ainda DESLIGADO.** R4.1/R4.2A/R4.2B/R4.2C1/R4.2C2/R4.3A/R4.3B1/R4.3C sao fundacao + gates + adapters + merge local
+> **Executor ainda DESLIGADO.** R4.1/R4.2A/R4.2B/R4.2C1/R4.2C2/R4.3A/R4.3B1/R4.3C/R4.3D1 sao fundacao + gates + adapters + merge local
 > controlado + integracao supervisionada + CLI de smoke + fechamento com commit local controlado + CLI de revisao/merge: nenhum agente real roda por default, fluxo legado direto foi desativado, e
 > `JAVIS_ENABLE_SUPERVISED_EXEC` continua `False`.
 ---
 
 ## PROXIMO PASSO OFICIAL
 
-**R4.3D — executar o primeiro merge real controlado e validar o ciclo completo**
+**Retomar R4.3D com uma nova task após encerrar explicitamente a task obsoleta**
 
-Usar uma task smoke real já revisada para solicitar e consumir o gate
-`execution.merge`, executar o merge local controlado e validar task concluida,
-commit final, resultados preservados e remocao exclusiva da worktree da task.
+Usar `reject-merge` somente com confirmação humana para encerrar a task cuja
+source branch moveu; depois preparar uma nova task smoke e validar o ciclo de
+merge controlado completo sem reaproveitar commit ou approval obsoleto.
 ---
 
 ## Fases seguintes (ordem oficial)
 
-1. **R4.3D — primeiro merge real controlado** (proximo passo acima).
+1. **R4.3D — primeiro merge real controlado com nova task** (proximo passo acima).
 
 2. **R4.4 - Endurecimento adicional / sandbox opcional**
    Bloqueio de rede real (Docker `--network none` opcional, nunca default),
