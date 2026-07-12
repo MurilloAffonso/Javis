@@ -95,11 +95,17 @@ def test_init_db_migra_banco_legado_sem_project_id_e_preserva_linhas(isolated_db
     assert "session_id" in _columns(isolated_db, "messages")
     assert "project_id" in _columns(isolated_db, "tasks")
     assert "project_id" in _columns(isolated_db, "approvals")
+    assert "executor" in _columns(isolated_db, "approvals")
+    assert "spec_hash" in _columns(isolated_db, "approvals")
     assert "project_id" in _columns(isolated_db, "execution_tasks")
     assert "source_commit" in _columns(isolated_db, "execution_tasks")
 
     assert _index_exists(isolated_db, "idx_messages_project_session")
     assert _index_exists(isolated_db, "idx_execution_tasks_project_status")
+    assert _index_exists(isolated_db, "idx_execution_task_specs_project")
+    assert _columns(isolated_db, "execution_task_specs") >= {
+        "task_id", "project_id", "spec_hash", "schema_version", "snapshot_json"
+    }
 
     conn = sqlite3.connect(isolated_db)
     try:
@@ -122,6 +128,7 @@ def test_init_db_pode_rodar_duas_vezes_em_banco_legado(isolated_db):
 
     assert _index_exists(isolated_db, "idx_messages_project_session")
     assert _index_exists(isolated_db, "idx_execution_tasks_project_status")
+    assert _index_exists(isolated_db, "idx_execution_task_specs_project")
 
 
 def test_banco_novo_cria_execution_tasks_corretamente(isolated_db):

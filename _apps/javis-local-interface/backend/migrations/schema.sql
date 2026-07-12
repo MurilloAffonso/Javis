@@ -77,6 +77,8 @@ CREATE TABLE IF NOT EXISTS approvals (
     task_id    TEXT,                              -- task relacionada (ext_id), se houver
     project_id TEXT,
     action     TEXT,
+    executor   TEXT,
+    spec_hash  TEXT,
     route      TEXT,
     risk_level TEXT,
     status     TEXT DEFAULT 'pending',            -- pending | approved | rejected | expired | canceled
@@ -232,3 +234,26 @@ CREATE TABLE IF NOT EXISTS execution_tasks (
     last_error        TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_execution_tasks_project_status ON execution_tasks(project_id, status);
+
+-- R4.4A — snapshot imutável da especificação admitida.
+CREATE TABLE IF NOT EXISTS execution_task_specs (
+    task_id         TEXT NOT NULL,
+    project_id      TEXT NOT NULL,
+    spec_hash       TEXT NOT NULL,
+    schema_version  INTEGER NOT NULL,
+    snapshot_json   TEXT NOT NULL,
+    created_at      TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (task_id, project_id),
+    UNIQUE (project_id, spec_hash, task_id)
+);
+CREATE INDEX IF NOT EXISTS idx_execution_task_specs_project ON execution_task_specs(project_id);
+CREATE TRIGGER IF NOT EXISTS execution_task_specs_no_update
+BEFORE UPDATE ON execution_task_specs
+BEGIN
+    SELECT RAISE(ABORT, 'execution_task_spec_immutable');
+END;
+CREATE TRIGGER IF NOT EXISTS execution_task_specs_no_delete
+BEFORE DELETE ON execution_task_specs
+BEGIN
+    SELECT RAISE(ABORT, 'execution_task_spec_immutable');
+END;

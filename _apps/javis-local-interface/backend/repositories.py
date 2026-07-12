@@ -153,14 +153,15 @@ class _Approvals:
             detail: str = "", task_id: str = "", project_id: str = "",
             action: str = "", route: str = "", risk_level: str = "",
             requested_by: str = "", reason: str = "",
-            metadata: dict | None = None) -> int:
+            metadata: dict | None = None, executor: str = "",
+            spec_hash: str = "") -> int:
         metadata_json = _json.dumps(metadata, ensure_ascii=False) if metadata else None
         return db.execute(
-            "INSERT INTO approvals(kind, subject, agent, task_id, project_id, action, route, "
-            "risk_level, status, detail, requested_by, reason, metadata_json, updated_at) "
-            "VALUES(?,?,?,?,?,?,?,?,'pending',?,?,?,?,datetime('now'))",
+            "INSERT INTO approvals(kind, subject, agent, task_id, project_id, action, executor, "
+            "spec_hash, route, risk_level, status, detail, requested_by, reason, metadata_json, updated_at) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,'pending',?,?,?,?,datetime('now'))",
             (
-                kind, subject, agent, task_id, project_id, action, route,
+                kind, subject, agent, task_id, project_id, action, executor, spec_hash, route,
                 risk_level, detail, requested_by, reason, metadata_json,
             ),
         )
@@ -489,6 +490,35 @@ class _ExecutionTasks:
         return db.count("execution_tasks", f"status IN ({placeholders})", tuple(statuses))
 
 
+class _ExecutionTaskSpecs:
+    """Snapshots R4.4A: INSERT-only e sempre escopados por project_id."""
+
+    def add(self, *, task_id: str, project_id: str, spec_hash: str,
+            schema_version: int, snapshot_json: str) -> None:
+        db.execute(
+            "INSERT INTO execution_task_specs(task_id, project_id, spec_hash, schema_version, snapshot_json) "
+            "VALUES(?,?,?,?,?)",
+            (task_id, project_id, spec_hash, schema_version, snapshot_json),
+        )
+
+    def get(self, task_id: str, project_id: str) -> dict | None:
+        return db.query_one(
+            "SELECT * FROM execution_task_specs WHERE task_id=? AND project_id=?",
+            (task_id, project_id),
+        )
+
+    def active_for_project(self, project_id: str) -> dict | None:
+        return db.query_one(
+            "SELECT s.task_id, s.project_id, s.spec_hash, t.status "
+            "FROM execution_task_specs s JOIN execution_tasks t "
+            "ON t.task_id=s.task_id AND t.project_id=s.project_id "
+            "WHERE s.project_id=? AND t.status NOT IN "
+            "('completed','blocked','failed','timed_out','canceled','review_rejected') "
+            "ORDER BY t.created_at DESC LIMIT 1",
+            (project_id,),
+        )
+
+
 # instâncias prontas pra uso
 messages  = _Messages()
 tasks     = _Tasks()
@@ -501,3 +531,4 @@ memories  = _Memories()
 content   = _Content()
 task_events = _TaskEvents()
 execution_tasks = _ExecutionTasks()
+execution_task_specs = _ExecutionTaskSpecs()

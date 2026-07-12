@@ -110,8 +110,11 @@ class ExecutionFacade:
         rows = self.repository.execution_tasks.list_by_project(pid, status or "")
         return [self._task_payload(row) for row in rows]
 
-    def request_start_approval(self, task_id: str, project_id: str) -> dict:
-        return execution_approvals.request_execution_start(task_id, project_id)
+    def request_start_approval(self, task_id: str, project_id: str, *, executor: str = "",
+                               spec_hash: str = "") -> dict:
+        return execution_approvals.request_execution_start(
+            task_id, project_id, executor=executor, spec_hash=spec_hash,
+        )
 
     def approve_start(self, task_id: str, project_id: str, approval_id: int) -> dict:
         return execution_approvals.approve_execution_start(task_id, project_id, approval_id)

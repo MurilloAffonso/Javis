@@ -70,19 +70,27 @@ def _approval_bound(approval: dict | None, action: str, task_id: str, project_id
 
 
 # ── Gate 1: execução ────────────────────────────────────────────────────────
-def request_execution_start(task_id: str, project_id: str) -> dict:
+def request_execution_start(task_id: str, project_id: str, *, executor: str = "",
+                            spec_hash: str = "") -> dict:
     """draft → pending_approval, criando a aprovação (pending) de execution.start."""
     repo = _repo()
     task = _load_task(task_id, project_id)
     tid, pid = task["task_id"], task["project_id"]
 
     et.validate_transition(task["status"], et.PENDING_APPROVAL)
+    if executor or spec_hash:
+        snapshot = repo.execution_task_specs.get(tid, pid)
+        if (not snapshot or snapshot.get("spec_hash") != spec_hash
+                or task.get("executor") != executor):
+            raise ApprovalDenied("spec_snapshot_mismatch")
 
     approval_id = repo.approvals.add(
         subject=f"Executar tarefa {tid} ({task.get('executor', '?')})",
         kind="execution_gate", task_id=tid, project_id=pid,
         action=ACTION_START, risk_level="high", requested_by="execution",
         reason="human_approval_required_execution_start",
+        executor=executor, spec_hash=spec_hash,
+        metadata={"executor": executor, "spec_hash": spec_hash} if spec_hash else None,
     )
     repo.execution_tasks.update_status(tid, pid, et.PENDING_APPROVAL)
     _journey(tid, "execution_approval_requested",
@@ -102,6 +110,12 @@ def approve_execution_start(task_id: str, project_id: str, approval_id: int) -> 
     if not _approval_bound(approval, ACTION_START, tid, pid):
         _log(ACTION_START, f"execução {tid}: aprovação {approval_id} inválida", False)
         raise ApprovalDenied("aprovação de execução inválida/não-amarrada")
+    snapshot = repo.execution_task_specs.get(tid, pid)
+    if snapshot or approval.get("spec_hash"):
+        if (not snapshot or snapshot.get("spec_hash") != approval.get("spec_hash")
+                or approval.get("executor") != task.get("executor")):
+            _log(ACTION_START, f"execução {tid}: spec da aprovação não confere", False)
+            raise ApprovalDenied("spec_snapshot_mismatch")
 
     # single-use: consumir; se já consumida (corrida), nega sem mudar estado
     if repo.approvals.consume(approval_id) < 1:
