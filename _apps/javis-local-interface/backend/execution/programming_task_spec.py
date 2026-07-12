@@ -169,3 +169,26 @@ def validate_spec(raw: dict[str, Any], registry: ProjectExecutionRegistry | None
 
 def load_and_validate(path: str | Path, registry: ProjectExecutionRegistry | None = None) -> ValidatedProgrammingTaskSpec:
     return validate_spec(load_spec(path), registry)
+
+
+def validate_snapshot(snapshot_json: str, expected_hash: str,
+                      registry: ProjectExecutionRegistry | None = None) -> ValidatedProgrammingTaskSpec:
+    """Revalida o snapshot persistido e recalcula seu hash canônico."""
+    if not snapshot_json:
+        raise SpecValidationError("spec_not_found")
+    try:
+        raw = json.loads(snapshot_json, object_pairs_hook=_pairs_no_duplicates,
+                         parse_constant=_reject_constant)
+    except SpecValidationError:
+        raise
+    except (json.JSONDecodeError, TypeError, ValueError) as exc:
+        raise SpecValidationError("spec_hash_mismatch") from exc
+    if not isinstance(raw, dict):
+        raise SpecValidationError("spec_hash_mismatch")
+    try:
+        validated = validate_spec(raw, registry)
+    except SpecValidationError as exc:
+        raise SpecValidationError("spec_hash_mismatch") from exc
+    if not expected_hash or validated.spec_hash != expected_hash:
+        raise SpecValidationError("spec_hash_mismatch")
+    return validated

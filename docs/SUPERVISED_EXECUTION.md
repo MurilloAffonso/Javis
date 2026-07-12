@@ -649,3 +649,76 @@ Preparar uma task não cria worktree nem chama adapters.
 
 R4.4B — executar uma primeira tarefa real de baixo risco, limitada a
 documentação, usando dois approvals e merge controlado.
+
+---
+
+# R4.4B1 — Fluxo supervisionado para tarefas reais
+
+A R4.4B1 conecta as specs admitidas pela R4.4A ao ciclo R4 existente. A
+implementação foi validada exclusivamente com SQLite, repositórios Git,
+worktrees e adapters temporários/falsos; nenhuma task real foi executada no
+repositório principal.
+
+## CLI operacional
+
+Além de `validate` e `prepare`, `scripts/javes_programming_task.py` oferece:
+
+```text
+approve-start --task-id <id> --approval-id <id> --confirm "APROVAR TAREFA REAL"
+run --task-id <id> --confirm "EXECUTAR TAREFA REAL"
+status --task-id <id>
+request-merge --task-id <id>
+approve-merge --task-id <id> --approval-id <id> --confirm "APROVAR MERGE REAL"
+merge --task-id <id> --confirm "EXECUTAR MERGE REAL"
+reject --task-id <id> --confirm "REJEITAR TAREFA REAL"
+reject-merge --task-id <id> --confirm "REJEITAR MERGE REAL"
+```
+
+`approve-start` recalcula o hash canônico do snapshot e decide, consome e
+transiciona o approval em uma única transação SQLite. Não cria worktree nem chama
+adapter. `run` exige simultaneamente `JAVIS_ENABLE_REAL_PROGRAMMING_TASKS=True` e
+`JAVIS_ENABLE_SUPERVISED_EXEC=True`; ambas continuam `False` por padrão.
+
+## Execução e enforcement
+
+O repositório e a source branch vêm somente do `ProjectExecutionRegistry`; o
+executor, paths, perfil e limites vêm do snapshot imutável. O prompt interno
+contém o objetivo e os guardrails, mas não é a barreira de segurança.
+
+Antes do commit, `ProgrammingChangePolicy` inspeciona arquivos modificados,
+adicionados, removidos e ambos os lados de renames. São bloqueados paths fora da
+allowlist, arquivos sensíveis, `.git`, symlinks, submodules, ausência de mudança,
+quantidade de arquivos, linhas de diff e duração acima da spec. O stage usa
+somente `git add -- <lista explícita>` e a mensagem fixa:
+
+```text
+javes(real:<task_id>): <title sanitizado>
+```
+
+O artefato interno de prompt é removido antes de testes, commit e coleta. O perfil
+`docs_only` executa `git diff --check` e valida UTF-8 dos arquivos textuais; não
+há validador Markdown instalado no projeto. `safe_python` usa somente a suíte
+segura registrada internamente, nunca comandos fornecidos pela spec.
+
+## Revisão, merge e rejeição
+
+`request-merge` exige `awaiting_review`, testes aprovados, commit novo, worktree
+limpa e revalidação integral da spec/allowlist/limites. O approval separado
+`execution.merge` carrega `task_id + project_id + executor + spec_hash` e é
+consumido atomicamente.
+
+`merge` compara `HEAD(source_branch)` com `source_commit` antes das demais
+validações, revalida o diff já commitado e delega o merge exclusivamente ao
+`ControlledMergeService`. Não há push. Em sucesso, somente a worktree da task é
+removida após `merged → completed`; resultados e relatórios permanecem.
+
+`reject` e `reject-merge` levam a `review_rejected`, preservando worktree,
+commit, approvals e evidências. Repetir `reject-merge` é idempotente e não duplica
+o evento append-only.
+
+**R4.4B1 — fluxo real implementado, ainda sem execução real.**
+
+## Próximo passo
+
+R4.4B2 — executar a primeira task real `docs_only`, com dois approvals e merge
+controlado.

@@ -6,7 +6,7 @@
 > (`estado-atual.md`, `proximos-passos.md`, `_logs/` datados ou `git log`).
 > Aqueles ficam como **histórico**; a decisão vigente é a daqui.
 
-**Atualizado:** 2026-07-11
+**Atualizado:** 2026-07-12
 **Mantido por:** hardening arc (R1 → R4)
 
 ---
@@ -34,26 +34,27 @@
 | **R4.3D1** | Preflight separado para source/worktree, prioridade para `source_branch_moved` e `reject-merge` idempotente | Concluido |
 | **R4.3D** | Ciclo supervisionado real validado ponta a ponta, com dois approvals, testes, revisão, merge local e conclusão sem push | ✅ **Concluído** |
 | **R4.4A** | Admissão segura de tarefas reais por spec estrita, allowlists, limites, snapshot imutável e approval vinculado ao hash, sem execução | ✅ **Concluído** |
+| **R4.4B1** | Fluxo supervisionado de tasks reais com enforcement pós-execução, dois approvals, commit e merge controlados, validado apenas em ambientes temporários | ✅ **Concluído** |
 
-> **Executor continua DESLIGADO por padrão.** A R4.4A admite specs reais somente
-> atrás de `JAVIS_ENABLE_REAL_PROGRAMMING_TASKS=False`; ela não cria worktree nem
-> executa agente. `JAVIS_ENABLE_SUPERVISED_EXEC` também continua `False`.
+> **Executor continua DESLIGADO por padrão.** A R4.4B1 implementa o fluxo, mas
+> `JAVIS_ENABLE_REAL_PROGRAMMING_TASKS` e `JAVIS_ENABLE_SUPERVISED_EXEC` continuam
+> `False`. Nenhuma task real foi executada nesta fase.
 ---
 
 ## PROXIMO PASSO OFICIAL
 
-**R4.4B — primeira tarefa real de baixo risco limitada a documentação**
+**R4.4B2 — primeira task real `docs_only`**
 
-Executar uma primeira tarefa documental usando allowlist, `project_id`, dois
-approvals separados, worktree isolada, testes, revisão humana e merge local sem
-push automático.
+Executar a primeira task real de documentação usando allowlist, `project_id`,
+dois approvals separados, worktree isolada, testes, revisão humana e merge local
+sem push automático.
 ---
 
 ## Fases seguintes (ordem oficial)
 
-1. **R4.4B — primeira tarefa real documental controlada** (próximo passo acima).
+1. **R4.4B2 — primeira task real documental controlada** (próximo passo acima).
 
-2. **R4.4B - Endurecimento adicional / sandbox opcional**
+2. **R4.4C - Endurecimento adicional / sandbox opcional**
    Bloqueio de rede real (Docker `--network none` opcional, nunca default),
    limites de recurso e hardening extra do executor.
 
