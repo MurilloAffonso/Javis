@@ -25,6 +25,8 @@ _LEGACY_COLUMNS: dict[str, tuple[tuple[str, str], ...]] = {
         ("note", "TEXT"),
         ("project_id", "TEXT"),
         ("action", "TEXT"),
+        ("executor", "TEXT"),
+        ("spec_hash", "TEXT"),
         ("route", "TEXT"),
         ("risk_level", "TEXT"),
         ("requested_by", "TEXT"),

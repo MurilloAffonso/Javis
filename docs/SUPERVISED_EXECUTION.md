@@ -599,3 +599,53 @@ conclusão sem push automático.
 R4.4A — habilitação gradual de tarefas reais de programação pelo fluxo
 supervisionado, mantendo allowlist, `project_id`, dois approvals, worktree
 isolada, testes, revisão e merge local sem push automático.
+
+---
+
+# R4.4A — Admissão segura de tarefas reais de programação
+
+A R4.4A substitui o objetivo fixo do smoke por uma especificação JSON estrita,
+mas limita esta fase à admissão. Nenhuma tarefa real, agente, worktree ou merge é
+executado. O fluxo existente de execução, revisão e merge permanece inalterado.
+
+## CLI
+
+```text
+python scripts/javes_programming_task.py validate --spec <arquivo.json>
+python scripts/javes_programming_task.py prepare --spec <arquivo.json>
+```
+
+`validate` é livre de efeitos persistentes: não inicializa SQLite, não cria task,
+approval ou worktree e retorna somente metadados sanitizados e o hash da spec.
+
+`prepare` valida novamente e exige `JAVIS_ENABLE_REAL_PROGRAMMING_TASKS=True`.
+Com a flag desligada, retorna `blocked/real_programming_tasks_disabled` sem criar
+o banco. Quando habilitado explicitamente, cria uma `execution_task` em
+`pending_approval`, persiste snapshot canônico imutável e solicita um approval
+`execution.start` vinculado a `task_id + project_id + executor + spec_hash`.
+
+## Política fail-closed
+
+- registro confiável inicial: somente `javes-core`, apontando internamente para o
+  repositório Javes e para a source branch controlada;
+- executores: somente `claude` ou `codex`;
+- perfis internos: `docs_only` e `safe_python`; a spec nunca fornece comandos;
+- limites máximos: 300 segundos, 5 arquivos alterados e 300 linhas de diff;
+- paths relativos obrigatórios, com bloqueio de absoluto/drive/UNC/traversal,
+  symlink externo, `.git`, `.env*`, segredos, SQLite, `_data`, worktrees,
+  evidências, `node_modules`, `.venv` e `__pycache__`;
+- uma task real ativa por `project_id`; tasks smoke não possuem snapshot R4.4A e
+  continuam independentes;
+- hash SHA-256 sobre JSON canônico validado; snapshot é INSERT-only e toda leitura
+  operacional continua escopada por `task_id + project_id`.
+
+As flags `JAVIS_ENABLE_REAL_PROGRAMMING_TASKS` e
+`JAVIS_ENABLE_SUPERVISED_EXEC` são independentes e permanecem `False` por padrão.
+Preparar uma task não cria worktree nem chama adapters.
+
+**R4.4A — admissão segura implementada.**
+
+## Próximo passo
+
+R4.4B — executar uma primeira tarefa real de baixo risco, limitada a
+documentação, usando dois approvals e merge controlado.

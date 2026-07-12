@@ -33,24 +33,25 @@
 | **R4.3C** | CLI de revisao e merge controlado do smoke com gate `execution.merge`, approval single-use e `ControlledMergeService` | Concluido |
 | **R4.3D1** | Preflight separado para source/worktree, prioridade para `source_branch_moved` e `reject-merge` idempotente | Concluido |
 | **R4.3D** | Ciclo supervisionado real validado ponta a ponta, com dois approvals, testes, revisão, merge local e conclusão sem push | ✅ **Concluído** |
+| **R4.4A** | Admissão segura de tarefas reais por spec estrita, allowlists, limites, snapshot imutável e approval vinculado ao hash, sem execução | ✅ **Concluído** |
 
-> **Executor continua DESLIGADO por padrão.** R4.1/R4.2A/R4.2B/R4.2C1/R4.2C2/R4.3A/R4.3B1/R4.3C/R4.3D1/R4.3D entregam fundacao + gates + adapters + merge local
-> controlado + integracao supervisionada + CLI de smoke + fechamento com commit local controlado + CLI de revisao/merge + validacao real ponta a ponta: tarefas reais ainda nao sao liberadas de forma geral, o fluxo legado direto permanece desativado, e
-> `JAVIS_ENABLE_SUPERVISED_EXEC` continua `False`.
+> **Executor continua DESLIGADO por padrão.** A R4.4A admite specs reais somente
+> atrás de `JAVIS_ENABLE_REAL_PROGRAMMING_TASKS=False`; ela não cria worktree nem
+> executa agente. `JAVIS_ENABLE_SUPERVISED_EXEC` também continua `False`.
 ---
 
 ## PROXIMO PASSO OFICIAL
 
-**R4.4A — habilitação gradual de tarefas reais de programação pelo fluxo supervisionado**
+**R4.4B — primeira tarefa real de baixo risco limitada a documentação**
 
-Habilitar gradualmente tarefas reais mantendo allowlist, `project_id`, dois
+Executar uma primeira tarefa documental usando allowlist, `project_id`, dois
 approvals separados, worktree isolada, testes, revisão humana e merge local sem
 push automático.
 ---
 
 ## Fases seguintes (ordem oficial)
 
-1. **R4.4A — habilitação gradual do fluxo supervisionado** (proximo passo acima).
+1. **R4.4B — primeira tarefa real documental controlada** (próximo passo acima).
 
 2. **R4.4B - Endurecimento adicional / sandbox opcional**
    Bloqueio de rede real (Docker `--network none` opcional, nunca default),
