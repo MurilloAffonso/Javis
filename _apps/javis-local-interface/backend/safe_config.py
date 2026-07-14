@@ -22,6 +22,7 @@ JAVIS_ENABLE_MCP = "JAVIS_ENABLE_MCP"
 JAVIS_ENABLE_LOCAL_ACTIONS = "JAVIS_ENABLE_LOCAL_ACTIONS"
 JAVIS_ENABLE_SUPERVISED_EXEC = "JAVIS_ENABLE_SUPERVISED_EXEC"
 JAVIS_ENABLE_REAL_PROGRAMMING_TASKS = "JAVIS_ENABLE_REAL_PROGRAMMING_TASKS"
+JAVIS_ENABLE_NIGHT_MODE = "JAVIS_ENABLE_NIGHT_MODE"
 JAVIS_ENABLE_VP_EFFECTS = "JAVIS_ENABLE_VP_EFFECTS"
 JAVIS_DEV_ALLOW_CORS = "JAVIS_DEV_ALLOW_CORS"
 
@@ -81,6 +82,15 @@ def real_programming_tasks_enabled() -> bool:
     return flag(JAVIS_ENABLE_REAL_PROGRAMMING_TASKS, False)
 
 
+def night_mode_enabled() -> bool:
+    """Modo Madrugada (R4.5): roda, desassistido, tasks que um humano JÁ aprovou.
+
+    Não substitui os outros flags — a Madrugada exige os três ligados, porque ela
+    só reusa o fluxo supervisionado; não tem caminho próprio de execução.
+    """
+    return flag(JAVIS_ENABLE_NIGHT_MODE, False)
+
+
 def vp_effects_enabled() -> bool:
     return flag(JAVIS_ENABLE_VP_EFFECTS, False)
 
@@ -128,6 +138,7 @@ EXPECTED_FLAGS = [
     JAVIS_ENABLE_LOCAL_ACTIONS,
     JAVIS_ENABLE_SUPERVISED_EXEC,
     JAVIS_ENABLE_REAL_PROGRAMMING_TASKS,
+    JAVIS_ENABLE_NIGHT_MODE,
     JAVIS_ENABLE_VP_EFFECTS,
     JAVIS_DEV_ALLOW_CORS,
 ]

@@ -38,18 +38,28 @@
 | **R4.4B2** | Primeira task real `docs_only` executada end-to-end: dois approvals single-use, worktree isolada, testes, commit automático, merge local sem push | ✅ **Concluído** |
 | **R4.4C-1** | Limites de recurso do executor via Windows Job Object (memória/CPU/nº processos, `KILL_ON_JOB_CLOSE`), sempre ligado, best-effort se pywin32 indisponível | ✅ **Concluído** |
 | **R4.4C-2** | Job Object também na fase de testes (onde código do agente executa) + correção do perfil `safe_python`, que estava morto por argv fora da allowlist | ✅ **Concluído** |
+| **R4.5** | Modo Madrugada: executa desassistida UMA task que o humano já aprovou acordado, para em `awaiting_review` e só pede o approval de merge; janela, kill switch e três flags, todos fail-closed | ✅ **Concluído** |
 
 > **Executor supervisionado OPERACIONAL.** R4.4B2 provou o fluxo com tarefa real; R4.4C-1 e C-2 puseram teto de recurso no adapter E na fase de testes.
+> **Modo Madrugada não fura os gates:** ela só reusa o `run` do fluxo R4.4B e é incapaz de rodar task que não esteja em `approved` — estado que só o humano cria, consumindo approval single-use amarrado ao `spec_hash`. Merge continua humano, de manhã. Ver `_logs/2026-07-14_R4.5_modo-madrugada.md`.
+> **Uma task por noite, por desenho:** o executor só admite uma task real ativa por vez, e duas tasks da mesma noite sairiam do mesmo `source_commit` — mergear a primeira deixaria as outras em `source_branch_moved`, inmergeáveis.
 > **Docker `--network none` avaliado e adiado** — ganho marginal sobre allowlist + validação pós-execução + Job Object; impossível na fase do agente (precisa da API). Ver `_logs/2026-07-14_R4.4C-2_bug-safe-python-e-sandbox-nos-testes.md`.
 ---
 
 ## PROXIMO PASSO OFICIAL
 
-**Modo Madrugada** (ou outro item do roadmap, a decidir)
+**Primeira noite real da Madrugada**
 
-R4.4C fechado. O executor tem: dois approvals single-use, worktree isolada,
-allowlist + validação pós-execução, commit explícito, merge local sem push,
-e teto de memória/CPU/processos tanto no agente quanto nos testes.
+Preparar uma task `docs_only`, aprovar acordado (`approve-start`), armar a
+Madrugada e revisar o diff de manhã. Só depois considerar `safe_python`.
+
+    python scripts/javes_madrugada.py preflight
+    python scripts/javes_madrugada.py run --confirm "ARMAR MADRUGADA"
+    python scripts/javes_madrugada.py off     # aborta a noite
+
+Exige os três flags ligados (`JAVIS_ENABLE_NIGHT_MODE`,
+`JAVIS_ENABLE_SUPERVISED_EXEC`, `JAVIS_ENABLE_REAL_PROGRAMMING_TASKS`).
+Depois disso: canais externos (browser, Telegram, WhatsApp, MCP).
 ---
 
 ## Fases seguintes (ordem oficial)

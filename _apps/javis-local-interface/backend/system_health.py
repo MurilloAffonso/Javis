@@ -23,12 +23,24 @@ def _git(args: list[str]) -> str:
         return ""
 
 
+def _night_kill_switch_active() -> bool:
+    try:
+        from execution.night_mode import KILL_SWITCH
+
+        return KILL_SWITCH.exists()
+    except Exception:
+        return False
+
+
 def _execution_stats() -> dict:
     """Fundação passiva do executor (R4.1). Só contagens/flags — nunca objetivo,
     stdout, stderr, diff ou paths sensíveis completos."""
     stats = {
         "execution_schema_present": False,
         "supervised_execution_enabled": safe_config.supervised_execution_enabled(),
+        # R4.5 — Modo Madrugada: só flags, nunca o que ela rodou
+        "night_mode_enabled": safe_config.night_mode_enabled(),
+        "night_mode_kill_switch_active": _night_kill_switch_active(),
         "active_execution_tasks": 0,
         "active_worktrees": 0,
         "orphan_worktrees": 0,
@@ -267,6 +279,8 @@ def render_text(data: dict) -> str:
         f"- legacy_history_found: {data.get('legacy_history_found', False)}",
         f"- session_project_inconsistencies: {data.get('session_project_inconsistencies', 0)}",
         f"- supervised_execution_enabled: {data.get('supervised_execution_enabled', False)}",
+        f"- night_mode_enabled: {data.get('night_mode_enabled', False)}",
+        f"- night_mode_kill_switch_active: {data.get('night_mode_kill_switch_active', False)}",
         f"- execution_schema_present: {data.get('execution_schema_present', False)}",
         f"- active_execution_tasks: {data.get('active_execution_tasks', 0)}",
         f"- worktree_root_configured: {data.get('worktree_root_configured', False)}",

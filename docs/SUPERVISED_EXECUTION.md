@@ -845,7 +845,70 @@ reject-merge --task-id <id> --confirm "REJEITAR MERGE REAL"
 
 **R4.4B1 — fluxo real implementado, ainda sem execução real.**
 
+---
+
+# R4.5 — Modo Madrugada
+
+A Madrugada executa, desassistida, **uma** task que Murillo já aprovou acordado.
+Ela **não é um caminho novo de execução**: reusa o `ProgrammingTaskFlow` da
+R4.4B e só consegue disparar o passo `run` de uma task em `approved`.
+
+Como `approved` só existe depois de um `approve_start` humano — que consome um
+approval `execution.start` single-use amarrado ao `spec_hash` — a Madrugada é
+**estruturalmente incapaz** de executar algo não aprovado. Não é uma promessa do
+código: é a máquina de estados.
+
+```text
+python scripts/javes_madrugada.py preflight
+python scripts/javes_madrugada.py run --confirm "ARMAR MADRUGADA"
+python scripts/javes_madrugada.py off     # kill switch: aborta a noite
+python scripts/javes_madrugada.py on
+```
+
+### Ciclo
+
+1. **Acordado:** `prepare` + `approve-start` (frase exata).
+2. **Antes de dormir:** `preflight`, depois `run --confirm`.
+3. **A noite:** executa o agente, roda os testes, faz o commit local, **para em
+   `awaiting_review`** e apenas **pede** o approval de merge (que nasce
+   `pending`).
+4. **De manhã:** Murillo revisa o diff e decide `approve-merge` + `merge`.
+
+### Guardas (todas fail-closed)
+
+- `JAVIS_ENABLE_NIGHT_MODE`, `JAVIS_ENABLE_SUPERVISED_EXEC` e
+  `JAVIS_ENABLE_REAL_PROGRAMMING_TASKS` — os três exigidos, todos off por padrão;
+- frase `ARMAR MADRUGADA` exata, verificada **antes** de qualquer efeito;
+- janela horária (default `00h–06h`, suporta virada tipo `22h–06h`);
+- kill switch `_estado/MADRUGADA.OFF` — a presença do arquivo aborta a noite;
+- task não aprovada por humano é **invisível** para a Madrugada;
+- relatório append-only em `_logs/madrugada/YYYY-MM-DD_madrugada.jsonl`.
+
+### O que a Madrugada nunca faz
+
+Não existe, no código, chamada para `approve_merge`, `merge` ou push. Ela não
+admite nem aprova task nova. **O merge continua sendo decisão humana, de manhã.**
+
+### Uma task por noite (por desenho, não por limitação)
+
+O executor mantém a invariante de **uma task real ativa por vez**
+(`execution_task_specs.active_for_project`, onde `awaiting_review` ainda conta
+como ativa) — a admissão recusa uma segunda task enquanto a primeira vive.
+
+E se uma fila existisse, seria incoerente: todas as tasks da noite nasceriam do
+mesmo `source_commit`, então mergear a primeira de manhã moveria o master e as
+outras cairiam em `source_branch_moved` — **inmergeáveis**. Uma fila de N
+produziria N-1 tasks com trabalho jogado fora.
+
+Se houver mais de uma task aprovada, a Madrugada **recusa**
+(`multiple_approved_tasks`) em vez de escolher sozinha qual roda.
+
+### Sem scheduler embutido
+
+A Madrugada é um comando, não um daemon. Quem agenda é o Windows Task Scheduler
+ou o próprio Murillo — um processo que acorda sozinho e executa código é
+exatamente o tipo de coisa que merece ser explícita.
+
 ## Próximo passo
 
-R4.4B2 — executar a primeira task real `docs_only`, com dois approvals e merge
-controlado.
+Primeira noite real: task `docs_only`, aprovada acordado, revisada de manhã.
