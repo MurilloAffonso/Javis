@@ -1050,6 +1050,53 @@ async def execution_tasks_list(
     })
 
 
+@app.get("/madrugada/status")
+async def madrugada_status(
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    """Preflight read-only do Modo Madrugada. NÃO executa nada — só diz se está
+    armado, dentro da janela, e se há task aprovada esperando. Rodar a Madrugada
+    (execução desassistida) continua deliberadamente só no CLI."""
+    blocked = _local_auth_gate(x_javes_local_token, "madrugada.status")
+    if blocked:
+        return _gate_json(blocked)
+    try:
+        from execution.night_mode import NightMode
+        return JSONResponse({
+            "status": "ok",
+            "night_mode_enabled": safe_config.night_mode_enabled(),
+            "preflight": NightMode().preflight(),
+        })
+    except Exception:
+        return JSONResponse({"status": "error", "reason": "night_mode_unavailable"})
+
+
+class MadrugadaKillSwitchRequest(BaseModel):
+    armed: bool  # True = religa a Madrugada; False = desarma (cria o kill switch)
+
+
+@app.post("/madrugada/kill-switch")
+async def madrugada_kill_switch(
+    req: MadrugadaKillSwitchRequest,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    """Liga/desliga o kill switch da Madrugada. Desarmar (armed=False) é a direção
+    SEGURA — impede qualquer execução desassistida. Não dispara nenhuma task."""
+    blocked = _local_auth_gate(x_javes_local_token, "madrugada.kill_switch")
+    if blocked:
+        return _gate_json(blocked)
+    try:
+        from execution.night_mode import KILL_SWITCH
+        if req.armed:
+            KILL_SWITCH.unlink(missing_ok=True)
+        else:
+            KILL_SWITCH.parent.mkdir(parents=True, exist_ok=True)
+            KILL_SWITCH.write_text("Desarmado via Command Center.\n", encoding="utf-8")
+        return JSONResponse({"status": "ok", "kill_switch_active": KILL_SWITCH.exists()})
+    except Exception:
+        return JSONResponse({"status": "error", "reason": "kill_switch_unavailable"})
+
+
 @app.post("/execution/tasks")
 async def execution_tasks_create(
     req: ExecutionTaskCreateRequest,

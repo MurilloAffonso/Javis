@@ -1,10 +1,14 @@
 // Execução supervisionada — R4.2C2. Sem streams brutos, sem paths internos.
 import { h, $, BACKEND, CORE_PROJECT_ID, tryJson, withLocalAuth, opEsc } from "../../app.js";
 
-let _execProjectId = CORE_PROJECT_ID;
+// Iniciado vazio de propósito: ler CORE_PROJECT_ID aqui, no topo do módulo,
+// dispara TDZ na dependência circular com app.js (app.js importa esta view antes
+// de terminar de definir suas consts). Resolvido dentro de viewExec.
+let _execProjectId = "";
 let _supervisedEnabled = false;
 
 function viewExec(body) {
+  _execProjectId = _execProjectId || CORE_PROJECT_ID;
   body.appendChild(h(`<div class="exec-view">
     <div class="exec-header">
       <div class="exec-header-left">

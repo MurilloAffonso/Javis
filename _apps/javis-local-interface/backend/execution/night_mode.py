@@ -72,16 +72,19 @@ class NightMode:
         repository=repo,
         window: NightWindow = DEFAULT_WINDOW,
         now=lambda: datetime.now(timezone.utc).astimezone(),
-        kill_switch: Path = KILL_SWITCH,
-        log_dir: Path = NIGHT_LOG_DIR,
+        kill_switch: Path | None = None,
+        log_dir: Path | None = None,
         request_merge_approval: bool = True,
     ):
         self._flow = flow
         self.repo = repository
         self.window = window
         self.now = now
-        self.kill_switch = Path(kill_switch)
-        self.log_dir = Path(log_dir)
+        # Resolvidos em tempo de execução (não no default da assinatura) para que
+        # um monkeypatch de KILL_SWITCH/NIGHT_LOG_DIR alcance instâncias criadas
+        # sem argumento explícito — é o que a rota do Command Center usa.
+        self.kill_switch = Path(kill_switch) if kill_switch is not None else KILL_SWITCH
+        self.log_dir = Path(log_dir) if log_dir is not None else NIGHT_LOG_DIR
         self.request_merge_approval = request_merge_approval
 
     @property

@@ -14,6 +14,7 @@ import { viewTarefas } from "./js/views/tarefas.js";
 import { viewPainel } from "./js/views/painel.js";
 import { viewConfig } from "./js/views/config.js";
 import { viewExec } from "./js/views/exec.js";
+import { viewMadrugada } from "./js/views/madrugada.js";
 import { viewMaquina } from "./js/views/maquina.js";
 import { viewConteudo } from "./js/views/conteudo.js";
 import { viewIngestao } from "./js/views/ingestao.js";
@@ -35,6 +36,7 @@ const ICONS = {
   config: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
   train: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1 3 2 6 2s6-1 6-2v-5"/></svg>',
   exec: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>',
+  madrugada: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
   board: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="4" height="15" rx="1"/></svg>',
   conclave: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9a2 2 0 0 1-2 2H6l-4 3V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-3h-6a2 2 0 0 1-2-2v-1"/></svg>',
   missoes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/></svg>',
@@ -53,6 +55,7 @@ const NAV = [
   { id: "conclave",label: "Conclave", icon: ICONS.conclave },
   { id: "missoes", label: "Missões", icon: ICONS.missoes },
   { id: "exec",    label: "Execução", icon: ICONS.exec },
+  { id: "madrugada", label: "Madrugada", icon: ICONS.madrugada },
   { id: "tarefas", label: "Tarefas", icon: ICONS.tasks },
   { id: "painel",  label: "Painel",  icon: ICONS.panel },
   { id: "treino",  label: "Treino",  icon: ICONS.train },
@@ -208,7 +211,7 @@ function fillAgentGroup(boxId, list) {
 }
 
 // ---------- Tabs / view ----------
-const TITLES = { chat: "Chat", ingestao: "Ingestão · Alimentar o Cérebro", maquina: "A Máquina · Pipeline de Conhecimento", operacao: "Operação · Quadro & Aprovações", conclave: "Conclave · Debate de Agentes", missoes: "Missões", tarefas: "Orquestrador de Tarefas", painel: "Painel", treino: "Treinamento", rotina: "Rotina · Briefing, Histórico & Lembretes", conteudo: "Estúdio de Conteúdo", vempassear: "Projeto conectado · Vem Passear Jampa", exec: "Execução em Tempo Real", config: "Configurações" };
+const TITLES = { chat: "Chat", ingestao: "Ingestão · Alimentar o Cérebro", maquina: "A Máquina · Pipeline de Conhecimento", operacao: "Operação · Quadro & Aprovações", conclave: "Conclave · Debate de Agentes", missoes: "Missões", tarefas: "Orquestrador de Tarefas", painel: "Painel", treino: "Treinamento", rotina: "Rotina · Briefing, Histórico & Lembretes", conteudo: "Estúdio de Conteúdo", vempassear: "Projeto conectado · Vem Passear Jampa", exec: "Execução em Tempo Real", madrugada: "Modo Madrugada · Preflight & Kill Switch", config: "Configurações" };
 function setView(v) {
   if (window._execPollTimer) { clearInterval(window._execPollTimer); window._execPollTimer = null; }
   state.view = v; renderSidebar(); renderCanvas(); renderRightPanel();
@@ -222,7 +225,7 @@ function renderCanvas() {
     return viewSearch(body);
   }
   $("canvas-title").textContent = TITLES[state.view] || "";
-  ({ chat: viewChat, ingestao: viewIngestao, maquina: viewMaquina, operacao: viewOperacao, conclave: viewConclave, missoes: viewMissoes, exec: viewExec, tarefas: viewTarefas, conteudo: viewConteudo, painel: viewPainel, treino: viewTreino, rotina: viewRotina, vempassear: viewVempassear, config: viewConfig }[state.view] || viewChat)(body);
+  ({ chat: viewChat, ingestao: viewIngestao, maquina: viewMaquina, operacao: viewOperacao, conclave: viewConclave, missoes: viewMissoes, exec: viewExec, madrugada: viewMadrugada, tarefas: viewTarefas, conteudo: viewConteudo, painel: viewPainel, treino: viewTreino, rotina: viewRotina, vempassear: viewVempassear, config: viewConfig }[state.view] || viewChat)(body);
 }
 
 function viewSearch(body) {
