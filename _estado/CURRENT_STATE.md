@@ -39,6 +39,7 @@
 | **R4.4C-1** | Limites de recurso do executor via Windows Job Object (memória/CPU/nº processos, `KILL_ON_JOB_CLOSE`), sempre ligado, best-effort se pywin32 indisponível | ✅ **Concluído** |
 | **R4.4C-2** | Job Object também na fase de testes (onde código do agente executa) + correção do perfil `safe_python`, que estava morto por argv fora da allowlist | ✅ **Concluído** |
 | **R4.5** | Modo Madrugada: executa desassistida UMA task que o humano já aprovou acordado, para em `awaiting_review` e só pede o approval de merge; janela, kill switch e três flags, todos fail-closed | ✅ **Concluído** |
+| **R5.1** | Primeiro canal externo (browser): aprovação de `/browser/run` amarrada ao hash da tarefa (`payload_hash` reusando `spec_hash`), fechando o buraco em que um "ok" para tarefa A autorizava a tarefa B | ✅ **Concluído** |
 
 > **Executor supervisionado OPERACIONAL.** R4.4B2 provou o fluxo com tarefa real; R4.4C-1 e C-2 puseram teto de recurso no adapter E na fase de testes.
 > **Modo Madrugada não fura os gates:** ela só reusa o `run` do fluxo R4.4B e é incapaz de rodar task que não esteja em `approved` — estado que só o humano cria, consumindo approval single-use amarrado ao `spec_hash`. Merge continua humano, de manhã. Ver `_logs/2026-07-14_R4.5_modo-madrugada.md`.
@@ -48,18 +49,21 @@
 
 ## PROXIMO PASSO OFICIAL
 
-**Primeira noite real da Madrugada**
+**Auditar o binding dos demais canais (Telegram, MCP) OU primeira noite real da Madrugada**
 
-Preparar uma task `docs_only`, aprovar acordado (`approve-start`), armar a
-Madrugada e revisar o diff de manhã. Só depois considerar `safe_python`.
+R5.1 fechou o gate do browser amarrando a aprovação ao conteúdo. A pergunta a
+repetir em cada canal: o gate valida *o que* está sendo autorizado, ou só *que
+há* autorização? O padrão `payload_hash` (em `gate.require_persisted_approval`)
+existe para reusar.
+
+Madrugada continua disponível a qualquer momento:
 
     python scripts/javes_madrugada.py preflight
     python scripts/javes_madrugada.py run --confirm "ARMAR MADRUGADA"
     python scripts/javes_madrugada.py off     # aborta a noite
 
-Exige os três flags ligados (`JAVIS_ENABLE_NIGHT_MODE`,
-`JAVIS_ENABLE_SUPERVISED_EXEC`, `JAVIS_ENABLE_REAL_PROGRAMMING_TASKS`).
-Depois disso: canais externos (browser, Telegram, WhatsApp, MCP).
+Exige os três flags (`JAVIS_ENABLE_NIGHT_MODE`, `JAVIS_ENABLE_SUPERVISED_EXEC`,
+`JAVIS_ENABLE_REAL_PROGRAMMING_TASKS`).
 ---
 
 ## Fases seguintes (ordem oficial)

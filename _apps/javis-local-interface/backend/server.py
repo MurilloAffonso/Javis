@@ -2937,6 +2937,19 @@ async def browser_status():
     return JSONResponse({"available": browser_agent.available()})
 
 
+def _browser_task_hash(task: str, project_id: str) -> str:
+    """Hash canônico da tarefa de navegador aprovada. Normaliza espaços para
+    que só diferenças reais de conteúdo invalidem o approval, e inclui o
+    project_id para a aprovação nunca vazar de um projeto para outro."""
+    import hashlib
+
+    normalized = " ".join((task or "").split())
+    scope = (project_id or "").strip() or gate.CORE_SCOPE
+    canonical = json.dumps({"action": "browser.run", "project_id": scope, "task": normalized},
+                           ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 class BrowserRequest(BaseModel):
     task: str
     project_id: str = ""
@@ -2960,6 +2973,9 @@ async def browser_run(
         return _gate_json(blocked)
     if not safe_config.browser_enabled():
         return _disabled_json("browser", safe_config.JAVIS_ENABLE_BROWSER)
+    # Amarra a aprovação à tarefa exata: o approval só vale para a task que o
+    # humano leu e aprovou. Trocar o texto invalida o approval (spec_hash-style).
+    task_hash = _browser_task_hash(req.task, req.project_id)
     blocked = gate.require_persisted_approval(
         "browser.run",
         approval_id=req.approval_id,
@@ -2967,7 +2983,8 @@ async def browser_run(
         project_id=req.project_id,
         risk_level="high",
         approved=req.approved,
-        metadata={"task": req.task},
+        metadata={"task": req.task, "task_hash": task_hash},
+        payload_hash=task_hash,
     )
     if blocked:
         return _gate_json(blocked)

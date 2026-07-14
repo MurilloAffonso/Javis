@@ -33,7 +33,7 @@ def _json(resp):
     return json.loads(resp.body.decode("utf-8"))
 
 
-def _approved_gate(repo, *, action: str, route: str, project_id: str):
+def _approved_gate(repo, *, action: str, route: str, project_id: str, spec_hash: str = ""):
     approval_id = repo.approvals.add(
         f"{action} test",
         kind="route_gate",
@@ -41,6 +41,7 @@ def _approved_gate(repo, *, action: str, route: str, project_id: str):
         route=route,
         project_id=project_id,
         risk_level="high",
+        spec_hash=spec_hash,
     )
     repo.approvals.decide(approval_id, True, approved_by="test")
     return approval_id
@@ -88,7 +89,10 @@ def test_browser_run_requires_single_use_approval(monkeypatch, tmp_path):
     )))
     assert blocked["status"] == "approval_required"
 
-    approval_id = _approved_gate(repo, action="browser.run", route="/browser/run", project_id=server.gate.CORE_SCOPE)
+    # R5.1: a aprovação de browser.run é amarrada ao hash da tarefa aprovada
+    task_hash = server._browser_task_hash("abrir site", server.gate.CORE_SCOPE)
+    approval_id = _approved_gate(repo, action="browser.run", route="/browser/run",
+                                 project_id=server.gate.CORE_SCOPE, spec_hash=task_hash)
     first = _json(asyncio.run(server.browser_run(
         server.BrowserRequest(task="abrir site", project_id=server.gate.CORE_SCOPE, approved=True, approval_id=approval_id),
         x_javes_local_token=TEST_TOKEN,

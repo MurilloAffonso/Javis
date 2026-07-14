@@ -184,16 +184,19 @@ class _Approvals:
             (approval_id,),
         )
 
-    def find_pending_action(self, action: str, route: str = "", project_id: str = "") -> dict | None:
+    def find_pending_action(self, action: str, route: str = "", project_id: str = "",
+                            payload_hash: str = "") -> dict | None:
         return db.query_one(
             "SELECT * FROM approvals WHERE status='pending' "
             "AND COALESCE(action,'')=? AND COALESCE(route,'')=? "
-            "AND COALESCE(project_id,'')=? ORDER BY id DESC LIMIT 1",
-            (action, route, project_id),
+            "AND COALESCE(project_id,'')=? AND COALESCE(spec_hash,'')=? "
+            "ORDER BY id DESC LIMIT 1",
+            (action, route, project_id, payload_hash),
         )
 
     def valid_for_action(self, approval: dict | None, action: str,
-                         route: str = "", project_id: str = "") -> bool:
+                         route: str = "", project_id: str = "",
+                         payload_hash: str = "") -> bool:
         if not approval or approval.get("status") != "approved":
             return False
         if approval.get("consumed_at"):
@@ -216,6 +219,12 @@ class _Approvals:
             return False
         saved_project = approval.get("project_id") or ""
         if project_id and saved_project != project_id:
+            return False
+        # Amarra o approval ao conteúdo aprovado: quem exige payload_hash (ex.:
+        # browser.run) só reusa a aprovação se a tarefa for byte-a-byte a mesma
+        # que o humano viu. Sem isso, um "ok" para ler o tempo valeria para
+        # postar no Instagram. Callers que não passam hash seguem como antes.
+        if payload_hash and (approval.get("spec_hash") or "") != payload_hash:
             return False
         return True
 

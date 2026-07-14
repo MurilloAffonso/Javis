@@ -117,12 +117,14 @@ def require_persisted_approval(
     reason: str = "human_approval_required",
     metadata: dict | None = None,
     approved: bool | str | None = False,
+    payload_hash: str = "",
 ) -> dict | None:
     import repositories as repo
 
     if approval_id:
         approval = repo.approvals.get(approval_id)
-        if repo.approvals.valid_for_action(approval, action, route=route, project_id=project_id):
+        if repo.approvals.valid_for_action(approval, action, route=route,
+                                           project_id=project_id, payload_hash=payload_hash):
             if repo.approvals.consume(approval_id) >= 1:
                 try:
                     repo.logs.add(
@@ -154,7 +156,8 @@ def require_persisted_approval(
             project_id=project_id,
         )
 
-    existing = repo.approvals.find_pending_action(action, route=route, project_id=project_id)
+    existing = repo.approvals.find_pending_action(action, route=route, project_id=project_id,
+                                                  payload_hash=payload_hash)
     created = False
     if existing:
         gate_id = existing["id"]
@@ -170,6 +173,7 @@ def require_persisted_approval(
             requested_by="route",
             reason=reason,
             metadata=metadata or {},
+            spec_hash=payload_hash,
         )
         created = True
     return approval_required(
