@@ -40,21 +40,25 @@
 | **R4.4C-2** | Job Object também na fase de testes (onde código do agente executa) + correção do perfil `safe_python`, que estava morto por argv fora da allowlist | ✅ **Concluído** |
 | **R4.5** | Modo Madrugada: executa desassistida UMA task que o humano já aprovou acordado, para em `awaiting_review` e só pede o approval de merge; janela, kill switch e três flags, todos fail-closed | ✅ **Concluído** |
 | **R5.1** | Canais externos auditados: browser com aprovação amarrada ao `payload_hash`, MCP gateado por approval persistido e hash canônico de `tool + arguments`, Telegram aprovado como daemon por allowlist de `chat_id` + filtro de intent | ✅ **Concluído** |
+| **R5.2** | Painel da Madrugada no Command Center: preflight read-only + kill switch (`GET /madrugada/status`, `POST /madrugada/kill-switch`), sem botão de executar (rodar continua só no CLI, por design); fix de TDZ circular no `exec.js` que quebrava a interface inteira | ✅ **Concluído** |
 
 > **Executor supervisionado OPERACIONAL.** R4.4B2 provou o fluxo com tarefa real; R4.4C-1 e C-2 puseram teto de recurso no adapter E na fase de testes.
 > **Modo Madrugada não fura os gates:** ela só reusa o `run` do fluxo R4.4B e é incapaz de rodar task que não esteja em `approved` — estado que só o humano cria, consumindo approval single-use amarrado ao `spec_hash`. Merge continua humano, de manhã. Ver `_logs/2026-07-14_R4.5_modo-madrugada.md`.
 > **Uma task por noite, por desenho:** o executor só admite uma task real ativa por vez, e duas tasks da mesma noite sairiam do mesmo `source_commit` — mergear a primeira deixaria as outras em `source_branch_moved`, inmergeáveis.
 > **Canais externos auditados:** browser e MCP agora validam *o que* foi aprovado, não apenas que existe approval; Telegram permanece fora de rota HTTP direta, limitado por allowlist de `chat_id` e intent filtering. Ver `_logs/2026-07-14_R5.1_browser-approval-binding.md` e `_logs/2026-07-14_R5.1_audit-telegram-mcp.md`.
+> **Madrugada tem UI:** painel read-only no Command Center (aba "Madrugada") mostra preflight ao vivo e oferece o kill switch; rodar continua só no CLI, por design. Ver `_logs/2026-07-14_R5.2_ui-madrugada.md`.
+> **Primeira noite real feita (14/07):** task `docs_only` executada desassistida ponta a ponta, parou em `awaiting_review`. Na revisão humana o conteúdo do agente saiu parcialmente alucinado (Telegram descrito errado, funções/colunas inexistentes) e a task caiu em `source_branch_moved` — foi rejeitada. O ciclo mecânico funcionou; o gate de revisão pegou o problema de mérito, que é pra isso que ele existe.
 > **Docker `--network none` avaliado e adiado** — ganho marginal sobre allowlist + validação pós-execução + Job Object; impossível na fase do agente (precisa da API). Ver `_logs/2026-07-14_R4.4C-2_bug-safe-python-e-sandbox-nos-testes.md`.
 ---
 
 ## PROXIMO PASSO OFICIAL
 
-**Primeira noite real da Madrugada**
+**WhatsApp — 4º canal externo (do zero, com `payload_hash` desde o começo)**
 
-R5.1 fechou o padrão de autorização dos canais externos já auditados. Browser e
-MCP validam o conteúdo autorizado por hash; Telegram foi aceito como daemon por
-allowlist de `chat_id` + intent filtering, sem rota HTTP ampla.
+Executor supervisionado + Madrugada + browser/MCP/Telegram auditados estão
+fechados. O próximo marco de capacidade é o canal WhatsApp (OpenWA), atrás de
+default-deny, token local, escopo e approval amarrada ao payload (destino +
+mensagem) — o mesmo padrão de R5.1, agora aplicado desde o desenho.
 
 Madrugada continua disponível a qualquer momento:
 
@@ -68,12 +72,12 @@ Exige os três flags (`JAVIS_ENABLE_NIGHT_MODE`, `JAVIS_ENABLE_SUPERVISED_EXEC`,
 
 ## Fases seguintes (ordem oficial)
 
-3. **Primeira noite real da Madrugada**
-   Executar uma task `docs_only` pequena, aprovada acordado, com revisão humana
-   do diff pela manhã antes de qualquer merge.
 4. **Novos canais externos**
-   WhatsApp, browser ampliado, MCP ampliado e automações externas só entram
-   atrás de default-deny, approval escopado e hash do payload autorizado.
+   WhatsApp (próximo), browser ampliado, MCP ampliado e automações externas só
+   entram atrás de default-deny, approval escopado e hash do payload autorizado.
+5. **Madrugada no painel de Operação**
+   Integrar o preflight da Madrugada ao painel de Operação (hoje é aba separada),
+   junto das aprovações pendentes.
 ---
 
 ## Invariantes preservadas (não regridem)
