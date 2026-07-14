@@ -465,6 +465,21 @@ def test_reject_e_reject_merge_preservam_evidencias_e_sao_idempotentes(env):
     assert repo.approvals.get(requested["approval_id"])["consumed_at"]
 
 
+def test_reject_fecha_approval_de_merge_pendente(env):
+    """Rejeitar uma task não pode deixar o approval de merge órfão na fila —
+    era o bug do 'approval fantasma' que poluía a Operação."""
+    flow = _flow(env)
+    task = _run_success(env, flow)
+    requested = flow.request_merge(task["task_id"])
+    assert repo.approvals.get(requested["approval_id"])["status"] == "pending"
+
+    assert flow.reject(task["task_id"], REJECT_PHRASE)["status"] == et.REVIEW_REJECTED
+
+    # o approval pendente foi fechado junto com a rejeição
+    assert repo.approvals.get(requested["approval_id"])["status"] != "pending"
+    assert repo.approvals.count_pending(CORE) == 0
+
+
 def test_claim_atomico_impede_dois_runs_da_mesma_task(env):
     flow = _flow(env)
     prepared = _approve(env, flow)

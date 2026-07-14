@@ -558,6 +558,18 @@ class ProgrammingTaskFlow:
         return {key: value for key, value in result.items()
                 if key in {"status", "reason", "task_id", "commit"}}
 
+    def _close_pending_approvals(self, task_id: str, note: str) -> int:
+        """Fecha approvals ainda pendentes desta task quando ela vai a um estado
+        terminal — evita approval de merge órfão poluindo a fila da Operação.
+        Só toca em pending; approvals já decididos/consumidos ficam intactos."""
+        closed = 0
+        for ap in self.repo.approvals.by_task(task_id, CORE_PROJECT_ID):
+            if (ap.get("status") or "").lower() == "pending":
+                self.repo.approvals.decide(int(ap["id"]), False,
+                                           note=note, approved_by="system")
+                closed += 1
+        return closed
+
     def reject(self, task_id: str, confirm: str) -> dict:
         disabled = self._flag_real(task_id)
         if disabled:
@@ -574,8 +586,11 @@ class ProgrammingTaskFlow:
         et.validate_transition(task["status"], et.REVIEW_REJECTED)
         self.repo.execution_tasks.update_status(task["task_id"], CORE_PROJECT_ID,
                                                 et.REVIEW_REJECTED)
+        closed = self._close_pending_approvals(task["task_id"],
+                                               "task rejeitada na revisão")
         self._event(task["task_id"], "real_programming_rejected",
-                    "Revisão rejeitada; evidências preservadas")
+                    f"Revisão rejeitada; evidências preservadas; "
+                    f"{closed} approval(s) pendente(s) fechado(s)")
         return {"status": et.REVIEW_REJECTED, "task_id": task["task_id"]}
 
     def reject_merge(self, task_id: str, confirm: str) -> dict:
