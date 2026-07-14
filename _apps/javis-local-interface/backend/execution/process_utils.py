@@ -12,6 +12,7 @@ import subprocess
 import time
 
 from ._sanitize import sanitize, sanitize_truncated
+from .process_sandbox import ProcessSandbox, SandboxLimits, SandboxUnavailable
 
 
 MAX_STREAM_CHARS = 40_000
@@ -145,9 +146,17 @@ def _kill_process_tree(proc: subprocess.Popen) -> None:
 
 def safe_run(argv, *, cwd, timeout_seconds: int, allowed_root=None,
              env: dict[str, str] | None = None,
-             popen_factory=None) -> ProcessResult:
-    """Executa argv estruturado com `shell=False` e sem vazar segredos."""
+             popen_factory=None,
+             sandbox_limits: SandboxLimits | None = None) -> ProcessResult:
+    """Executa argv estruturado com `shell=False` e sem vazar segredos.
+
+    `sandbox_limits`, se fornecido, associa o processo a um Job Object do
+    Windows (memória/CPU/nº processos). Melhor esforço: se indisponível
+    (plataforma não-Windows, pywin32 ausente), segue apenas com o timeout
+    de parede, que continua sendo a garantia primária.
+    """
     start = time.monotonic()
+    sandbox: ProcessSandbox | None = None
     try:
         if not isinstance(argv, (list, tuple)) or not argv:
             raise ValueError("argv deve ser lista não-vazia")
@@ -164,6 +173,12 @@ def safe_run(argv, *, cwd, timeout_seconds: int, allowed_root=None,
             stderr=subprocess.PIPE,
             text=True,
         )
+        if sandbox_limits is not None:
+            try:
+                sandbox = ProcessSandbox(sandbox_limits)
+                sandbox.assign(getattr(proc, "pid", None) or 0)
+            except SandboxUnavailable:
+                sandbox = None
         try:
             stdout, stderr = proc.communicate(timeout=max(1, int(timeout_seconds)))
             exit_code = int(proc.returncode if proc.returncode is not None else 0)
@@ -182,6 +197,9 @@ def safe_run(argv, *, cwd, timeout_seconds: int, allowed_root=None,
         status = "failed"
         timed_out = False
         argv = [str(item) for item in argv] if isinstance(argv, (list, tuple)) else ["invalid"]
+    finally:
+        if sandbox is not None:
+            sandbox.close()
 
     duration_ms = int((time.monotonic() - start) * 1000)
     return ProcessResult(

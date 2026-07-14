@@ -6,8 +6,8 @@
 > (`estado-atual.md`, `proximos-passos.md`, `_logs/` datados ou `git log`).
 > Aqueles ficam como **histórico**; a decisão vigente é a daqui.
 
-**Atualizado:** 2026-07-12
-**Mantido por:** hardening arc (R1 → R4)
+**Atualizado:** 2026-07-14
+**Mantido por:** hardening arc (R1 → R4.4B2 concluído)
 
 ---
 
@@ -35,28 +35,24 @@
 | **R4.3D** | Ciclo supervisionado real validado ponta a ponta, com dois approvals, testes, revisão, merge local e conclusão sem push | ✅ **Concluído** |
 | **R4.4A** | Admissão segura de tarefas reais por spec estrita, allowlists, limites, snapshot imutável e approval vinculado ao hash, sem execução | ✅ **Concluído** |
 | **R4.4B1** | Fluxo supervisionado de tasks reais com enforcement pós-execução, dois approvals, commit e merge controlados, validado apenas em ambientes temporários | ✅ **Concluído** |
+| **R4.4B2** | Primeira task real `docs_only` executada end-to-end: dois approvals single-use, worktree isolada, testes, commit automático, merge local sem push | ✅ **Concluído** |
+| **R4.4C-1** | Limites de recurso do executor via Windows Job Object (memória/CPU/nº processos, `KILL_ON_JOB_CLOSE`), sempre ligado, best-effort se pywin32 indisponível | ✅ **Concluído** |
+| **R4.4C-2** | Job Object também na fase de testes (onde código do agente executa) + correção do perfil `safe_python`, que estava morto por argv fora da allowlist | ✅ **Concluído** |
 
-> **Executor continua DESLIGADO por padrão.** A R4.4B1 implementa o fluxo, mas
-> `JAVIS_ENABLE_REAL_PROGRAMMING_TASKS` e `JAVIS_ENABLE_SUPERVISED_EXEC` continuam
-> `False`. Nenhuma task real foi executada nesta fase.
+> **Executor supervisionado OPERACIONAL.** R4.4B2 provou o fluxo com tarefa real; R4.4C-1 e C-2 puseram teto de recurso no adapter E na fase de testes.
+> **Docker `--network none` avaliado e adiado** — ganho marginal sobre allowlist + validação pós-execução + Job Object; impossível na fase do agente (precisa da API). Ver `_logs/2026-07-14_R4.4C-2_bug-safe-python-e-sandbox-nos-testes.md`.
 ---
 
 ## PROXIMO PASSO OFICIAL
 
-**R4.4B2 — primeira task real `docs_only`**
+**Modo Madrugada** (ou outro item do roadmap, a decidir)
 
-Executar a primeira task real de documentação usando allowlist, `project_id`,
-dois approvals separados, worktree isolada, testes, revisão humana e merge local
-sem push automático.
+R4.4C fechado. O executor tem: dois approvals single-use, worktree isolada,
+allowlist + validação pós-execução, commit explícito, merge local sem push,
+e teto de memória/CPU/processos tanto no agente quanto nos testes.
 ---
 
 ## Fases seguintes (ordem oficial)
-
-1. **R4.4B2 — primeira task real documental controlada** (próximo passo acima).
-
-2. **R4.4C - Endurecimento adicional / sandbox opcional**
-   Bloqueio de rede real (Docker `--network none` opcional, nunca default),
-   limites de recurso e hardening extra do executor.
 
 3. **Modo Madrugada e integracoes externas/canais**
    Modo Madrugada somente depois da R4.3 e testes controlados; browser,

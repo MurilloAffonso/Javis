@@ -18,7 +18,7 @@ POLICY_MAXIMUMS = {"max_duration_seconds": 300, "max_changed_files": 5,
                    "max_diff_lines": 300}
 TEST_PROFILES = {
     "docs_only": (("git", "diff", "--check"), ("internal", "document_validation")),
-    "safe_python": (("python", "-m", "pytest", "_apps/javis-local-interface/tests"),),
+    "safe_python": (("python", "-m", "pytest", "-q", "_apps/javis-local-interface/tests"),),
 }
 EXECUTORS = {"claude", "codex"}
 BLOCKED_PARTS = {".git", "_data", "javis-worktrees", "node_modules", ".venv",

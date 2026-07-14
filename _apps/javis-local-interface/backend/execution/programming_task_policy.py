@@ -285,7 +285,8 @@ class ProgrammingTestProfiles:
         if profile == "safe_python":
             commands = [list(command) for command in TEST_PROFILES["safe_python"]]
             runner = TestRunner(runner=self.python_runner.runner,
-                                timeout_seconds=max(1, timeout_seconds))
+                                timeout_seconds=max(1, timeout_seconds),
+                                sandbox_limits=self.python_runner.sandbox_limits)
             report = runner.run(commands, worktree)
             return ProfileReport(report.status, report.ok, report.report,
                                  int((time.monotonic() - start) * 1000))

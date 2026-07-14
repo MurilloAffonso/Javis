@@ -10,7 +10,13 @@ from pathlib import Path
 from . import execution_task as et
 from . import process_utils
 from ._sanitize import sanitize
+from .process_sandbox import SandboxLimits
 from .worktree_manager import JAVIS_ROOT, SecurityError
+
+
+DEFAULT_SANDBOX_LIMITS = SandboxLimits(
+    max_memory_mb=2048, max_cpu_seconds=600, max_processes=32,
+)
 
 
 @dataclass(frozen=True)
@@ -42,9 +48,11 @@ def _blocked(reason: str) -> AdapterResult:
 class BaseAdapter:
     executor_id = ""
 
-    def __init__(self, *, binary: str, runner=process_utils.safe_run):
+    def __init__(self, *, binary: str, runner=process_utils.safe_run,
+                 sandbox_limits: SandboxLimits | None = DEFAULT_SANDBOX_LIMITS):
         self.binary = binary
         self.runner = runner
+        self.sandbox_limits = sandbox_limits
 
     def validate_request(self, request: AdapterRequest) -> Path:
         et.validate_task_id(request.task_id)
@@ -72,6 +80,7 @@ class BaseAdapter:
             cwd=worktree,
             allowed_root=worktree,
             timeout_seconds=request.timeout_seconds,
+            sandbox_limits=self.sandbox_limits,
         )
 
 
@@ -80,8 +89,9 @@ class ClaudeCodeAdapter(BaseAdapter):
 
     executor_id = "claude"
 
-    def __init__(self, *, binary: str = "claude", runner=process_utils.safe_run):
-        super().__init__(binary=binary, runner=runner)
+    def __init__(self, *, binary: str = "claude", runner=process_utils.safe_run,
+                 sandbox_limits: SandboxLimits | None = DEFAULT_SANDBOX_LIMITS):
+        super().__init__(binary=binary, runner=runner, sandbox_limits=sandbox_limits)
 
     def run(self, request: AdapterRequest) -> AdapterResult:
         try:
@@ -104,8 +114,9 @@ class CodexAdapter(BaseAdapter):
     executor_id = "codex"
 
     def __init__(self, *, binary: str = "codex", runner=process_utils.safe_run,
-                 help_text: str | None = None):
-        super().__init__(binary=binary, runner=runner)
+                 help_text: str | None = None,
+                 sandbox_limits: SandboxLimits | None = DEFAULT_SANDBOX_LIMITS):
+        super().__init__(binary=binary, runner=runner, sandbox_limits=sandbox_limits)
         self.help_text = help_text
 
     def _secure_sandbox_available(self) -> bool:

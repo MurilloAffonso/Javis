@@ -7,8 +7,18 @@ from pathlib import Path
 from . import execution_policy
 from . import process_utils
 from ._sanitize import sanitize_truncated
+from .process_sandbox import SandboxLimits
 
 __test__ = False
+
+
+# A fase de testes executa código de autoria do agente (o perfil safe_python
+# roda pytest sobre a worktree, então qualquer .py dentro da allowlist que o
+# pytest importe vira código rodando). Teto mais apertado que o do adapter:
+# rodar a suíte não deveria precisar de muita memória nem estourar processos.
+DEFAULT_TEST_SANDBOX_LIMITS = SandboxLimits(
+    max_memory_mb=1024, max_cpu_seconds=300, max_processes=16,
+)
 
 
 @dataclass(frozen=True)
@@ -62,9 +72,11 @@ def _validate_runner_command(argv, worktree_path) -> str:
 class TestRunner:
     __test__ = False
 
-    def __init__(self, *, runner=process_utils.safe_run, timeout_seconds: int = 120):
+    def __init__(self, *, runner=process_utils.safe_run, timeout_seconds: int = 120,
+                 sandbox_limits: SandboxLimits | None = DEFAULT_TEST_SANDBOX_LIMITS):
         self.runner = runner
         self.timeout_seconds = timeout_seconds
+        self.sandbox_limits = sandbox_limits
 
     def run(self, commands: list[list[str]], worktree_path) -> TestRunReport:
         if not isinstance(commands, list) or not commands:
@@ -99,6 +111,7 @@ class TestRunner:
                     cwd=worktree,
                     allowed_root=worktree,
                     timeout_seconds=self.timeout_seconds,
+                    sandbox_limits=self.sandbox_limits,
                 )
             results.append(result)
             if result.status != "success":
