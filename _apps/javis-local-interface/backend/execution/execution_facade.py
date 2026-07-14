@@ -122,8 +122,11 @@ class ExecutionFacade:
     def start_execution(self, task_id: str, project_id: str, test_commands: list[list[str]]) -> dict:
         return self.execution_service.run(task_id, project_id, test_commands=test_commands or [])
 
-    def request_merge_approval(self, task_id: str, project_id: str) -> dict:
-        return execution_approvals.request_merge(task_id, project_id)
+    def request_merge_approval(self, task_id: str, project_id: str, *, executor: str = "",
+                               spec_hash: str = "") -> dict:
+        return execution_approvals.request_merge(
+            task_id, project_id, executor=executor, spec_hash=spec_hash,
+        )
 
     def approve_merge(self, task_id: str, project_id: str, approval_id: int) -> dict:
         return execution_approvals.approve_merge(task_id, project_id, approval_id)

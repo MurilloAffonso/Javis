@@ -133,7 +133,8 @@ def approve_execution_start(task_id: str, project_id: str, approval_id: int) -> 
 
 
 # ── Gate 2: merge ───────────────────────────────────────────────────────────
-def request_merge(task_id: str, project_id: str) -> dict:
+def request_merge(task_id: str, project_id: str, *, executor: str = "",
+                  spec_hash: str = "") -> dict:
     """Cria a aprovação (pending) de execution.merge para uma task em review.
     NÃO faz merge. A task permanece em awaiting_review."""
     repo = _repo()
@@ -141,12 +142,19 @@ def request_merge(task_id: str, project_id: str) -> dict:
     tid, pid = task["task_id"], task["project_id"]
     if task["status"] != et.AWAITING_REVIEW:
         raise ApprovalDenied("merge só pode ser solicitado em awaiting_review")
+    if executor or spec_hash:
+        snapshot = repo.execution_task_specs.get(tid, pid)
+        if (not snapshot or snapshot.get("spec_hash") != spec_hash
+                or task.get("executor") != executor):
+            raise ApprovalDenied("spec_snapshot_mismatch")
 
     approval_id = repo.approvals.add(
         subject=f"Mergear tarefa {tid}",
         kind="execution_gate", task_id=tid, project_id=pid,
         action=ACTION_MERGE, risk_level="high", requested_by="execution",
         reason="human_approval_required_execution_merge",
+        executor=executor, spec_hash=spec_hash,
+        metadata={"executor": executor, "spec_hash": spec_hash} if spec_hash else None,
     )
     _journey(tid, "merge_approval_requested",
              f"Aprovação de merge solicitada (approval {approval_id})",
