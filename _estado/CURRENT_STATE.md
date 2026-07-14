@@ -7,7 +7,7 @@
 > Aqueles ficam como **histórico**; a decisão vigente é a daqui.
 
 **Atualizado:** 2026-07-14
-**Mantido por:** hardening arc (R1 → R4.4B2 concluído)
+**Mantido por:** hardening arc (R1 → R5.1 concluído)
 
 ---
 
@@ -39,22 +39,22 @@
 | **R4.4C-1** | Limites de recurso do executor via Windows Job Object (memória/CPU/nº processos, `KILL_ON_JOB_CLOSE`), sempre ligado, best-effort se pywin32 indisponível | ✅ **Concluído** |
 | **R4.4C-2** | Job Object também na fase de testes (onde código do agente executa) + correção do perfil `safe_python`, que estava morto por argv fora da allowlist | ✅ **Concluído** |
 | **R4.5** | Modo Madrugada: executa desassistida UMA task que o humano já aprovou acordado, para em `awaiting_review` e só pede o approval de merge; janela, kill switch e três flags, todos fail-closed | ✅ **Concluído** |
-| **R5.1** | Primeiro canal externo (browser): aprovação de `/browser/run` amarrada ao hash da tarefa (`payload_hash` reusando `spec_hash`), fechando o buraco em que um "ok" para tarefa A autorizava a tarefa B | ✅ **Concluído** |
+| **R5.1** | Canais externos auditados: browser com aprovação amarrada ao `payload_hash`, MCP gateado por approval persistido e hash canônico de `tool + arguments`, Telegram aprovado como daemon por allowlist de `chat_id` + filtro de intent | ✅ **Concluído** |
 
 > **Executor supervisionado OPERACIONAL.** R4.4B2 provou o fluxo com tarefa real; R4.4C-1 e C-2 puseram teto de recurso no adapter E na fase de testes.
 > **Modo Madrugada não fura os gates:** ela só reusa o `run` do fluxo R4.4B e é incapaz de rodar task que não esteja em `approved` — estado que só o humano cria, consumindo approval single-use amarrado ao `spec_hash`. Merge continua humano, de manhã. Ver `_logs/2026-07-14_R4.5_modo-madrugada.md`.
 > **Uma task por noite, por desenho:** o executor só admite uma task real ativa por vez, e duas tasks da mesma noite sairiam do mesmo `source_commit` — mergear a primeira deixaria as outras em `source_branch_moved`, inmergeáveis.
+> **Canais externos auditados:** browser e MCP agora validam *o que* foi aprovado, não apenas que existe approval; Telegram permanece fora de rota HTTP direta, limitado por allowlist de `chat_id` e intent filtering. Ver `_logs/2026-07-14_R5.1_browser-approval-binding.md` e `_logs/2026-07-14_R5.1_audit-telegram-mcp.md`.
 > **Docker `--network none` avaliado e adiado** — ganho marginal sobre allowlist + validação pós-execução + Job Object; impossível na fase do agente (precisa da API). Ver `_logs/2026-07-14_R4.4C-2_bug-safe-python-e-sandbox-nos-testes.md`.
 ---
 
 ## PROXIMO PASSO OFICIAL
 
-**Auditar o binding dos demais canais (Telegram, MCP) OU primeira noite real da Madrugada**
+**Primeira noite real da Madrugada**
 
-R5.1 fechou o gate do browser amarrando a aprovação ao conteúdo. A pergunta a
-repetir em cada canal: o gate valida *o que* está sendo autorizado, ou só *que
-há* autorização? O padrão `payload_hash` (em `gate.require_persisted_approval`)
-existe para reusar.
+R5.1 fechou o padrão de autorização dos canais externos já auditados. Browser e
+MCP validam o conteúdo autorizado por hash; Telegram foi aceito como daemon por
+allowlist de `chat_id` + intent filtering, sem rota HTTP ampla.
 
 Madrugada continua disponível a qualquer momento:
 
@@ -68,10 +68,12 @@ Exige os três flags (`JAVIS_ENABLE_NIGHT_MODE`, `JAVIS_ENABLE_SUPERVISED_EXEC`,
 
 ## Fases seguintes (ordem oficial)
 
-3. **Modo Madrugada e integracoes externas/canais**
-   Modo Madrugada somente depois da R4.3 e testes controlados; browser,
-   Telegram, WhatsApp, MCP e automacoes externas so depois da R4,
-   sempre atras de default-deny, approval e escopo explicito.
+3. **Primeira noite real da Madrugada**
+   Executar uma task `docs_only` pequena, aprovada acordado, com revisão humana
+   do diff pela manhã antes de qualquer merge.
+4. **Novos canais externos**
+   WhatsApp, browser ampliado, MCP ampliado e automações externas só entram
+   atrás de default-deny, approval escopado e hash do payload autorizado.
 ---
 
 ## Invariantes preservadas (não regridem)

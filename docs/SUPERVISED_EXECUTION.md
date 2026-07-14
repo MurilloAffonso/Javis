@@ -911,4 +911,51 @@ exatamente o tipo de coisa que merece ser explícita.
 
 ## Próximo passo
 
-Primeira noite real: task `docs_only`, aprovada acordado, revisada de manhã.
+R5.1 — fechar os gates dos primeiros canais externos antes da primeira noite real.
+
+---
+
+# R5.1 — Gates de canais externos
+
+A R5.1 fecha o primeiro bloco de canais externos sem alterar o fluxo
+supervisionado principal. A pergunta usada na auditoria foi: o gate valida **o
+conteúdo autorizado** ou apenas a existência de uma aprovação?
+
+## Browser
+
+`/browser/run` passou a exigir approval persistido amarrado ao `payload_hash` da
+tarefa. O hash reaproveita a coluna `spec_hash` existente: trocar qualquer byte
+da tarefa invalida a aprovação. Assim, um "ok" para a tarefa A não autoriza a
+tarefa B.
+
+## MCP
+
+O endpoint MCP deixou de aceitar chamada ampla sem gate e passou a exigir:
+
+- `project_id` explícito;
+- `approved=true`;
+- `approval_id`;
+- action `mcp.call`;
+- approval persistido pendente/consumível;
+- hash canônico de `tool + arguments`.
+
+Trocar a ferramenta ou qualquer argumento invalida o approval. O padrão é o
+mesmo do browser: o canal valida *o que* foi autorizado.
+
+## Telegram
+
+Telegram foi auditado e mantido como aceitável no estado atual porque opera como
+daemon, não como rota HTTP aberta. O risco é limitado por allowlist de `chat_id`
+e filtro de intent antes de qualquer ação. Se virar rota ou canal amplo, deve
+passar pelo mesmo padrão de approval escopado e hash de payload.
+
+## Evidência
+
+- Browser: `_logs/2026-07-14_R5.1_browser-approval-binding.md`;
+- MCP/Telegram: `_logs/2026-07-14_R5.1_audit-telegram-mcp.md`;
+- suíte registrada: `587 passed, 3 skipped, 0 failed`.
+
+## Próximo passo
+
+Primeira noite real da Madrugada: task `docs_only`, aprovada acordado, executada
+de madrugada e revisada de manhã antes de qualquer merge.
