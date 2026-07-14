@@ -2950,6 +2950,20 @@ def _browser_task_hash(task: str, project_id: str) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _mcp_call_hash(server_id: str, tool: str, arguments: dict | None, project_id: str) -> str:
+    """Hash da chamada MCP: servidor + tool + args. Garante que trocar qualquer um
+    invalida o approval. Inclui project_id pra não vazar entre escopos."""
+    import hashlib
+
+    scope = (project_id or "").strip() or gate.CORE_SCOPE
+    canonical = json.dumps(
+        {"action": "mcp.call", "project_id": scope, "server_id": server_id,
+         "tool": tool, "arguments": arguments or {}},
+        ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 class BrowserRequest(BaseModel):
     task: str
     project_id: str = ""
@@ -3095,16 +3109,44 @@ async def mcp_tools(server_id: str):
     return JSONResponse(await mcp_client.list_tools(server_id))
 
 
-class MCPCallRequest(BaseModel):
+class MCPCallRequestWithAuth(BaseModel):
     tool: str
     arguments: dict = {}
+    project_id: str = ""
+    approved: bool = False
+    approval_id: int | None = None
 
 
 @app.post("/mcp/{server_id}/call")
-async def mcp_call(server_id: str, req: MCPCallRequest):
-    """Chama uma tool de um servidor MCP."""
+async def mcp_call(
+    server_id: str,
+    req: MCPCallRequestWithAuth,
+    x_javes_local_token: str | None = Header(None, alias=gate.LOCAL_TOKEN_HEADER),
+):
+    """Chama uma tool de um servidor MCP. MCP = tools remotos = risco → gate completo."""
+    blocked = _local_auth_gate(x_javes_local_token, "mcp.call")
+    if blocked:
+        return _gate_json(blocked)
+    blocked = gate.require_project_scope(req.project_id, scope=gate.CORE_SCOPE)
+    if blocked:
+        return _gate_json(blocked)
     if not safe_config.mcp_enabled():
         return _disabled_json("mcp", safe_config.JAVIS_ENABLE_MCP)
+    # Amarra a aprovação ao servidor + tool + args: o approval vale só pra exatamente
+    # isso que o humano aprovou, não pra qualquer tool no servidor.
+    call_hash = _mcp_call_hash(server_id, req.tool, req.arguments, req.project_id)
+    blocked = gate.require_persisted_approval(
+        "mcp.call",
+        approval_id=req.approval_id,
+        route=f"/mcp/{server_id}/call",
+        project_id=req.project_id,
+        risk_level="high",
+        approved=req.approved,
+        metadata={"server_id": server_id, "tool": req.tool, "call_hash": call_hash},
+        payload_hash=call_hash,
+    )
+    if blocked:
+        return _gate_json(blocked)
     import mcp_client
     return JSONResponse(await mcp_client.call_tool(server_id, req.tool, req.arguments))
 
