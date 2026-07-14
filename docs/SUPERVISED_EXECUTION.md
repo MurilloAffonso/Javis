@@ -679,42 +679,169 @@ transiciona o approval em uma única transação SQLite. Não cria worktree nem 
 adapter. `run` exige simultaneamente `JAVIS_ENABLE_REAL_PROGRAMMING_TASKS=True` e
 `JAVIS_ENABLE_SUPERVISED_EXEC=True`; ambas continuam `False` por padrão.
 
-## Execução e enforcement
+## Dois gates de aprovação
 
-O repositório e a source branch vêm somente do `ProjectExecutionRegistry`; o
-executor, paths, perfil e limites vêm do snapshot imutável. O prompt interno
-contém o objetivo e os guardrails, mas não é a barreira de segurança.
+### Gate 1 — Aprovação de execução (`execution.start`)
 
-Antes do commit, `ProgrammingChangePolicy` inspeciona arquivos modificados,
-adicionados, removidos e ambos os lados de renames. São bloqueados paths fora da
-allowlist, arquivos sensíveis, `.git`, symlinks, submodules, ausência de mudança,
-quantidade de arquivos, linhas de diff e duração acima da spec. O stage usa
-somente `git add -- <lista explícita>` e a mensagem fixa:
+A tarefa real começa em `pending_approval` após `prepare`. O operador solicita e
+consome o approval `execution.start` com:
 
 ```text
-javes(real:<task_id>): <title sanitizado>
+approve-start --task-id <id> --approval-id <id> --confirm "APROVAR TAREFA REAL"
 ```
 
-O artefato interno de prompt é removido antes de testes, commit e coleta. O perfil
-`docs_only` executa `git diff --check` e valida UTF-8 dos arquivos textuais; não
-há validador Markdown instalado no projeto. `safe_python` usa somente a suíte
-segura registrada internamente, nunca comandos fornecidos pela spec.
+**Invariantes:**
+- A frase de confirmação é exata e case-sensitive;
+- O `approval_id` é validado e vinculado a `task_id + project_id + executor + spec_hash`;
+- O approval é single-use (consumido atomicamente, sem reuso);
+- Nenhuma worktree é criada nesta etapa;
+- O estado muda para `approved` somente após consumo bem-sucedido.
+
+### Gate 2 — Aprovação de merge (`execution.merge`)
+
+Após revisão bem-sucedida em `awaiting_review`, um segundo approval separado é
+requerido:
+
+```text
+approve-merge --task-id <id> --approval-id <id> --confirm "APROVAR MERGE REAL"
+```
+
+**Invariantes:**
+- A frase de confirmação é exata e case-sensitive;
+- O `approval_id` é **diferente** do primeiro (e não reutiliza `execution.start`);
+- O approval é vinculado novamente a `task_id + project_id + executor + spec_hash`;
+- É single-use (consumido atomicamente);
+- O estado muda para `approved_for_merge` somente após consumo bem-sucedido.
+
+## Criação isolada da worktree
+
+A worktree isolada é criada **apenas após aprovação de execução** (`approved`), no
+comando:
+
+```text
+run --task-id <id> --confirm "EXECUTAR TAREFA REAL"
+```
+
+**Fluxo:**
+1. Validação do estado (`approved`), flags habilitadas e frase exata;
+2. Preflight no repositório principal (Git limpo, source branch válida);
+3. Captura de `source_commit` (HEAD da source branch no momento exato);
+4. Criação isolada da worktree Git em diretório fora do repositório;
+5. Criação de branch de trabalho segura (`javes/exec/<task_id>`);
+6. Injeção do prompt interno (objetivo + guardrails);
+7. Transição para `preparing_workspace → running`.
+
+**Garantias:**
+- A worktree é removida **apenas após** sucesso completo ou rejeição final;
+- Não é criada se a aprovação não foi consumida;
+- Não é criada se as flags não estão ambas habilitadas.
+
+## Validação pós-execução de arquivos alterados
+
+Após a execução e testes, `ProgrammingChangePolicy` inspeciona todos os arquivos
+alterados antes do commit local.
+
+### Bloqueios de arquivo
+
+- **Paths fora da allowlist:** recusados imediatamente;
+- **Arquivos sensíveis:** extensões `.env*`, `*.key`, `*.pem`, `*.p12`, nomes
+  com padrão `*secret*`, `*password*`, `*token*`, `*credential*` (case-insensitive);
+- **Diretórios proibidos:** `.git`, `.venv`, `node_modules`, `__pycache__`, `_data`,
+  `_evidence`, worktrees preexistentes;
+- **SQLite:** `*.db`, `*.sqlite`, `*.sqlite3`;
+- **Symlinks:** recusados se apontam fora da worktree;
+- **Submodules:** recusados (não permitir `.gitmodules` modificado).
+
+### Mudanças de arquivo aceitáveis
+
+- Adição de arquivo (novo, dentro da allowlist);
+- Modificação de arquivo existente;
+- **Rename:** ambos os lados (antigo e novo) validados como path relativo e dentro
+  da allowlist; o rename é registrado como remoção + adição na validação;
+- **Remoção:** arquivos removidos não são bloqueados.
+
+### Validação de codificação
+
+O perfil `docs_only` valida UTF-8 em todos os arquivos textuais e executa
+`git diff --check` para espaços finais. O perfil `safe_python` não impõe
+validação adicional além dos guardrails do executor.
+
+## Limites de escopo
+
+Todos os limites são aplicados **antes do commit** e **antes da coleta de resultado**:
+
+- **max_changed_files:** máximo 5 arquivos alterados (adições, modificações, remoções);
+- **max_diff_lines:** máximo 300 linhas de diff acumulado (adições + remoções);
+- **max_duration_seconds:** máximo 300 segundos da execução (timeout hard).
+
+Exceder qualquer limite resulta em bloqueio, transição para `failed` e preservação
+da worktree para auditoria.
+
+## Commit local controlado
+
+Após validações e testes aprovados, `CommitService` constrói o commit com:
+
+```text
+git add -- <arquivo_1> <arquivo_2> ... <arquivo_n>
+```
+
+**Invariantes:**
+- Usa somente `git add --` com lista **explícita** de arquivos (nunca `git add .`,
+  `git add -A`, ou `git add --all`);
+- A mensagem é fixa e gerada automaticamente:
+  ```text
+  javes(real:<task_id>): <title sanitizado>
+  ```
+- O `<title>` vem da spec e é sanitizado (sem quebra de linha, truncado);
+- O artefato interno de prompt (`.javes_execution_prompt.txt`) é removido **antes**
+  do stage, nunca entra no diff.
 
 ## Revisão, merge e rejeição
 
-`request-merge` exige `awaiting_review`, testes aprovados, commit novo, worktree
-limpa e revalidação integral da spec/allowlist/limites. O approval separado
-`execution.merge` carrega `task_id + project_id + executor + spec_hash` e é
-consumido atomicamente.
+### Request-merge (transição para `approved_for_merge`)
 
-`merge` compara `HEAD(source_branch)` com `source_commit` antes das demais
-validações, revalida o diff já commitado e delega o merge exclusivamente ao
-`ControlledMergeService`. Não há push. Em sucesso, somente a worktree da task é
-removida após `merged → completed`; resultados e relatórios permanecem.
+```text
+request-merge --task-id <id>
+```
 
-`reject` e `reject-merge` levam a `review_rejected`, preservando worktree,
-commit, approvals e evidências. Repetir `reject-merge` é idempotente e não duplica
-o evento append-only.
+- Exige estado `awaiting_review` e testes aprovados;
+- Revalida a spec, allowlist e limites sobre o diff **já commitado**;
+- Valida que a worktree está limpa (sem untracked ou staged);
+- Cria um approval separado `execution.merge` com `task_id + project_id + executor + spec_hash`;
+- Retorna o novo `approval_id`;
+- **Não executa merge.**
+
+### Merge controlado (transição para `completed`)
+
+```text
+merge --task-id <id> --confirm "EXECUTAR MERGE REAL"
+```
+
+- Exige estado `approved_for_merge` e frase exata;
+- Revalida que `HEAD(source_branch)` == `source_commit` (sem drift);
+- Revalida o diff commitado contra allowlist e limites;
+- Delega exclusivamente ao `ControlledMergeService`:
+  ```text
+  git checkout <source_branch>
+  git merge --no-ff --no-edit <work_branch>
+  ```
+- **Nunca executa push;**
+- Em sucesso, remove **apenas a worktree** após transição para `merged → completed`;
+- Resultados, diff e testes permanecem preservados para auditoria;
+- Em conflito, aborta merge, preserva worktree e marca `review_rejected`.
+
+### Rejeição (sem executar merge)
+
+```text
+reject --task-id <id> --confirm "REJEITAR TAREFA REAL"
+reject-merge --task-id <id> --confirm "REJEITAR MERGE REAL"
+```
+
+- `reject` transiciona para `review_rejected` se em `awaiting_review`;
+- `reject-merge` transiciona para `review_rejected` se em `approved_for_merge`;
+- Ambos preservam worktree, commit, approvals e evidências;
+- Repetir o comando é idempotente (não duplica evento);
+- Nenhum Git, merge ou push é executado.
 
 **R4.4B1 — fluxo real implementado, ainda sem execução real.**
 
